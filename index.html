@@ -3,157 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HTML5 PvP Arena</title>
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <title>3D Raycast Shooter</title>
     <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
-        body { margin: 0; background: #1a1a2e; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; touch-action: none; }
-        .container { width: 100%; max-width: 800px; aspect-ratio: 2/1; position: relative; }
-        canvas { width: 100%; height: 100%; border: 3px solid #e94560; background: #161623; border-radius: 12px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+        body { background: #111; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; touch-action: none; }
+        #canvas-container { position: relative; width: 100%; max-width: 640px; aspect-ratio: 4/3; }
+        canvas { width: 100%; height: 100%; background: #000; border: 2px solid #555; border-radius: 8px; }
         
-        /* Кнопки управления для смартфона */
-        .controls { display: flex; justify-content: space-between; width: 100%; max-width: 800px; padding: 20px; }
-        .btn-group { display: flex; gap: 15px; }
-        .btn { width: 65px; height: 65px; background: #0f3460; border: 2px solid #e94560; border-radius: 50%; color: white; font-weight: bold; font-size: 20px; display: flex; align-items: center; justify-content: center; }
-        .btn:active { background: #e94560; }
-        .btn-attack { background: #950740; width: 80px; height: 65px; border-radius: 10px; }
+        /* Стили управления для мобилок */
+        .controls { display: flex; justify-content: space-between; width: 100%; max-width: 640px; padding: 15px; position: absolute; bottom: 10px; z-index: 10; }
+        .joystick, .actions { display: grid; gap: 10px; }
+        .joystick { grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(2, 60px); }
+        .actions { grid-template-columns: 80px; }
+        .btn { background: rgba(255, 255, 255, 0.2); border: 2px solid #fff; border-radius: 50%; color: #fff; font-size: 24px; font-weight: bold; display: flex; align-items: center; justify-content: center; width: 60px; height: 60px; }
+        .btn:active { background: rgba(255, 255, 255, 0.6); }
+        .btn-shoot { width: 80px; height: 80px; background: rgba(255, 0, 0, 0.4); border-color: #ff0000; border-radius: 15px; font-size: 16px; }
+        .btn-shoot:active { background: #ff0000; }
+        #btnUp { grid-column: 2; }
+        #btnLeft { grid-column: 1; grid-row: 2; }
+        #btnDown { grid-column: 2; grid-row: 2; }
+        #btnRight { grid-column: 3; grid-row: 2; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <canvas id="arena" width="800" height="400"></canvas>
-    </div>
-
-    <div class="controls">
-        <div class="btn-group">
-            <div class="btn" id="btnLeft">←</div>
-            <div class="btn" id="btnRight">→</div>
-        </div>
-        <div class="btn-group">
-            <div class="btn" id="btnJump">↑</div>
-            <div class="btn btn-attack" id="btnAttack">АТАКА</div>
+    <div id="canvas-container">
+        <canvas id="game" width="320" height="240"></canvas>
+        
+        <div class="controls">
+            <div class="joystick">
+                <div class="btn" id="btnUp">↑</div>
+                <div class="btn" id="btnLeft">←</div>
+                <div class="btn" id="btnDown">↓</div>
+                <div class="btn" id="btnRight">→</div>
+            </div>
+            <div class="actions">
+                <div class="btn btn-shoot" id="btnShoot">ОГОНЬ</div>
+            </div>
         </div>
     </div>
 
     <script>
-        const canvas = document.getElementById('arena');
+        const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
 
-        // Твой рабочий сервер на Render
-        const socket = io('https://pvp-arena-online.onrender.com', { transports: ['websocket'] });
+        // Карта лабиринта (1 — стена, 0 — пусто)
+        const map = [
+            [1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,1,0,0,1],
+            [1,0,1,1,0,0,1,0,0,1],
+            [1,0,0,1,0,0,0,0,0,1],
+            [1,0,0,1,1,1,1,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,1,0,1,1,1,0,1,0,1],
+            [1,0,0,0,0,1,0,1,0,1],
+            [1,0,1,0,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1]
+        ];
+        const mapSize = 10;
 
-        let myId = null;
-        let players = {};
-        const gravity = 0.6;
-        const floorY = 350;
+        // Игрок
+        let pX = 2.5, pY = 2.5; // Позиция на карте
+        let pAngle = 0;         // Направление взгляда
+        const fov = Math.PI / 3; // Угол обзора (60 градусов)
 
-        let keys = { left: false, right: false };
+        // Состояние кнопок
+        const keys = { up: false, down: false, left: false, right: false };
+        let isShooting = false;
 
-        socket.on('init', (data) => {
-            myId = data.myId;
-            players = data.players;
-        });
+        // Настройка тач-событий
+        setupBtn('btnUp', 'up');
+        setupBtn('btnDown', 'down');
+        setupBtn('btnLeft', 'left');
+        setupBtn('btnRight', 'right');
 
-        socket.on('playerJoined', (player) => { players[player.id] = player; });
-        socket.on('playerMoved', (player) => { if(players[player.id]) { players[player.id].x = player.x; players[player.id].y = player.y; players[player.id].isAttacking = player.isAttacking; } });
-        socket.on('hpUpdate', (data) => { if(players[data.id]) players[data.id].hp = data.hp; });
-        socket.on('playerLeft', (id) => { delete players[id]; });
-
-        // Сенсорное управление
-        setupMobileButton('btnLeft',  (v) => keys.left = v);
-        setupMobileButton('btnRight', (v) => keys.right = v);
-        
-        document.getElementById('btnJump').addEventListener('touchstart', () => {
-            let me = players[myId];
-            if (me && me.y >= floorY - 40) me.vy = -13;
-        });
-
-        document.getElementById('btnAttack').addEventListener('touchstart', () => {
-            let me = players[myId];
-            if (me && !me.isAttacking && me.hp > 0) {
-                me.isAttacking = true;
-                
-                let enemyId = Object.keys(players).find(id => id !== myId);
-                if (enemyId && players[enemyId]) {
-                    let dist = Math.abs(me.x - players[enemyId].x);
-                    if (dist < 90 && players[enemyId].hp > 0) { 
-                        socket.emit('hitEnemy'); 
-                    }
-                }
-
-                setTimeout(() => { me.isAttacking = false; }, 300); 
+        document.getElementById('btnShoot').addEventListener('touchstart', () => {
+            if (!isShooting) {
+                isShooting = true;
+                setTimeout(() => isShooting = false, 200);
             }
         });
 
-        function setupMobileButton(id, callback) {
-            const btn = document.getElementById(id);
-            btn.addEventListener('touchstart', () => callback(true));
-            btn.addEventListener('touchend', () => callback(false));
+        function setupBtn(id, key) {
+            const el = document.getElementById(id);
+            el.addEventListener('touchstart', () => keys[key] = true);
+            el.addEventListener('touchend', () => keys[key] = false);
         }
 
         function update() {
-            let me = players[myId];
-            if (!me || me.hp <= 0) return;
+            let moveSpeed = 0.04;
+            let rotSpeed = 0.03;
 
-            if (keys.left) me.x -= 5;
-            if (keys.right) me.x += 5;
-            
-            if (me.x < 0) me.x = 0;
-            if (me.x > 760) me.x = 760;
+            if (keys.left) pAngle -= rotSpeed;
+            if (keys.right) pAngle += rotSpeed;
 
-            if(me.vy === undefined) me.vy = 0;
-            me.vy += gravity;
-            me.y += me.vy;
+            let newX = pX;
+            let newY = pY;
 
-            if (me.y >= floorY - 40) {
-                me.y = floorY - 40;
-                me.vy = 0;
+            if (keys.up) {
+                newX += Math.cos(pAngle) * moveSpeed;
+                newY += Math.sin(pAngle) * moveSpeed;
+            }
+            if (keys.down) {
+                newX -= Math.cos(pAngle) * moveSpeed;
+                newY -= Math.sin(pAngle) * moveSpeed;
             }
 
-            socket.emit('playerUpdate', { x: me.x, y: me.y, isAttacking: me.isAttacking });
+            // Простая проверка коллизий со стенами
+            if (map[Math.floor(pY)][Math.floor(newX)] === 0) pX = newX;
+            if (map[Math.floor(newY)][Math.floor(pX)] === 0) pY = newY;
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Пол
-            ctx.fillStyle = '#0f3460';
-            ctx.fillRect(0, floorY, canvas.width, 50);
+            // Небо и Пол
+            ctx.fillStyle = '#223344';
+            ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
+            ctx.fillStyle = '#332211';
+            ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
 
-            // Отрисовка бойцов
-            for (let id in players) {
-                let p = players[id];
-                if (p.hp <= 0) {
-                    ctx.fillStyle = 'rgba(255,255,255,0.2)';
-                    ctx.fillRect(p.x, floorY - 15, 40, 15);
-                    continue;
+            // Рендеринг 3D стен методом Raycasting
+            const numRays = canvas.width;
+            const startAngle = pAngle - fov / 2;
+
+            for (let i = 0; i < numRays; i++) {
+                let rayAngle = startAngle + (i / numRays) * fov;
+                let distance = 0;
+                let hitWall = false;
+
+                let cos = Math.cos(rayAngle);
+                let sin = Math.sin(rayAngle);
+
+                while (!hitWall && distance < 16) {
+                    distance += 0.05;
+                    let checkX = Math.floor(pX + cos * distance);
+                    let checkY = Math.floor(pY + sin * distance);
+
+                    if (checkX < 0 || checkX >= mapSize || checkY < 0 || checkY >= mapSize) {
+                        hitWall = true;
+                        distance = 16;
+                    } else if (map[checkY][checkX] > 0) {
+                        hitWall = true;
+                    }
                 }
 
-                if (p.isAttacking) {
-                    ctx.fillStyle = 'rgba(233, 69, 96, 0.4)';
-                    ctx.beginPath();
-                    ctx.arc(p.x + 20, p.y + 20, 60, 0, Math.PI * 2);
-                    ctx.fill();
-                }
+                // Убираем эффект «рыбьего глаза»
+                let correctedDist = distance * Math.cos(rayAngle - pAngle);
+                let wallHeight = Math.min(canvas.height, (canvas.height / correctedDist));
 
-                ctx.fillStyle = p.color;
-                ctx.fillRect(p.x, p.y, 40, 40);
+                // Цвет стены зависит от расстояния (чем дальше, тем темнее)
+                let colorVal = Math.max(20, 200 - (correctedDist * 12));
+                ctx.fillStyle = `rgb(${colorVal}, ${colorVal}, ${colorVal})`;
+                
+                ctx.fillRect(i, (canvas.height - wallHeight) / 2, 1, wallHeight);
+            }
 
-                // Полоска здоровья
-                ctx.fillStyle = '#ff0000';
-                ctx.fillRect(p.x - 5, p.y - 15, 50, 6);
-                ctx.fillStyle = '#00ff00';
-                ctx.fillRect(p.x - 5, p.y - 15, 50 * (p.hp / 100), 6);
+            // Отрисовка прицела
+            ctx.fillStyle = '#0ff';
+            ctx.fillRect(canvas.width / 2 - 3, canvas.height / 2 - 1, 6, 2);
+            ctx.fillRect(canvas.width / 2 - 1, canvas.height / 2 - 3, 2, 6);
+
+            // Эффект выстрела
+            if (isShooting) {
+                ctx.fillStyle = 'rgba(255, 200, 0, 0.7)';
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2, canvas.height / 2 + 30, 40, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
 
-        function mainLoop() {
+        function gameLoop() {
             update();
             draw();
-            requestAnimationFrame(mainLoop);
+            requestAnimationFrame(gameLoop);
         }
-        mainLoop();
+
+        gameLoop();
     </script>
 </body>
 </html>
