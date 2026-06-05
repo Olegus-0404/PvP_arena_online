@@ -3,183 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Raycast Shooter</title>
+    <title>Modern 3D Mobile Shooter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
-        body { background: #111; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; touch-action: none; }
-        #canvas-container { position: relative; width: 100%; max-width: 640px; aspect-ratio: 4/3; }
-        canvas { width: 100%; height: 100%; background: #000; border: 2px solid #555; border-radius: 8px; }
+        body { background: #050505; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; width: 100vw; height: 100vh; }
         
-        /* Стили управления для мобилок */
-        .controls { display: flex; justify-content: space-between; width: 100%; max-width: 640px; padding: 15px; position: absolute; bottom: 10px; z-index: 10; }
-        .joystick, .actions { display: grid; gap: 10px; }
-        .joystick { grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(2, 60px); }
-        .actions { grid-template-columns: 80px; }
-        .btn { background: rgba(255, 255, 255, 0.2); border: 2px solid #fff; border-radius: 50%; color: #fff; font-size: 24px; font-weight: bold; display: flex; align-items: center; justify-content: center; width: 60px; height: 60px; }
-        .btn:active { background: rgba(255, 255, 255, 0.6); }
-        .btn-shoot { width: 80px; height: 80px; background: rgba(255, 0, 0, 0.4); border-color: #ff0000; border-radius: 15px; font-size: 16px; }
-        .btn-shoot:active { background: #ff0000; }
-        #btnUp { grid-column: 2; }
-        #btnLeft { grid-column: 1; grid-row: 2; }
-        #btnDown { grid-column: 2; grid-row: 2; }
-        #btnRight { grid-column: 3; grid-row: 2; }
+        /* Экран игры */
+        #game-container { width: 100%; height: 100%; position: relative; }
+        
+        /* Прицел по центру экрана */
+        #reticle { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; border: 2px solid rgba(0, 255, 255, 0.8); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 5; }
+        
+        /* Сенсорный интерфейс управления */
+        .controls-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: space-between; padding: 20px; pointer-events: none; z-index: 10; }
+        
+        /* Зоны тачпада */
+        .touch-zone { width: 40%; height: 80%; background: rgba(255, 255, 255, 0.02); border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 20px; pointer-events: auto; display: flex; align-items: center; justify-content: center; position: relative; }
+        
+        /* Кнопка стрельбы */
+        .shoot-container { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); pointer-events: auto; z-index: 11; }
+        .btn-shoot { width: 80px; height: 80px; background: linear-gradient(135deg, #ff0055, #990022); border: 3px solid #fff; border-radius: 50%; color: white; font-weight: bold; font-size: 16px; box-shadow: 0 0 15px rgba(255, 0, 85, 0.6); }
+        .btn-shoot:active { background: #ff0055; transform: scale(0.95); }
+
+        .label { position: absolute; top: 10px; color: rgba(255, 255, 255, 0.4); font-size: 12px; font-weight: bold; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
-    <div id="canvas-container">
-        <canvas id="game" width="320" height="240"></canvas>
+    <div id="game-container">
+        <div id="reticle"></div>
         
-        <div class="controls">
-            <div class="joystick">
-                <div class="btn" id="btnUp">↑</div>
-                <div class="btn" id="btnLeft">←</div>
-                <div class="btn" id="btnDown">↓</div>
-                <div class="btn" id="btnRight">→</div>
+        <div class="controls-overlay">
+            <div class="touch-zone" id="moveZone">
+                <span class="label">Ходьба</span>
             </div>
-            <div class="actions">
-                <div class="btn btn-shoot" id="btnShoot">ОГОНЬ</div>
+            
+            <div class="touch-zone" id="lookZone">
+                <span class="label">Обзор</span>
             </div>
+        </div>
+
+        <div class="shoot-container">
+            <button class="btn-shoot" id="btnShoot">ОГОНЬ</button>
         </div>
     </div>
 
     <script>
-        const canvas = document.getElementById('game');
-        const ctx = canvas.getContext('2d');
+        // --- 1. ИНИЦИАЛИЗАЦИЯ THREE.JS МИРА ---
+        const container = document.getElementById('game-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a1a);
+        scene.fog = new THREE.FogExp2(0x0a0a1a, 0.05); // Эффект тумана вдали
 
-        // Карта лабиринта (1 — стена, 0 — пусто)
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        // --- 2. ОСВЕЩЕНИЕ ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0x00ffff, 0.8);
+        dirLight.position.set(20, 40, 20);
+        scene.add(dirLight);
+
+        // --- 3. ТЕКСТУРА ПОЛА И СТЕН ---
+        // Создаем пол в клеточку программно
+        const floorGeo = new THREE.PlaneGeometry(100, 100);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.4 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        // Сетка поверх пола для красоты
+        const grid = new THREE.GridHelper(100, 50, 0x00ffff, 0x444444);
+        grid.position.y = 0.01;
+        scene.add(grid);
+
+        // --- 4. СОЗДАНИЕ КАРТЫ СТЕН ---
         const map = [
             [1,1,1,1,1,1,1,1,1,1],
-            [1,0,0,0,0,0,1,0,0,1],
-            [1,0,1,1,0,0,1,0,0,1],
-            [1,0,0,1,0,0,0,0,0,1],
-            [1,0,0,1,1,1,1,0,0,1],
             [1,0,0,0,0,0,0,0,0,1],
-            [1,1,0,1,1,1,0,1,0,1],
-            [1,0,0,0,0,1,0,1,0,1],
-            [1,0,1,0,0,0,0,0,0,1],
+            [1,0,1,1,0,0,1,1,0,1],
+            [1,0,1,0,0,0,0,1,0,1],
+            [1,0,0,0,1,1,0,0,0,1],
+            [1,0,0,0,1,1,0,0,0,1],
+            [1,0,1,0,0,0,0,1,0,1],
+            [1,0,1,1,0,0,1,1,0,1],
+            [1,0,0,0,0,0,0,0,0,1],
             [1,1,1,1,1,1,1,1,1,1]
         ];
-        const mapSize = 10;
+        const cubeSize = 4;
+        const wallGeo = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x330066, roughness: 0.2, metalness: 0.5 });
 
-        // Игрок
-        let pX = 2.5, pY = 2.5; // Позиция на карте
-        let pAngle = 0;         // Направление взгляда
-        const fov = Math.PI / 3; // Угол обзора (60 градусов)
-
-        // Состояние кнопок
-        const keys = { up: false, down: false, left: false, right: false };
-        let isShooting = false;
-
-        // Настройка тач-событий
-        setupBtn('btnUp', 'up');
-        setupBtn('btnDown', 'down');
-        setupBtn('btnLeft', 'left');
-        setupBtn('btnRight', 'right');
-
-        document.getElementById('btnShoot').addEventListener('touchstart', () => {
-            if (!isShooting) {
-                isShooting = true;
-                setTimeout(() => isShooting = false, 200);
-            }
-        });
-
-        function setupBtn(id, key) {
-            const el = document.getElementById(id);
-            el.addEventListener('touchstart', () => keys[key] = true);
-            el.addEventListener('touchend', () => keys[key] = false);
-        }
-
-        function update() {
-            let moveSpeed = 0.04;
-            let rotSpeed = 0.03;
-
-            if (keys.left) pAngle -= rotSpeed;
-            if (keys.right) pAngle += rotSpeed;
-
-            let newX = pX;
-            let newY = pY;
-
-            if (keys.up) {
-                newX += Math.cos(pAngle) * moveSpeed;
-                newY += Math.sin(pAngle) * moveSpeed;
-            }
-            if (keys.down) {
-                newX -= Math.cos(pAngle) * moveSpeed;
-                newY -= Math.sin(pAngle) * moveSpeed;
-            }
-
-            // Простая проверка коллизий со стенами
-            if (map[Math.floor(pY)][Math.floor(newX)] === 0) pX = newX;
-            if (map[Math.floor(newY)][Math.floor(pX)] === 0) pY = newY;
-        }
-
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Небо и Пол
-            ctx.fillStyle = '#223344';
-            ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
-            ctx.fillStyle = '#332211';
-            ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
-
-            // Рендеринг 3D стен методом Raycasting
-            const numRays = canvas.width;
-            const startAngle = pAngle - fov / 2;
-
-            for (let i = 0; i < numRays; i++) {
-                let rayAngle = startAngle + (i / numRays) * fov;
-                let distance = 0;
-                let hitWall = false;
-
-                let cos = Math.cos(rayAngle);
-                let sin = Math.sin(rayAngle);
-
-                while (!hitWall && distance < 16) {
-                    distance += 0.05;
-                    let checkX = Math.floor(pX + cos * distance);
-                    let checkY = Math.floor(pY + sin * distance);
-
-                    if (checkX < 0 || checkX >= mapSize || checkY < 0 || checkY >= mapSize) {
-                        hitWall = true;
-                        distance = 16;
-                    } else if (map[checkY][checkX] > 0) {
-                        hitWall = true;
-                    }
-                }
-
-                // Убираем эффект «рыбьего глаза»
-                let correctedDist = distance * Math.cos(rayAngle - pAngle);
-                let wallHeight = Math.min(canvas.height, (canvas.height / correctedDist));
-
-                // Цвет стены зависит от расстояния (чем дальше, тем темнее)
-                let colorVal = Math.max(20, 200 - (correctedDist * 12));
-                ctx.fillStyle = `rgb(${colorVal}, ${colorVal}, ${colorVal})`;
-                
-                ctx.fillRect(i, (canvas.height - wallHeight) / 2, 1, wallHeight);
-            }
-
-            // Отрисовка прицела
-            ctx.fillStyle = '#0ff';
-            ctx.fillRect(canvas.width / 2 - 3, canvas.height / 2 - 1, 6, 2);
-            ctx.fillRect(canvas.width / 2 - 1, canvas.height / 2 - 3, 2, 6);
-
-            // Эффект выстрела
-            if (isShooting) {
-                ctx.fillStyle = 'rgba(255, 200, 0, 0.7)';
-                ctx.beginPath();
-                ctx.arc(canvas.width / 2, canvas.height / 2 + 30, 40, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
-
-        gameLoop();
-    </script>
-</body>
-</html>
+        // Расставляем 3D кубы по карте
+        for(let r=0; r<map.length; r++) {
+            for(let c=0; c<map[r].length; c++) {
+                if(map[r][c] === 1) {
+                    const wall = new THREE.Mesh(wall
