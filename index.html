@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HTML5 PvP Arena</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        body { margin: 0; background: #1a1a2e; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; touch-action: none; }
+        .container { width: 100%; max-width: 800px; aspect-ratio: 2/1; position: relative; }
+        canvas { width: 100%; height: 100%; border: 3px solid #e94560; background: #161623; border-radius: 12px; }
+        
+        /* Кнопки управления для смартфона */
+        .controls { display: flex; justify-content: space-between; width: 100%; max-width: 800px; padding: 20px; }
+        .btn-group { display: flex; gap: 15px; }
+        .btn { width: 65px; height: 65px; background: #0f3460; border: 2px solid #e94560; border-radius: 50%; color: white; font-weight: bold; font-size: 20px; display: flex; align-items: center; justify-content: center; }
+        .btn:active { background: #e94560; }
+        .btn-attack { background: #950740; width: 80px; height: 65px; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <canvas id="arena" width="800" height="400"></canvas>
+    </div>
+
+    <div class="controls">
+        <div class="btn-group">
+            <div class="btn" id="btnLeft">←</div>
+            <div class="btn" id="btnRight">→</div>
+        </div>
+        <div class="btn-group">
+            <div class="btn" id="btnJump">↑</div>
+            <div class="btn btn-attack" id="btnAttack">АТАКА</div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('arena');
+        const ctx = canvas.getContext('2d');
+
+        // !!! СЮДА ТЫ ВСТАВИШЬ ССЫЛКУ, КОТОРУЮ ДАСТ RENDER ПОСЛЕ СБОРКИ СЕРВЕРА !!!
+        const socket = io('http://localhost:3000', { transports: ['websocket'] });
+
+        let myId = null;
+        let players = {};
+        const gravity = 0.6;
+        const floorY = 350;
+
+        let keys = { left: false, right: false };
+
+        socket.on('init', (data) => {
+            myId = data.myId;
+            players = data.players;
+        });
+
+        socket.on('playerJoined', (player) => { players[player.id] = player; });
+        socket.on('playerMoved', (player) => { if(players[player.id]) { players[player.id].x = player.x; players[player.id].y = player.y; players[player.id].isAttacking = player.isAttacking; } });
+        socket.on('hpUpdate', (data) => { if(players[data.id]) players[data.id].hp = data.hp; });
+        socket.on('playerLeft', (id) => { delete players[id]; });
+
+        // Сенсорное управление
+        setupMobileButton('btnLeft',  (v) => keys.left = v);
+        setupMobileButton('btnRight', (v) => keys.right = v);
+        
+        document.getElementById('btnJump').addEventListener('touchstart', () => {
+            let me = players[myId];
+            if (me && me.y >= floorY - 40) me.vy = -13;
+        });
+
+        document.getElementById('btnAttack').addEventListener('touchstart', () => {
+            let me = players[myId];
+            if (me && !me.isAttacking && me.hp > 0) {
+                me.isAttacking = true;
+                
+                let enemyId = Object.keys(players).find(id => id !== myId);
+                if (enemyId && players[enemyId]) {
+                    let dist = Math.abs(me.x - players[enemyId].x);
+                    if (dist < 90 && players[enemyId].hp > 0) { 
+                        socket.emit('hitEnemy'); 
+                    }
+                }
+
+                setTimeout(() => { me.isAttacking = false; }, 300); 
+            }
+        });
+
+        function setupMobileButton(id, callback) {
+            const btn = document.getElementById(id);
+            btn.addEventListener('touchstart', () => callback(true));
+            btn.addEventListener('touchend', () => callback(false));
+        }
+
+        function update() {
+            let me = players[myId];
+            if (!me || me.hp <= 0) return;
+
+            if (keys.left) me.x -= 5;
+            if (keys.right) me.x += 5;
+            
+            if (me.x < 0) me.x = 0;
+            if (me.x > 760) me.x = 760;
+
+            if(me.vy === undefined) me.vy = 0;
+            me.vy += gravity;
+            me.y += me.vy;
+
+            if (me.y >= floorY - 40) {
+                me.y = floorY - 40;
+                me.vy = 0;
+            }
+
+            socket.emit('playerUpdate', { x: me.x, y: me.y, isAttacking: me.isAttacking });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Пол
+            ctx.fillStyle = '#0f3460';
+            ctx.fillRect(0, floorY, canvas.width, 50);
+
+            // Отрисовка бойцов
+            for (let id in players) {
+                let p = players[id];
+                if (p.hp <= 0) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                    ctx.fillRect(p.x, floorY - 15, 40, 15);
+                    continue;
+                }
+
+                if (p.isAttacking) {
+                    ctx.fillStyle = 'rgba(233, 69, 96, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(p.x + 20, p.y + 20, 60, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 40, 40);
+
+                // Полоска здоровья
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(p.x - 5, p.y - 15, 50, 6);
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(p.x - 5, p.y - 15, 50 * (p.hp / 100), 6);
+            }
+        }
+
+        function mainLoop() {
+            update();
+            draw();
+            requestAnimationFrame(mainLoop);
+        }
+        mainLoop();
+    </script>
+</body>
+</html>
