@@ -1,0 +1,17 @@
+body { margin: 0; overflow: hidden; touch-action: none; }
+canvas { display: block; }
+
+/* Кнопка стрельбы */
+#shootBtn {
+    position: absolute;
+    right: 20px;
+    bottom: 50px;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: red;
+    opacity: 0.6;
+    font-size: 2rem;
+    border: none;
+    touch-action: none;
+}
