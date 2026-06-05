@@ -86,21 +86,20 @@
     </div>
 
     <script>
-        // ВАЖНО: Вставь сюда СВОЮ ссылку с Render, которую скопируешь в панели управления бэкендом!
-        const socket = io('https://pvp-arena-online-server.onrender.com'); 
+        // Твоя рабочая ссылка на Render сервер установлена здесь:
+        const socket = io('https://pvp-arena-online.onrender.com'); 
 
         // --- 1. СВЕТЛАЯ КАРТА (Инициализация сцены) ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xdce6f0); // Светло-голубое красивое небо
-        scene.fog = new THREE.FogExp2(0xdce6f0, 0.015); // Лёгкий светлый туман вдали
+        scene.background = new THREE.Color(0xdce6f0); 
+        scene.fog = new THREE.FogExp2(0xdce6f0, 0.015); 
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true; // Включаем тени
+        renderer.shadowMap.enabled = true; 
         document.getElementById('game-container').appendChild(renderer.domElement);
 
-        // Настройка яркого освещения солнца
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); 
         scene.add(ambientLight);
 
@@ -109,13 +108,11 @@
         sunLight.castShadow = true;
         scene.add(sunLight);
 
-        // Переменные игрока
         let hp = 100, armor = 100, ammo = 30, reserveAmmo = 90, kills = 0;
         let isDead = false, currentMap = 'arena';
         let moveInput = { x: 0, y: 0 }, rotY = 0, rotX = 0, verticalVelocity = 0, isGrounded = true;
         const opponents = {};
 
-        // Светлый пол (Арена)
         const floorGeo = new THREE.PlaneGeometry(80, 80);
         const floorMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.6 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -135,14 +132,13 @@
             wallMeshes.forEach(w => scene.remove(w));
             wallMeshes = [];
             
-            let wallColor = 0x4a90e2; // Голубые укрытия для Арены
-            if(mapName === 'factory') wallColor = 0x7c8c9c; // Серые для Завода
-            if(mapName === 'city') wallColor = 0xe2a04a; // Оранжево-кирпичные для Города
+            let wallColor = 0x4a90e2; 
+            if(mapName === 'factory') wallColor = 0x7c8c9c; 
+            if(mapName === 'city') wallColor = 0xe2a04a; 
 
             const boxGeo = new THREE.BoxGeometry(wallSize, wallSize, wallSize);
             const boxMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.4 });
 
-            // Генерируем 12 укрытий на карте
             for(let i = 0; i < 12; i++) {
                 const wall = new THREE.Mesh(boxGeo, boxMat);
                 let angle = (i / 12) * Math.PI * 2;
@@ -153,17 +149,15 @@
                 wall.receiveShadow = true;
                 scene.add(wall);
                 
-                // Сохраняем в массив для обсчета столкновений
                 wallMeshes.push(wall);
             }
         }
         buildMap('arena');
 
-        // --- 3. СЛОЖНЫЕ МОДЕЛЬКИ ПЕРСОНАЖЕЙ (Сборка робота-гуманоида) ---
+        // --- 3. СЛОЖНЫЕ МОДЕЛЬКИ ПЕРСОНАЖЕЙ ---
         function createCharacterModel() {
             const group = new THREE.Group();
 
-            // Торс (Тело)
             const bodyGeo = new THREE.BoxGeometry(1.2, 1.4, 0.7);
             const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff0055, metalness: 0.3, roughness: 0.3 });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -171,7 +165,6 @@
             body.castShadow = true;
             group.add(body);
 
-            // Голова
             const headGeo = new THREE.SphereGeometry(0.35, 16, 16);
             const headMat = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
             const head = new THREE.Mesh(headGeo, headMat);
@@ -179,17 +172,15 @@
             head.castShadow = true;
             group.add(head);
 
-            // Оружие в руках (Винтовка)
             const gunGeo = new THREE.BoxGeometry(0.2, 0.2, 1.1);
             const gunMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
             const gun = new THREE.Mesh(gunGeo, gunMat);
-            gun.position.set(0.5, 1.1, -0.5); // Вынесено немного вперед и вправо
+            gun.position.set(0.5, 1.1, -0.5); 
             group.add(gun);
 
             return group;
         }
 
-        // Мобильные джойстики
         setupJoystick('move-pad', (dx, dy) => { moveInput.x = dx; moveInput.y = dy; });
         setupLookPad('look-pad');
 
@@ -226,7 +217,6 @@
             el.addEventListener('touchend', e => { for(let t of e.changedTouches) { if(t.identifier === tid) tid=null; } });
         }
 
-        // Кнопки стрельбы, перезарядки, прыжка
         document.getElementById('btn-shoot').addEventListener('touchstart', shootWeapon);
         document.getElementById('btn-reload').addEventListener('touchstart', reloadWeapon);
         document.getElementById('btn-jump').addEventListener('touchstart', () => { if(isGrounded && !isDead) { verticalVelocity = 0.16; isGrounded = false; } });
@@ -247,11 +237,10 @@
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
 
-            // Собираем все части тела соперников для регистрации попаданий
             const targets = [];
             Object.values(opponents).forEach(op => {
                 op.mesh.children.forEach(child => {
-                    child.userData = { id: op.mesh.name, type: child.geometry.type }; // Передаем ID игрока во внутренности
+                    child.userData = { id: op.mesh.name, type: child.geometry.type }; 
                     targets.push(child);
                 });
             });
@@ -260,7 +249,7 @@
             if(intersects.length > 0) {
                 const hitMesh = intersects[0].object;
                 let hitZone = 'body';
-                if(hitMesh.geometry.type === 'SphereGeometry') hitZone = 'head'; // Если попали в сферу головы — Ваншот!
+                if(hitMesh.geometry.type === 'SphereGeometry') hitZone = 'head'; 
 
                 socket.emit('playerHit', { targetId: hitMesh.userData.id, zone: hitZone });
             }
@@ -276,7 +265,7 @@
 
         function voteForMap(mapName) { socket.emit('voteMap', mapName); }
 
-        // --- СЕТЕВАЯ СВЯЗЬ С СЕРВЕРОМ ---
+        // --- СЕТЕВАЯ СВЯЗЬ ---
         socket.on('init', (data) => { camera.position.set(data.x, 2, data.z); });
 
         socket.on('updatePlayers', (serverPlayers) => {
@@ -294,7 +283,6 @@
                     return;
                 }
 
-                // Спавним составную модельку вместо куба
                 if(!opponents[id]) {
                     const charModel = createCharacterModel();
                     charModel.name = id;
@@ -330,7 +318,7 @@
             document.getElementById('v-city').innerText = votes.city || 0;
         });
 
-        // --- 4. РАБОТА ЦИКЛА ОБНОВЛЕНИЯ И КОЛЛИЗИЙ ---
+        // --- 4. ЦИКЛ ОБНОВЛЕНИЯ И КОЛЛИЗИЙ ---
         function animate() {
             requestAnimationFrame(animate);
 
@@ -345,12 +333,10 @@
                 forward.y = 0; forward.normalize();
                 side.y = 0; side.normalize();
 
-                // Вычисляем ТЕОРЕТИЧЕСКИЙ следующий шаг игрока
                 let nextX = camera.position.x + (forward.x * moveInput.y + side.x * moveInput.x) * speed;
                 let nextZ = camera.position.z + (forward.z * moveInput.y + side.z * moveInput.x) * speed;
 
-                // Математический просчет коллизий со стенами (AABB Box Collision)
-                let playerSize = 0.7; // Радиус тела игрока
+                let playerSize = 0.7; 
                 let allowMoveX = true;
                 let allowMoveZ = true;
 
@@ -359,23 +345,19 @@
                     let wZ = wall.position.z;
                     let halfWall = wallSize / 2;
 
-                    // Проверяем столкновение по оси X
                     if (nextX + playerSize > wX - halfWall && nextX - playerSize < wX + halfWall &&
                         camera.position.z + playerSize > wZ - halfWall && camera.position.z - playerSize < wZ + halfWall) {
                         allowMoveX = false;
                     }
-                    // Проверяем столкновение по оси Z
                     if (camera.position.x + playerSize > wX - halfWall && camera.position.x - playerSize < wX + halfWall &&
                         nextZ + playerSize > wZ - halfWall && nextZ - playerSize < wZ + halfWall) {
                         allowMoveZ = false;
                     }
                 }
 
-                // Двигаем только туда, где нет стен
                 if (allowMoveX) camera.position.x = nextX;
                 if (allowMoveZ) camera.position.z = nextZ;
 
-                // Прыжки и гравитация
                 camera.position.y += verticalVelocity;
                 if(camera.position.y > 2) {
                     verticalVelocity -= 0.009;
@@ -385,7 +367,6 @@
                     isGrounded = true;
                 }
 
-                // Границы края карты
                 camera.position.x = Math.max(-38, Math.min(38, camera.position.x));
                 camera.position.z = Math.max(-38, Math.min(38, camera.position.z));
 
