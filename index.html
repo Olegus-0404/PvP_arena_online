@@ -40,8 +40,8 @@
         const canvas = document.getElementById('arena');
         const ctx = canvas.getContext('2d');
 
-        // !!! СЮДА ТЫ ВСТАВИШЬ ССЫЛКУ, КОТОРУЮ ДАСТ RENDER ПОСЛЕ СБОРКИ СЕРВЕРА !!!
-        const socket = io('http://localhost:3000', { transports: ['websocket'] });
+        // Твой рабочий сервер на Render
+        const socket = io('https://pvp-arena-online.onrender.com', { transports: ['websocket'] });
 
         let myId = null;
         let players = {};
