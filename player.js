@@ -67,13 +67,26 @@ function createCharacterModel(isOwnPlayer = false) {
     const legLGeo = new THREE.BoxGeometry(0.3, 0.8, 0.3);
     const legL = new THREE.Mesh(legLGeo, darkMat);
     legL.position.set(-0.25, 0.4, 0);
+    // Сдвигаем центр вращения ноги к бедру (чтобы она качалась от бедра, а не от центра)
+    legLGeo.translate(0, -0.4, 0); 
+    legL.position.y = 0.8; 
     legL.castShadow = true;
     group.add(legL);
 
     // Правая нога
-    const legR = legL.clone();
-    legR.position.x = 0.25;
+    const legRGeo = new THREE.BoxGeometry(0.3, 0.8, 0.3);
+    const legR = new THREE.Mesh(legRGeo, darkMat);
+    legR.position.set(0.25, 0.4, 0);
+    legRGeo.translate(0, -0.4, 0);
+    legR.position.y = 0.8;
+    legR.castShadow = true;
     group.add(legR);
+
+    // Сохраняем ссылки прямо в группу, чтобы index.html их видел
+    group.userData = {
+        legL: legL,
+        legR: legR
+    };
 
     // Ботинки / Опора
     const bootGeo = new THREE.BoxGeometry(0.32, 0.15, 0.45);
