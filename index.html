@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D PvP Shooter Online - Fixed Map</title>
+    <title>3D PvP Shooter Online - Fixed Map & Net</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="player.js"></script>
+    <script src="item.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #e0e8f0; font-family: 'Arial', sans-serif; touch-action: none; }
@@ -97,6 +98,9 @@
         scene.fog = new THREE.FogExp2(0xdce6f0, 0.015); 
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // Устанавливаем базовую позицию игрока до подключения к сети
+        camera.position.set(0, 2, 0);
+
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true; 
@@ -123,6 +127,11 @@
         let wallMeshes = [];
         const wallSize = 4;
 
+        // Сетевые настройки (Tick Rate)
+        let lastNetUpdate = 0;
+        const netTickRate = 1000 / 30; // 30 сетевых тиков в секунду
+
+        // Создаем пол
         const floorGeo = new THREE.PlaneGeometry(80, 80);
         const floorMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.6 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -130,13 +139,13 @@
         floor.receiveShadow = true;
         scene.add(floor);
         
+        // Создаем сетку на полу
         const grid = new THREE.GridHelper(80, 40, 0xbbbbbb, 0xdddddd); 
         grid.position.y = 0.01;
         scene.add(grid);
 
         // Функция жесткого создания стен
         function buildMap(mapName) {
-            // Очищаем старые стены
             wallMeshes.forEach(w => scene.remove(w));
             wallMeshes = [];
             
@@ -162,303 +171,31 @@
             respawnSupplyCrates();
         }
 
+        // Спавн ящиков снабжения из item.js
         function respawnSupplyCrates() {
             supplyCrates.forEach(crate => scene.remove(crate));
             supplyCrates = [];
 
             const cratePositions = [
-                {x: -10, z: -10},
-                {x: 12, z: 8},
-                {x: 0, z: -18}
+                {x: -12, z: -12},
+                {x: 15, z: 10},
+                {x: 0, z: -20}
             ];
 
-            const crateGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
-            const crateMat = new THREE.MeshStandardMaterial({ color: 0xffaa00, metalness: 0.3, roughness: 0.2 });
-
             cratePositions.forEach(pos => {
-                const crate = new THREE.Mesh(crateGeo, crateMat);
-                crate.position.set(pos.x, 0.6, pos.z);
-                crate.castShadow = true;
-                scene.add(crate);
-                supplyCrates.push(crate);
+                const container = new THREE.Group();
+                container.position.set(pos.x, 0.4, pos.z);
+
+                // Создаем 3D армейский ящик из файла item.js
+                const supplyBox = createSupplyBoxModel();
+                container.add(supplyBox);
+
+                scene.add(container);
+                supplyCrates.push(container);
             });
         }
 
-        // Вызываем генерацию КАРТЫ СРАЗУ, не дожидаясь ответа сервера!
+        // ВЫЗЫВАЕМ СТРОИТЕЛЬСТВО КАРТЫ СРАЗУ (баг устранен)
         buildMap('arena');
 
-        // Таймер переспавна ящиков каждые 2 минуты
-        setInterval(() => {
-            respawnSupplyCrates();
-        }, 120000);
-
-        function createHealthBar() {
-            const barGroup = new THREE.Group();
-            
-            const bgGeo = new THREE.PlaneGeometry(1.2, 0.18);
-            const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
-            const bg = new THREE.Mesh(bgGeo, bgMat);
-            barGroup.add(bg);
-
-            const hpGeo = new THREE.PlaneGeometry(1.16, 0.14);
-            const hpMat = new THREE.MeshBasicMaterial({ color: 0x00ff22, side: THREE.DoubleSide });
-            const hpMesh = new THREE.Mesh(hpGeo, hpMat);
-            hpMesh.position.z = 0.01;
-            barGroup.add(hpMesh);
-
-            const canvas = document.createElement('canvas');
-            canvas.width = 128;
-            canvas.height = 32;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'Bold 20px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('100 / 100', 64, 22);
-
-            const texture = new THREE.CanvasTexture(canvas);
-            const textMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
-            const textGeo = new THREE.PlaneGeometry(1.0, 0.3);
-            const textMesh = new THREE.Mesh(textGeo, textMat);
-            textMesh.position.set(0, 0.3, 0.02);
-            barGroup.add(textMesh);
-
-            barGroup.position.y = 2.7;
-            return { group: barGroup, hpMesh: hpMesh, canvas: canvas, texture: texture, ctx: ctx };
-        }
-
-        setupJoystick('move-pad', (dx, dy) => { moveInput.x = dx; moveInput.y = dy; });
-        setupLookPad('look-pad');
-
-        function setupJoystick(id, callback) {
-            const el = document.getElementById(id);
-            let tid = null, sx = 0, sy = 0;
-            el.addEventListener('touchstart', e => { const t = e.changedTouches[0]; tid = t.identifier; sx = t.clientX; sy = t.clientY; });
-            el.addEventListener('touchmove', e => {
-                for(let t of e.changedTouches) {
-                    if(t.identifier === tid) {
-                        let dx = (t.clientX - sx)/50; let dy = (t.clientY - sy)/50;
-                        let d = Math.sqrt(dx*dx+dy*dy); if(d>1){dx/=d; dy/=d;}
-                        callback(dx, -dy);
-                    }
-                }
-            });
-            el.addEventListener('touchend', e => { for(let t of e.changedTouches) { if(t.identifier === tid){ tid=null; callback(0,0); } } });
-        }
-
-        function setupLookPad(id) {
-            const el = document.getElementById(id);
-            let tid = null, lx = 0, ly = 0;
-            el.addEventListener('touchstart', e => { const t = e.changedTouches[0]; tid = t.identifier; lx = t.clientX; ly = t.clientY; });
-            el.addEventListener('touchmove', e => {
-                for(let t of e.changedTouches) {
-                    if(t.identifier === tid) {
-                        rotY -= (t.clientX - lx) * 0.006;
-                        rotX -= (t.clientY - ly) * 0.006;
-                        rotX = Math.max(-Math.PI/2.4, Math.min(Math.PI/2.4, rotX));
-                        lx = t.clientX; ly = t.clientY;
-                    }
-                }
-            });
-            el.addEventListener('touchend', e => { for(let t of e.changedTouches) { if(t.identifier === tid) tid=null; } });
-        }
-
-        // Зажатая стрельба
-        const shootBtn = document.getElementById('btn-shoot');
-        shootBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if(isDead || isReloading) return;
-            isShootingPressed = true;
-            
-            fireBullet();
-            shootInterval = setInterval(() => {
-                if(isShootingPressed) fireBullet();
-            }, 150);
-        });
-
-        window.addEventListener('touchend', () => {
-            isShootingPressed = false;
-            clearInterval(shootInterval);
-        });
-
-        document.getElementById('btn-reload').addEventListener('touchstart', startManualReload);
-        document.getElementById('btn-jump').addEventListener('touchstart', () => { if(isGrounded && !isDead) { verticalVelocity = 0.16; isGrounded = false; } });
-        document.getElementById('respawn-btn').addEventListener('click', () => { socket.emit('requestRespawn'); document.getElementById('death-screen').style.display = 'none'; isDead = false; });
-
-        document.getElementById('btn-fullscreen').addEventListener('click', () => {
-            const gameContainer = document.documentElement;
-            if (!document.fullscreenElement) {
-                gameContainer.requestFullscreen().catch(err => { console.log(err); });
-            } else {
-                document.exitFullscreen();
-            }
-        });
-
-        function updateHUD() {
-            document.getElementById('hud-hp').innerText = `❤️ HP: ${hp}`;
-            document.getElementById('hud-armor').innerText = `🛡️ ARM: ${armor}`;
-            if (isReloading) {
-                document.getElementById('hud-ammo').innerText = `🔄 ПЕРЕЗРАДКА...`;
-            } else {
-                document.getElementById('hud-ammo').innerText = `🔫 Ammo: ${ammo} / ${reserveAmmo}`;
-            }
-            document.getElementById('kills-counter').innerText = `💀 Убийства: ${kills} / 15`;
-        }
-
-        function fireBullet() {
-            if(ammo <= 0 || isDead || isReloading) {
-                isShootingPressed = false;
-                clearInterval(shootInterval);
-                return;
-            }
-            
-            ammo--;
-            updateHUD();
-
-            if (ammo === 0) {
-                isShootingPressed = false;
-                clearInterval(shootInterval);
-                startAutoReload();
-            }
-
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-
-            const targets = [];
-            Object.values(opponents).forEach(op => {
-                op.mesh.children.forEach(child => {
-                    if(child.type !== "Group") {
-                        child.userData = { id: op.mesh.name, type: child.geometry.type }; 
-                        targets.push(child);
-                    }
-                });
-            });
-
-            const intersects = raycaster.intersectObjects(targets);
-            if(intersects.length > 0) {
-                const hitMesh = intersects[0].object;
-                let hitZone = 'body';
-                if(hitMesh.geometry.type === 'SphereGeometry') hitZone = 'head'; 
-                socket.emit('playerHit', { targetId: hitMesh.userData.id, zone: hitZone });
-            }
-        }
-
-        function startManualReload() {
-            if (reserveAmmo <= 0 || ammo === 30 || isDead || isReloading) return;
-            triggerReloadProcess();
-        }
-
-        function startAutoReload() {
-            if (reserveAmmo <= 0) return;
-            triggerReloadProcess();
-        }
-
-        function triggerReloadProcess() {
-            isReloading = true;
-            updateHUD();
-
-            setTimeout(() => {
-                let needed = 30 - ammo;
-                if(reserveAmmo >= needed) { 
-                    ammo += needed; 
-                    reserveAmmo -= needed; 
-                } else { 
-                    ammo += reserveAmmo; 
-                    reserveAmmo = 0; 
-                }
-                isReloading = false;
-                updateHUD();
-            }, 4000);
-        }
-
-        function voteForMap(mapName) { socket.emit('voteMap', mapName); }
-
-        // --- СЕТЕВАЯ СВЯЗЬ ---
-        socket.on('init', (data) => { camera.position.set(data.x, 2, data.z); });
-
-        socket.on('updatePlayers', (serverPlayers) => {
-            Object.keys(serverPlayers).forEach(id => {
-                if(id === socket.id) {
-                    hp = serverPlayers[id].hp;
-                    armor = serverPlayers[id].armor;
-                    kills = serverPlayers[id].kills;
-                    updateHUD();
-
-                    if(hp <= 0 && !isDead) {
-                        isDead = true;
-                        isShootingPressed = false;
-                        clearInterval(shootInterval);
-                        document.getElementById('death-screen').style.display = 'flex';
-                    }
-                    return;
-                }
-
-                if(!opponents[id]) {
-                    const charModel = createCharacterModel(false);
-                    charModel.name = id;
-                    
-                    const hb = createHealthBar();
-                    charModel.add(hb.group);
-
-                    scene.add(charModel);
-                    opponents[id] = { 
-                        mesh: charModel, 
-                        hpMesh: hb.hpMesh, 
-                        hbGroup: hb.group,
-                        ctx: hb.ctx,
-                        texture: hb.texture
-                    };
-                }
-
-                opponents[id].mesh.position.set(serverPlayers[id].x, 0, serverPlayers[id].z);
-                if(serverPlayers[id].rotY) opponents[id].mesh.rotation.y = serverPlayers[id].rotY;
-
-                let currentHp = serverPlayers[id].hp;
-                let healthPercent = currentHp / 100;
-                opponents[id].hpMesh.scale.x = Math.max(0, healthPercent);
-                opponents[id].hpMesh.position.x = (1 - healthPercent) * -0.58; 
-
-                opponents[id].ctx.clearRect(0, 0, 128, 32);
-                opponents[id].ctx.fillStyle = '#ffffff';
-                opponents[id].ctx.fillText(`${currentHp} / 100`, 64, 22);
-                opponents[id].texture.needsUpdate = true;
-            });
-
-            Object.keys(opponents).forEach(id => {
-                if(!serverPlayers[id]) { scene.remove(opponents[id].mesh); delete opponents[id]; }
-            });
-        });
-
-        socket.on('mapChange', (mapName) => {
-            currentMap = mapName;
-            buildMap(mapName);
-            document.getElementById('voting-screen').style.display = 'none';
-            document.getElementById('leaderboard-screen').style.display = 'none';
-        });
-
-        socket.on('matchEnd', (data) => {
-            document.getElementById('leaderboard-screen').style.display = 'flex';
-            let list = document.getElementById('leaderboard-list');
-            list.innerHTML = data.leaderboard.map((p, i) => `${i+1}. Игрок [${p.id.substring(0,4)}] — ${p.kills} фрагов`).join('<br>');
-            setTimeout(() => { document.getElementById('voting-screen').style.display = 'flex'; }, 4000);
-        });
-
-        socket.on('updateVotes', (votes) => {
-            document.getElementById('v-arena').innerText = votes.arena || 0;
-            document.getElementById('v-factory').innerText = votes.factory || 0;
-            document.getElementById('v-city').innerText = votes.city || 0;
-        });
-
-        // --- ЦИКЛ ОБНОВЛЕНИЯ ---
-        function animate() {
-            requestAnimationFrame(animate);
-
-            if(!isDead) {
-                camera.rotation.order = "YXZ";
-                camera.rotation.y = rotY;
-                camera.rotation.x = rotX;
-
-                const speed = 0.08;
-                let forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                let side = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-                forward.y = 0; forward.normalize();
-                side.y = 0; side.normalize();
+        // Авто-переспавн ящиков каждые
