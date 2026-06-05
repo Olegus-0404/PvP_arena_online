@@ -10,7 +10,7 @@ let votedPlayers = {};
 io.on('connection', (socket) => {
     console.log('Игрок подключился: ' + socket.id);
 
-    // Выделяем базовые статы игрока по ТЗ
+    // Создаём данные игрока при подключении
     players[socket.id] = {
         x: (Math.random() - 0.5) * 20,
         z: (Math.random() - 0.5) * 20,
@@ -19,9 +19,10 @@ io.on('connection', (socket) => {
         kills: 0
     };
 
+    // Отправляем игроку его начальные координаты
     socket.emit('init', { x: players[socket.id].x, z: players[socket.id].z });
 
-    // Обработка бега
+    // Обновление позиции
     socket.on('playerMove', (data) => {
         if (players[socket.id] && players[socket.id].hp > 0) {
             players[socket.id].x = data.x;
@@ -29,33 +30,29 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Обработка стрельбы и попаданий по ТЗ
+    // Регистрация попаданий и урон
     socket.on('playerHit', (data) => {
         const targetId = data.targetId;
         const zone = data.zone;
 
         if (players[targetId] && players[targetId].hp > 0) {
-            let damage = 15; // Попадание в тело
-            if (zone === 'head') damage = 100; // Ваншот в голову!
-            if (zone === 'legs') damage = 12; // Руки / Ноги
+            let damage = 15; 
+            if (zone === 'head') damage = 100; // Ваншот в сферу головы!
 
-            // Сначала урон идет в броню по ТЗ
             if (players[targetId].armor > 0 && zone !== 'head') {
                 players[targetId].armor -= damage;
                 if (players[targetId].armor < 0) {
-                    players[targetId].hp += players[targetId].armor; // Осадок урона в ХП
+                    players[targetId].hp += players[targetId].armor;
                     players[targetId].armor = 0;
                 }
             } else {
                 players[targetId].hp -= damage;
             }
 
-            // Проверяем на смерть
             if (players[targetId].hp <= 0) {
                 players[targetId].hp = 0;
                 players[socket.id].kills += 1;
 
-                // Проверка условий победы в раунде (15 убийств)
                 if (players[socket.id].kills >= 15) {
                     let leaderboard = Object.keys(players).map(id => ({ id, kills: players[id].kills }))
                         .sort((a,b) => b.kills - a.kills);
@@ -65,7 +62,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Респавн
     socket.on('requestRespawn', () => {
         if (players[socket.id]) {
             players[socket.id].hp = 100;
@@ -73,21 +69,18 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Голосование за карты
     socket.on('voteMap', (mapName) => {
         if (!votedPlayers[socket.id]) {
             votedPlayers[socket.id] = true;
             votes[mapName] = (votes[mapName] || 0) + 1;
             io.emit('updateVotes', votes);
             
-            // Если проголосовали все, меняем карту
             let totalVotes = Object.values(votes).reduce((a, b) => a + b, 0);
             if (totalVotes >= Object.keys(players).length) {
                 let winnerMap = Object.keys(votes).reduce((a, b) => votes[a] > votes[b] ? a : b);
                 votes = { arena: 0, factory: 0, city: 0 };
                 votedPlayers = {};
                 
-                // Сброс статов для нового раунда
                 Object.keys(players).forEach(id => { players[id].kills = 0; players[id].hp = 100; players[id].armor = 100; });
                 io.emit('mapChange', winnerMap);
             }
@@ -100,7 +93,8 @@ io.on('connection', (socket) => {
     });
 });
 
+// Каждые 30 миллисекунд отправляем всем игрокам координаты роботов-соперников
 setInterval(() => { io.emit('updatePlayers', players); }, 30);
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => { console.log('Сервер запущен на порту ' + PORT); });
+http.listen(PORT, () => { console.log('Сервер работает на порту ' + PORT); });
