@@ -4,57 +4,103 @@ const http = require('http').createServer(app);
 const io = require('socket.io')(http, { cors: { origin: "*" } });
 
 let players = {};
+let votes = { arena: 0, factory: 0, city: 0 };
+let votedPlayers = {};
 
 io.on('connection', (socket) => {
-    console.log('Игрок зашел: ' + socket.id);
+    console.log('Игрок подключился: ' + socket.id);
 
-    // Распределяем роли: первый зашедший — левый, второй — правый
-    const isFirst = Object.keys(players).length === 0;
+    // Выделяем базовые статы игрока по ТЗ
     players[socket.id] = {
-        id: socket.id,
-        x: isFirst ? 150 : 600,
-        y: 300,
+        x: (Math.random() - 0.5) * 20,
+        z: (Math.random() - 0.5) * 20,
         hp: 100,
-        color: isFirst ? '#00ffff' : '#ff0055',
-        isAttacking: false
+        armor: 100,
+        kills: 0
     };
 
-    // Отправляем игроку его ID и начальное состояние комнат
-    socket.emit('init', { myId: socket.id, players });
-    // Всем остальным говорим, что зашел новый игрок
-    socket.broadcast.emit('playerJoined', players[socket.id]);
+    socket.emit('init', { x: players[socket.id].x, z: players[socket.id].z });
 
-    // Получаем движения от игрока
-    socket.on('playerUpdate', (data) => {
-        if (players[socket.id]) {
+    // Обработка бега
+    socket.on('playerMove', (data) => {
+        if (players[socket.id] && players[socket.id].hp > 0) {
             players[socket.id].x = data.x;
-            players[socket.id].y = data.y;
-            players[socket.id].isAttacking = data.isAttacking;
-
-            // Рассылаем координаты другим игрокам
-            socket.broadcast.emit('playerMoved', players[socket.id]);
+            players[socket.id].z = data.z;
         }
     });
 
-    // Получаем сигнал о нанесении урона
-    socket.on('hitEnemy', () => {
-        let enemyId = Object.keys(players).find(id => id !== socket.id);
-        if (enemyId && players[enemyId]) {
-            players[enemyId].hp -= 10; // Отнимаем 10 единиц здоровья
-            if (players[enemyId].hp <= 0) {
-                players[enemyId].hp = 0; 
+    // Обработка стрельбы и попаданий по ТЗ
+    socket.on('playerHit', (data) => {
+        const targetId = data.targetId;
+        const zone = data.zone;
+
+        if (players[targetId] && players[targetId].hp > 0) {
+            let damage = 15; // Попадание в тело
+            if (zone === 'head') damage = 100; // Ваншот в голову!
+            if (zone === 'legs') damage = 12; // Руки / Ноги
+
+            // Сначала урон идет в броню по ТЗ
+            if (players[targetId].armor > 0 && zone !== 'head') {
+                players[targetId].armor -= damage;
+                if (players[targetId].armor < 0) {
+                    players[targetId].hp += players[targetId].armor; // Осадок урона в ХП
+                    players[targetId].armor = 0;
+                }
+            } else {
+                players[targetId].hp -= damage;
             }
-            io.emit('hpUpdate', { id: enemyId, hp: players[enemyId].hp });
+
+            // Проверяем на смерть
+            if (players[targetId].hp <= 0) {
+                players[targetId].hp = 0;
+                players[socket.id].kills += 1;
+
+                // Проверка условий победы в раунде (15 убийств)
+                if (players[socket.id].kills >= 15) {
+                    let leaderboard = Object.keys(players).map(id => ({ id, kills: players[id].kills }))
+                        .sort((a,b) => b.kills - a.kills);
+                    io.emit('matchEnd', { leaderboard });
+                }
+            }
         }
     });
 
-    // Если игрок вышел
+    // Респавн
+    socket.on('requestRespawn', () => {
+        if (players[socket.id]) {
+            players[socket.id].hp = 100;
+            players[socket.id].armor = 100;
+        }
+    });
+
+    // Голосование за карты
+    socket.on('voteMap', (mapName) => {
+        if (!votedPlayers[socket.id]) {
+            votedPlayers[socket.id] = true;
+            votes[mapName] = (votes[mapName] || 0) + 1;
+            io.emit('updateVotes', votes);
+            
+            // Если проголосовали все, меняем карту
+            let totalVotes = Object.values(votes).reduce((a, b) => a + b, 0);
+            if (totalVotes >= Object.keys(players).length) {
+                let winnerMap = Object.keys(votes).reduce((a, b) => votes[a] > votes[b] ? a : b);
+                votes = { arena: 0, factory: 0, city: 0 };
+                votedPlayers = {};
+                
+                // Сброс статов для нового раунда
+                Object.keys(players).forEach(id => { players[id].kills = 0; players[id].hp = 100; players[id].armor = 100; });
+                io.emit('mapChange', winnerMap);
+            }
+        }
+    });
+
     socket.on('disconnect', () => {
         delete players[socket.id];
-        io.emit('playerLeft', socket.id);
+        delete votedPlayers[socket.id];
     });
 });
 
-// Настройка порта для Render
+setInterval(() => { io.emit('updatePlayers', players); }, 30);
+
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
+http.listen(PORT, () => { console.log('Сервер запущен на порту ' + PORT); });
