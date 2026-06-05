@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D PvP Shooter Online - Bright Edition</title>
+    <title>3D PvP Shooter Online - Auto Reload & HP Text</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="player.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #e0e8f0; font-family: 'Arial', sans-serif; touch-action: none; }
         #game-container { width: 100%; height: 100%; position: relative; }
         
-        /* Игровой интерфейс (HUD) */
         #hud { position: absolute; top: 15px; left: 15px; z-index: 10; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
         .hud-bar { background: rgba(255, 255, 255, 0.85); padding: 8px 15px; border-radius: 5px; border-left: 5px solid #333; font-weight: bold; font-size: 14px; color: #111; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         #hud-hp { border-left-color: #ff3333; }
@@ -23,17 +23,14 @@
         .vote-btn { background: #eee; border: 2px solid #aaa; color: #111; padding: 12px 30px; margin: 10px; font-size: 18px; border-radius: 8px; pointer-events: auto; font-weight: bold; }
         .vote-btn:active { background: #ff0055; color: white; border-color: #fff; }
 
-        /* Прицел */
         #reticle { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; transform: translate(-50%, -50%); pointer-events: none; z-index: 5; }
         #reticle::before, #reticle::after { content: ''; position: absolute; background: rgba(255,0,85,0.9); }
         #reticle::before { top: 6px; left: 0; width: 14px; height: 2px; }
         #reticle::after { top: 0; left: 6px; width: 2px; height: 14px; }
 
-        /* Экран смерти */
         #death-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 50, 50, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 90; color: white; display: none; }
         #respawn-btn { background: #111; color: #fff; border: none; padding: 15px 40px; font-size: 20px; font-weight: bold; border-radius: 30px; cursor: pointer; pointer-events: auto; }
 
-        /* Сенсоры под мобилки */
         .touch-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: space-between; padding: 20px; pointer-events: none; z-index: 20; }
         .zone { width: 38%; height: 85%; background: rgba(0,0,0,0.02); border: 1px dashed rgba(0,0,0,0.1); border-radius: 20px; pointer-events: auto; position: relative; }
         
@@ -63,7 +60,6 @@
 
         <div class="action-container">
             <div class="circle-btn" id="btn-shoot">ОГОНЬ</div>
-            <div class="circle-btn" id="btn-reload">🔄 ПЕРЕЗР.</div>
             <div class="circle-btn" id="btn-jump">🚀 ПРЫЖОК</div>
         </div>
 
@@ -86,10 +82,8 @@
     </div>
 
     <script>
-        // Твоя рабочая ссылка на Render сервер установлена здесь:
         const socket = io('https://pvp-arena-online.onrender.com'); 
 
-        // --- 1. СВЕТЛАЯ КАРТА (Инициализация сцены) ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xdce6f0); 
         scene.fog = new THREE.FogExp2(0xdce6f0, 0.015); 
@@ -109,7 +103,7 @@
         scene.add(sunLight);
 
         let hp = 100, armor = 100, ammo = 30, reserveAmmo = 90, kills = 0;
-        let isDead = false, currentMap = 'arena';
+        let isDead = false, isReloading = false, currentMap = 'arena';
         let moveInput = { x: 0, y: 0 }, rotY = 0, rotX = 0, verticalVelocity = 0, isGrounded = true;
         const opponents = {};
 
@@ -124,7 +118,6 @@
         grid.position.y = 0.01;
         scene.add(grid);
 
-        // --- 2. КОЛЛИЗИЯ ОБЪЕКТОВ (Генерация стен и укрытий) ---
         let wallMeshes = [];
         const wallSize = 4;
 
@@ -154,31 +147,42 @@
         }
         buildMap('arena');
 
-        // --- 3. СЛОЖНЫЕ МОДЕЛЬКИ ПЕРСОНАЖЕЙ ---
-        function createCharacterModel() {
-            const group = new THREE.Group();
+        // Создаем полоску ХП и текстовое значение над головой бойца
+        function createHealthBar() {
+            const barGroup = new THREE.Group();
+            
+            // Задний фон (чёрный подслой)
+            const bgGeo = new THREE.PlaneGeometry(1.2, 0.18);
+            const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
+            const bg = new THREE.Mesh(bgGeo, bgMat);
+            barGroup.add(bg);
 
-            const bodyGeo = new THREE.BoxGeometry(1.2, 1.4, 0.7);
-            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff0055, metalness: 0.3, roughness: 0.3 });
-            const body = new THREE.Mesh(bodyGeo, bodyMat);
-            body.position.y = 1.2;
-            body.castShadow = true;
-            group.add(body);
+            // Сама полоска здоровья (зелёная)
+            const hpGeo = new THREE.PlaneGeometry(1.16, 0.14);
+            const hpMat = new THREE.MeshBasicMaterial({ color: 0x00ff22, side: THREE.DoubleSide });
+            const hpMesh = new THREE.Mesh(hpGeo, hpMat);
+            hpMesh.position.z = 0.01;
+            barGroup.add(hpMesh);
 
-            const headGeo = new THREE.SphereGeometry(0.35, 16, 16);
-            const headMat = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
-            const head = new THREE.Mesh(headGeo, headMat);
-            head.position.y = 2.1;
-            head.castShadow = true;
-            group.add(head);
+            // Создаем текст ХП через Canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'Bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('100 / 100', 64, 22);
 
-            const gunGeo = new THREE.BoxGeometry(0.2, 0.2, 1.1);
-            const gunMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-            const gun = new THREE.Mesh(gunGeo, gunMat);
-            gun.position.set(0.5, 1.1, -0.5); 
-            group.add(gun);
+            const texture = new THREE.CanvasTexture(canvas);
+            const textMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
+            const textGeo = new THREE.PlaneGeometry(1.0, 0.3);
+            const textMesh = new THREE.Mesh(textGeo, textMat);
+            textMesh.position.set(0, 0.3, 0.02); // Размещаем чуть выше плашки
+            barGroup.add(textMesh);
 
-            return group;
+            barGroup.position.y = 2.7; // Высота над головой
+            return { group: barGroup, hpMesh: hpMesh, canvas: canvas, texture: texture, ctx: ctx };
         }
 
         setupJoystick('move-pad', (dx, dy) => { moveInput.x = dx; moveInput.y = dy; });
@@ -218,21 +222,30 @@
         }
 
         document.getElementById('btn-shoot').addEventListener('touchstart', shootWeapon);
-        document.getElementById('btn-reload').addEventListener('touchstart', reloadWeapon);
         document.getElementById('btn-jump').addEventListener('touchstart', () => { if(isGrounded && !isDead) { verticalVelocity = 0.16; isGrounded = false; } });
         document.getElementById('respawn-btn').addEventListener('click', () => { socket.emit('requestRespawn'); document.getElementById('death-screen').style.display = 'none'; isDead = false; });
 
         function updateHUD() {
             document.getElementById('hud-hp').innerText = `❤️ HP: ${hp}`;
             document.getElementById('hud-armor').innerText = `🛡️ ARM: ${armor}`;
-            document.getElementById('hud-ammo').innerText = `🔫 Ammo: ${ammo} / ${reserveAmmo}`;
+            
+            if (isReloading) {
+                document.getElementById('hud-ammo').innerText = `🔄 ПЕРЕЗРАДКА...`;
+            } else {
+                document.getElementById('hud-ammo').innerText = `🔫 Ammo: ${ammo} / ${reserveAmmo}`;
+            }
             document.getElementById('kills-counter').innerText = `💀 Убийства: ${kills} / 15`;
         }
 
         function shootWeapon() {
-            if(ammo <= 0 || isDead) return;
+            if(ammo <= 0 || isDead || isReloading) return;
             ammo--;
             updateHUD();
+
+            // Если патроны кончились — запускаем автоматическую перезарядку на 4 секунды
+            if (ammo === 0) {
+                startAutoReload();
+            }
 
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
@@ -240,8 +253,10 @@
             const targets = [];
             Object.values(opponents).forEach(op => {
                 op.mesh.children.forEach(child => {
-                    child.userData = { id: op.mesh.name, type: child.geometry.type }; 
-                    targets.push(child);
+                    if(child.type !== "Group") {
+                        child.userData = { id: op.mesh.name, type: child.geometry.type }; 
+                        targets.push(child);
+                    }
                 });
             });
 
@@ -255,12 +270,19 @@
             }
         }
 
-        function reloadWeapon() {
-            if(reserveAmmo <= 0 || ammo === 30 || isDead) return;
-            let needed = 30 - ammo;
-            if(reserveAmmo >= needed) { ammo += needed; reserveAmmo -= needed; } 
-            else { ammo += reserveAmmo; reserveAmmo = 0; }
+        // Логика автоматической перезарядки на 4 секунды (4000 мс)
+        function startAutoReload() {
+            if (reserveAmmo <= 0) return;
+            isReloading = true;
             updateHUD();
+
+            setTimeout(() => {
+                let needed = 30 - ammo;
+                if(reserveAmmo >= needed) { ammo += needed; reserveAmmo -= needed; } 
+                else { ammo += reserveAmmo; reserveAmmo = 0; }
+                isReloading = false;
+                updateHUD();
+            }, 4000); 
         }
 
         function voteForMap(mapName) { socket.emit('voteMap', mapName); }
@@ -284,13 +306,36 @@
                 }
 
                 if(!opponents[id]) {
-                    const charModel = createCharacterModel();
+                    const charModel = createCharacterModel(false);
                     charModel.name = id;
+                    
+                    const hb = createHealthBar();
+                    charModel.add(hb.group);
+
                     scene.add(charModel);
-                    opponents[id] = { mesh: charModel };
+                    opponents[id] = { 
+                        mesh: charModel, 
+                        hpMesh: hb.hpMesh, 
+                        hbGroup: hb.group,
+                        ctx: hb.ctx,
+                        texture: hb.texture
+                    };
                 }
 
                 opponents[id].mesh.position.set(serverPlayers[id].x, 0, serverPlayers[id].z);
+                if(serverPlayers[id].rotY) opponents[id].mesh.rotation.y = serverPlayers[id].rotY;
+
+                // Обновляем шкалу здоровья
+                let currentHp = serverPlayers[id].hp;
+                let healthPercent = currentHp / 100;
+                opponents[id].hpMesh.scale.x = Math.max(0, healthPercent);
+                opponents[id].hpMesh.position.x = (1 - healthPercent) * -0.58; 
+
+                // Перерисовываем текстовое значение ХП на плашке врага
+                opponents[id].ctx.clearRect(0, 0, 128, 32);
+                opponents[id].ctx.fillStyle = '#ffffff';
+                opponents[id].ctx.fillText(`${currentHp} / 100`, 64, 22);
+                opponents[id].texture.needsUpdate = true;
             });
 
             Object.keys(opponents).forEach(id => {
@@ -318,7 +363,7 @@
             document.getElementById('v-city').innerText = votes.city || 0;
         });
 
-        // --- 4. ЦИКЛ ОБНОВЛЕНИЯ И КОЛЛИЗИЙ ---
+        // --- ЦИКЛ ОБНОВЛЕНИЯ ---
         function animate() {
             requestAnimationFrame(animate);
 
@@ -370,7 +415,12 @@
                 camera.position.x = Math.max(-38, Math.min(38, camera.position.x));
                 camera.position.z = Math.max(-38, Math.min(38, camera.position.z));
 
-                socket.emit('playerMove', { x: camera.position.x, z: camera.position.z });
+                // Разворот плашек с ХП и текстом к камере игрока
+                Object.values(opponents).forEach(op => {
+                    if(op.hbGroup) op.hbGroup.quaternion.copy(camera.quaternion);
+                });
+
+                socket.emit('playerMove', { x: camera.position.x, z: camera.position.z, rotY: rotY });
             }
 
             renderer.render(scene, camera);
