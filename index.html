@@ -2,96 +2,78 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>3D PvP Cyber Arena</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Кибер Арена</title>
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
 
-    <div id="auth-screen">
-        <div class="auth-container">
-            <h2>Вход в Кибер-Арену</h2>
-            <input type="text" id="input-nick" class="auth-input" placeholder="Никнейм (от 2 симв.)" maxlength="12">
-            <input type="password" id="input-pass" class="auth-input" placeholder="Пароль (от 3 симв.)">
-            <button id="btn-auth" class="auth-btn">Войти / Создать</button>
-            <div id="auth-status">Ожидание сервера...</div>
-        </div>
-    </div>
+    <div id="damage-flash"></div>
 
-    <div id="hud">
-        <div id="hud-hp" class="hud-bar">❤️ HP: 100</div>
-        <div id="hud-armor" class="hud-bar">🛡️ Броня: 0</div>
-        <div id="hud-ammo" class="hud-bar">🔫 Патроны: 30 / 120</div>
-    </div>
-
-    <div id="game-timer">03:00</div>
-
-    <div id="top-right-controls">
-        <div id="kills-counter">💀 Убийства: 0</div>
-        <div class="control-row">
-            <button id="btn-settings" class="small-btn">⚙️ НАСТРОЙКИ</button>
-            <button id="btn-fullscreen" class="small-btn">📺 ЭКРАН</button>
-        </div>
-    </div>
-
-    <div id="crosshair"></div>
+    <div id="damage-indicator"></div>
 
     <div id="canvas-container"></div>
 
-    <div id="joystick-zone" class="draggable">
-        <div id="joystick-stick"></div>
+    <div id="hud-top">
+        <div id="hud-hp">❤️ HP: 100</div>
+        <div id="hud-armor">🛡️ Броня: 100</div>
+        <div id="game-timer">Матч: 03:00</div>
+        <div id="kills-counter">💀 Убийства: 0</div>
+        <button class="small-btn text-red" onclick="leaveMatch()">Выйти</button>
     </div>
 
-    <button id="btn-fire" class="btn-action draggable"></button>
-    <button id="btn-jump" class="btn-action draggable"></button>
-    <button id="btn-crouch" class="btn-action draggable"></button>
-    <button id="btn-reload" class="btn-action draggable"></button>
+    <div id="hud-bottom">
+        <div id="hud-ammo">🔫 Патроны: 30 / 120</div>
+    </div>
 
-    <div id="settings-panel">
-        <h3>Настройки игры</h3>
-        
-        <button id="btn-leave-match" class="panel-btn" onclick="leaveMatch()">🚪 Выйти в меню</button>
-        
-        <div class="setting-item">
-            <span>Чувствительность:</span>
-            <input type="range" id="slider-sens" min="1" max="100" value="35">
-        </div>
-        <div class="setting-item">
-            <span>Инверсия Y:</span>
-            <input type="checkbox" id="check-invert">
-        </div>
-        <div class="setting-item">
-            <span>Качество графики:</span>
-            <select id="select-graphics">
-                <option value="high">Высокое</option>
-                <option value="medium" selected>Среднее</option>
-                <option value="low">Низкое (FPS+)</option>
-            </select>
-        </div>
-        
-        <div class="panel-grid-buttons">
-            <button id="btn-custom-layout" class="panel-btn">📐 Изменить раскладку</button>
-            <button id="btn-save-settings" class="panel-btn">💾 ОК</button>
-            <button id="btn-close-settings" class="panel-btn">❌ Отмена</button>
-            <button id="btn-reset-all" class="panel-btn">🔄 Сбросить всё</button>
+    <div id="auth-screen" class="overlay">
+        <div class="menu-box">
+            <h2>КИБЕР АРЕНА 3D</h2>
+            <div id="auth-status">Введите ник и пароль для входа</div>
+            <input type="text" id="input-nick" placeholder="Ваш никнейм" maxlength="14">
+            <input type="password" id="input-pass" placeholder="Пароль">
+            <button id="btn-auth" class="menu-btn">Войти / Создать</button>
         </div>
     </div>
 
-    <div id="layout-edit-subpanel">
-        <p style="margin:0 0 10px 0; font-weight:bold; color:#eab308;">Режим настройки кнопок</p>
-        <span style="font-size:12px; color:#94a3b8; display:block; margin-bottom:12px;">Перетаскивай элементы пальцем по экрану</span>
-        <button id="btn-save-layout" class="panel-btn" style="background:#10b981; color:white; padding:8px 16px;">Сохранить раскладку</button>
+    <div id="respawn-screen" class="overlay" style="display: none;">
+        <div class="menu-box">
+            <h2 class="text-red">ВЫ ПОГИБЛИ</h2>
+            <button id="btn-respawn" class="menu-btn">Возродиться</button>
+        </div>
     </div>
 
-    <div id="respawn-screen">
-        <h1 style="color:#ef4444; font-size:32px; margin-bottom:5px; text-transform:uppercase; letter-spacing:2px;">Ты погиб!</h1>
-        <p style="color:#94a3b8; margin-bottom:20px;">Тебя ликвидировал соперник</p>
-        <button id="btn-respawn" class="auth-btn" style="max-width:200px; margin:0;">Возродиться</button>
+    <div id="voting-screen" class="overlay" style="display: none;">
+        <div class="menu-box border-yellow">
+            <h2 class="text-yellow animate-pulse">МАТЧ ЗАВЕРШЕН</h2>
+            <p style="margin-bottom: 20px; color: #94a3b8;">Голосование за следующую локацию:</p>
+            <div class="vote-row">
+                <button class="vote-btn btn-blue" onclick="voteMap('arena')">
+                    🏟️ Арена (<span id="vote-arena-count">0</span>)
+                </button>
+                <button class="vote-btn btn-pink" onclick="voteMap('maze')">
+                    🧬 Лабиринт (<span id="vote-maze-count">0</span>)
+                </button>
+            </div>
+        </div>
     </div>
 
-    <script src="js/settings.js"></script>
+    <div id="touch-controls">
+        <div id="joystick-zone">
+            <div id="joystick-stick"></div>
+        </div>
+
+        <button id="btn-reload" class="btn-action"></button>
+
+        <button id="btn-fire" class="btn-action"></button>
+
+        <button id="btn-crouch" class="btn-action"></button>
+
+        <button id="btn-jump" class="btn-action"></button>
+    </div>
+
     <script src="js/main.js"></script>
 </body>
 </html>
