@@ -365,9 +365,10 @@ function setupControls() {
 
     document.getElementById('btn-save-hud').addEventListener('click', () => { isCustomizing = false; document.body.classList.remove('edit-mode'); customMenu.style.display = 'none'; saveHUDPositions(); });
 
-    // ПОЛНОСТЬЮ АДАПТИРОВАННАЯ КНОПКА ПОЛНОГО ЭКРАНА С МОБИЛЬНЫМИ ПРЕФИКСАМИ
-    document.getElementById('btn-fullscreen-toggle').addEventListener('click', (e) => {
+    // ИСПРАВЛЕННЫЙ ВАРИАНТ: ТЕПЕРЬ НА ТАЧЕ (TOUCHSTART) ДЛЯ МОМЕНТАЛЬНОГО ОБХОДА БЛОКИРОВОК СМАРТФОНОВ
+    document.getElementById('btn-fullscreen-toggle').addEventListener('touchstart', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         const docEl = document.documentElement;
         const isFullscreen = document.fullscreenElement || 
                              document.webkitFullscreenElement || 
@@ -403,7 +404,7 @@ function setupControls() {
                 renderer.setSize(window.innerWidth, window.innerHeight);
             }
         }, 300);
-    });
+    }, { passive: false });
 
     document.getElementById('btn-menu-switch-coop').addEventListener('click', () => {
         if(currentGameMode === 'coop') return;
@@ -478,30 +479,4 @@ function saveHUDPositions() { let layout = {}; document.querySelectorAll('.hud-e
 function loadHUDPositions() {
     let saved = localStorage.getItem('hud_layout_universal'); if (!saved) return;
     let layout = JSON.parse(saved);
-    for (let id in layout) { let el = document.getElementById(id); if (el && layout[id].left) { el.style.left = layout[id].left; el.style.top = layout[id].top; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.transform = 'none'; } }
-}
-
-let clock = new THREE.Clock();
-function animate() {
-    requestAnimationFrame(animate); if (!renderer || !scene || !camera) return;
-    let delta = clock.getDelta(); if (delta > 0.1) delta = 0.1;
-
-    if (myId && hp > 0 && !isCustomizing) {
-        playerVelocity.y -= GRAVITY * delta;
-        let forwardVector = new THREE.Vector3(0, 0, -1).applyQuaternion(yawObject.quaternion);
-        let sideVector = new THREE.Vector3(1, 0, 0).applyQuaternion(yawObject.quaternion);
-        let moveX = (forwardVector.x * moveDirection.forward + sideVector.x * moveDirection.right) * moveSpeed * delta;
-        let moveZ = (forwardVector.z * moveDirection.forward + sideVector.z * moveDirection.right) * moveSpeed * delta;
-
-        let targetPos = yawObject.position.clone(); targetPos.x += moveX; if (!checkWallCollisions(targetPos)) yawObject.position.x = targetPos.x;
-        targetPos = yawObject.position.clone(); targetPos.z += moveZ; if (!checkWallCollisions(targetPos)) yawObject.position.z = targetPos.z;
-
-        yawObject.position.y += playerVelocity.y * delta;
-        let targetHeight = isCrouching ? 0.9 : 1.7;
-        if (yawObject.position.y <= targetHeight) { playerVelocity.y = 0; yawObject.position.y = targetHeight; isGrounded = true; } else { isGrounded = false; }
-
-        if(socket && socket.connected) socket.emit('playerMove', { x: yawObject.position.x, z: yawObject.position.z, rotY: yawObject.rotation.y });
-    }
-    renderer.render(scene, camera);
-}
-window.addEventListener('resize', () => { if(camera && renderer) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } });
+    for (let id in layout) { let el = document.getElementById(id); if (el && layout[id].left) { el.style.left = layout[id].left; el.
