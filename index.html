@@ -3,39 +3,260 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D PvP Arena</title>
+    <title>3D PvP Cyber Arena Online</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #050811; font-family: sans-serif; user-select: none; -webkit-user-select: none; }
-        #canvas-container { width: 100vw; height: 100vh; position: absolute; z-index: 1; }
-        
-        /* ОКНО ВХОДА */
-        #auth-screen { position: absolute; width: 100vw; height: 100vh; background: #020617; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
-        .auth-box { background: rgba(30, 41, 59, 0.8); padding: 25px; border-radius: 12px; border: 2px solid #38bdf8; text-align: center; width: 80%; max-width: 300px; }
-        .auth-input { width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: white; box-sizing: border-box; text-align: center; font-size: 16px; }
-        .auth-btn { width: 100%; padding: 12px; background: #ff0055; border: none; border-radius: 6px; color: white; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 10px; }
-        #auth-status { color: #38bdf8; margin-top: 15px; font-size: 14px; }
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #050811;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
 
-        /* ИНТЕРФЕЙС HUD */
-        #hud { position: absolute; top: 12px; left: 12px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 5px; }
-        .hud-bar { background: rgba(15, 23, 42, 0.8); color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; }
-        
-        #top-controls { position: absolute; top: 12px; right: 12px; z-index: 10; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
-        #game-timer { background: #00ffff; color: #000; font-weight: bold; padding: 6px 12px; border-radius: 4px; font-size: 14px; }
-        #kills-counter { background: rgba(15, 23, 42, 0.8); color: white; padding: 6px 12px; border-radius: 4px; font-size: 14px; }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            left: 0;
+            top: 0;
+            z-index: 1;
+        }
 
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; }
-        #crosshair::before { content: ''; position: absolute; top: 4px; left: -5px; width: 20px; height: 2px; background: #00ffcc; }
-        #crosshair::after { content: ''; position: absolute; top: -5px; left: 4px; width: 2px; height: 20px; background: #00ffcc; }
+        /* --- ЭКРАН АВТОРИЗАЦИИ --- */
+        #auth-screen {
+            position: absolute;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle, #0f172a 0%, #020617 100%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
 
-        /* УПРАВЛЕНИЕ */
-        #joystick-zone { position: absolute; bottom: 30px; left: 30px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; z-index: 20; }
-        #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: #38bdf8; border-radius: 50%; }
-        #action-buttons { position: absolute; bottom: 30px; right: 30px; z-index: 20; display: flex; gap: 10px; }
-        .btn-act { width: 70px; height: 70px; border-radius: 50%; border: none; color: white; font-weight: bold; font-size: 12px; }
-        #btn-fire { background: #ef4444; }
-        #btn-reload { background: #475569; }
+        .auth-container {
+            background: rgba(30, 41, 59, 0.7);
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid #38bdf8;
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.2);
+            text-align: center;
+            width: 85%;
+            max-width: 320px;
+            backdrop-filter: blur(10px);
+        }
 
-        #respawn-screen { position: absolute; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 50; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; }
+        .auth-container h2 {
+            margin-top: 0;
+            margin-bottom: 25px;
+            color: #38bdf8;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 22px;
+            text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+
+        .auth-input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #475569;
+            background: #0f172a;
+            color: white;
+            font-size: 16px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .auth-input:focus {
+            outline: none;
+            border-color: #38bdf8;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+        }
+
+        .auth-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(90deg, #ff0055, #ff00aa);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(255, 0, 85, 0.4);
+            transition: 0.2s;
+        }
+
+        #auth-status {
+            color: #38bdf8;
+            margin-top: 15px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* --- ИГРОВОЙ ИНТЕРФЕЙС (HUD) --- */
+        #hud {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .hud-bar {
+            background: rgba(15, 23, 42, 0.75);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 15px;
+            border-left: 4px solid #fff;
+            backdrop-filter: blur(4px);
+            min-width: 110px;
+        }
+
+        #hud-hp { border-left-color: #ef4444; color: #fca5a5; }
+        #hud-ammo { border-left-color: #eab308; color: #fef08a; }
+
+        #top-right-controls {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+        }
+
+        #game-timer {
+            background: rgba(10, 16, 30, 0.85);
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            font-weight: bold;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+        }
+
+        #kills-counter {
+            background: rgba(15, 23, 42, 0.75);
+            color: #38bdf8;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            border: 1px solid #38bdf8;
+        }
+
+        #btn-fullscreen {
+            background: rgba(30, 41, 59, 0.8);
+            color: #94a3b8;
+            border: 1px solid #475569;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            pointer-events: none;
+        }
+        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #00ffcc; }
+        #crosshair::before { top: 4px; left: -5px; width: 20px; height: 2px; }
+        #crosshair::after { top: -5px; left: 4px; width: 2px; height: 20px; }
+
+        /* --- ВОЗВРАЩЕНА СТАРАЯ РАСКЛАДКА КНОПОК СЕТКОЙ --- */
+        #joystick-zone {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 130px;
+            height: 130px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            border-radius: 50%;
+            z-index: 20;
+        }
+
+        #joystick-stick {
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            width: 50px;
+            height: 50px;
+            background: radial-gradient(circle, #38bdf8 0%, #0284c7 100%);
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        }
+
+        #action-buttons {
+            position: absolute;
+            bottom: 25px;
+            right: 25px;
+            z-index: 20;
+            display: grid;
+            grid-template-areas: 
+                ". fire ."
+                "reload fire jump";
+            gap: 12px;
+        }
+
+        .btn-action {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            border: none;
+            color: white;
+            font-weight: bold;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            text-transform: uppercase;
+        }
+
+        #btn-fire { grid-area: fire; width: 85px; height: 85px; background: radial-gradient(circle, #ef4444 0%, #991b1b 100%); border: 2px solid #f87171; font-size: 15px; }
+        #btn-reload { grid-area: reload; background: #475569; border: 1px solid #64748b; }
+        #btn-jump { grid-area: jump; background: #065f46; border: 1px solid #059669; }
+
+        #respawn-screen {
+            position: absolute;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.85);
+            z-index: 50;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            backdrop-filter: blur(6px);
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -43,18 +264,18 @@
 <body>
 
     <div id="auth-screen">
-        <div class="auth-box">
-            <h3 style="margin-top:0;">КИБЕР АРЕНА 3D</h3>
-            <input type="text" id="input-nick" class="auth-input" placeholder="Никнейм">
-            <input type="password" id="input-pass" class="auth-input" placeholder="Пароль">
-            <button id="btn-auth" class="auth-btn">ИГРАТЬ</button>
+        <div class="auth-container">
+            <h2>Вход в кибер-арену</h2>
+            <input type="text" id="input-nick" class="auth-input" placeholder="Твой Никнейм" maxlength="12">
+            <input type="password" id="input-pass" class="auth-input" placeholder="Пароль" maxlength="16">
+            <button id="btn-auth" class="auth-btn">Войти / Создать</button>
             <div id="auth-status">Подключение к серверу...</div>
         </div>
     </div>
 
     <div id="respawn-screen">
-        <h2 style="color:#ef4444;">ТЕБЯ УБИЛИ</h2>
-        <button id="btn-respawn" class="auth-btn" style="width:auto; padding:10px 30px;">РЕСПАВН</button>
+        <h1 style="color: #ef4444; text-shadow: 0 0 10px rgba(239,68,68,0.5);">ТЕБЯ УБИЛИ!</h1>
+        <button id="btn-respawn" class="auth-btn" style="width: auto; padding: 15px 40px;">Возродиться</button>
     </div>
 
     <div id="hud">
@@ -62,53 +283,63 @@
         <div id="hud-ammo" class="hud-bar">🔫 Патроны: 30 / 90</div>
     </div>
 
-    <div id="top-controls">
+    <div id="top-right-controls">
         <div id="game-timer">⏱️ Время: 3:00</div>
         <div id="kills-counter">💀 Убийства: 0</div>
+        <button id="btn-fullscreen">📺 ЭКРАН</button>
     </div>
 
     <div id="crosshair"></div>
     <div id="joystick-zone"><div id="joystick-stick"></div></div>
+    
     <div id="action-buttons">
-        <button id="btn-reload" class="btn-act">ПЕРЕЗАР.</button>
-        <button id="btn-fire" class="btn-act">ОГОНЬ</button>
+        <button id="btn-fire" class="btn-action">Огонь</button>
+        <button id="btn-reload" class="btn-action">Перезр.</button>
+        <button id="btn-jump" class="btn-action">Прыжок</button>
     </div>
 
     <div id="canvas-container"></div>
 
     <script>
-        // !!! ВНИМАНИЕ: ОСТАВЬ ТУТ СВОЮ ССЫЛКУ ИЗ ПАНЕЛИ RENDER !!!
         const SERVER_URL = "https://pvp-arena-online.onrender.com"; 
         const socket = io(SERVER_URL);
 
         let myId = null, myNick = "", myPass = "";
         let hp = 100, ammo = 30, reserveAmmo = 90, kills = 0, isReloading = false;
-        let scene, camera, renderer, yawObject = new THREE.Object3D(), pitchObject = new THREE.Object3D();
+        
+        let scene, camera, renderer;
+        let yawObject = new THREE.Object3D(), pitchObject = new THREE.Object3D();
         let remotePlayers = {}, mapObjects = [];
         let moveDirection = { forward: 0, right: 0 };
-        let lookSpeed = 0.004;
+        let playerVelocity = new THREE.Vector3();
+        let isGrounded = true;
+        
+        const GRAVITY = 28;
+        const JUMP_FORCE = 11;
+        const MOVE_SPEED = 14;
+        let lookSpeed = 0.0035;
 
-        // Проверка коннекта к Render
-        socket.on('connect', () => {
-            document.getElementById('auth-status').innerText = "Сервер онлайн! Введите данные.";
-        });
-        socket.on('connect_error', () => {
-            document.getElementById('auth-status').innerText = "Ошибка подключения к Render...";
-        });
+        // Физические хитбоксы для коллизий
+        let colliders = [];
+
+        socket.on('connect', () => { document.getElementById('auth-status').innerText = "Сервер онлайн! Введите данные."; });
+        socket.on('connect_error', () => { document.getElementById('auth-status').innerText = "Ошибка подключения к Render..."; });
 
         window.addEventListener('DOMContentLoaded', () => {
-            initGame();
-            setupTouch();
+            initEngine();
+            setupControls();
             if(localStorage.getItem('n') && localStorage.getItem('p')) {
                 document.getElementById('input-nick').value = localStorage.getItem('n');
                 document.getElementById('input-pass').value = localStorage.getItem('p');
             }
         });
 
-        function initGame() {
+        function initEngine() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0a0f1d);
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
+            scene.fog = new THREE.FogExp2(0x0a0f1d, 0.015);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             pitchObject.add(camera);
             yawObject.add(pitchObject);
             scene.add(yawObject);
@@ -117,190 +348,51 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-            let light = new THREE.DirectionalLight(0x38bdf8, 0.8);
-            light.position.set(10, 30, 10);
-            scene.add(light);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+            let dirLight = new THREE.DirectionalLight(0x38bdf8, 0.8);
+            dirLight.position.set(20, 40, 20);
+            scene.add(dirLight);
 
-            buildArena();
+            buildMap();
             animate();
         }
 
-        function buildArena() {
-            mapObjects.forEach(o => scene.remove(o));
+        // --- ТВОЯ БОЛЬШАЯ НОВАЯ КАРТА НА КЛИЕНТЕ ---
+        function buildMap() {
+            mapObjects.forEach(obj => scene.remove(obj));
             mapObjects = [];
+            colliders = [];
 
-            let floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: 0x111827 }));
-            floor.rotation.x = -Math.PI/2;
+            // Пол арены 100х100
+            let floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8 }));
+            floor.rotation.x = -Math.PI / 2;
             scene.add(floor);
             mapObjects.push(floor);
 
-            let grid = new THREE.GridHelper(100, 40, 0x38bdf8, 0x1f2937);
-            grid.position.y = 0.02;
+            let grid = new THREE.GridHelper(100, 50, 0x38bdf8, 0x1f2937);
+            grid.position.y = 0.01;
             scene.add(grid);
             mapObjects.push(grid);
 
-            // Препятствия
-            addBox(0, 2, 0, 10, 4, 3, 0x334155);
-            addBox(-15, 3, 15, 6, 6, 6, 0x0284c7);
-            addBox(15, 3, -15, 6, 6, 6, 0x0284c7);
+            // Препятствия с хитбоксами
+            createObstacle(0, 3, 0, 12, 6, 2, 0x334155);    // Центр арены
+            createObstacle(-20, 4, 20, 6, 8, 6, 0x0284c7);  // Башня 1
+            createObstacle(20, 4, -20, 6, 8, 6, 0x0284c7);  // Башня 2
+            createObstacle(25, 2, 15, 8, 4, 2, 0x475569);   // Стены
+            createObstacle(-25, 2, -15, 8, 4, 2, 0x475569);
         }
 
-        function addBox(x,y,z,w,h,d,color) {
-            let mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshStandardMaterial({color: color}));
-            mesh.position.set(x,y,z);
+        function createObstacle(x, y, z, w, h, d, color) {
+            let mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: color, roughness: 0.5 }));
+            mesh.position.set(x, y, z);
             scene.add(mesh);
             mapObjects.push(mesh);
+
+            // Создаем bounding box вокруг стены для проверки коллизий
+            let box = new THREE.Box3().setFromObject(mesh);
+            colliders.push(box);
         }
 
-        // АВТОРИЗАЦИЯ
-        document.getElementById('btn-auth').addEventListener('click', () => {
-            let n = document.getElementById('input-nick').value.trim();
-            let p = document.getElementById('input-pass').value.trim();
-            if(n.length < 2) return;
-            document.getElementById('btn-auth').innerText = "Вход...";
-            myNick = n; myPass = p;
-            socket.emit('playerAuth', { nick: n, pass: p });
-        });
-
-        socket.on('authSuccess', (data) => {
-            localStorage.setItem('n', data.nick);
-            localStorage.setItem('p', data.pass);
-            document.getElementById('auth-screen').style.display = 'none';
-            myId = socket.id;
-        });
-
-        socket.on('authFailed', (txt) => {
-            document.getElementById('btn-auth').innerText = "ИГРАТЬ";
-            document.getElementById('auth-status').innerText = txt;
-        });
-
-        socket.on('init', (pos) => {
-            yawObject.position.set(pos.x, 1.7, pos.z);
-            hp = 100; ammo = 30; updateHUD();
-            document.getElementById('respawn-screen').style.display = 'none';
-        });
-
-        socket.on('timerUpdate', (data) => {
-            let m = Math.floor(data.timeLeft / 60);
-            let s = data.timeLeft % 60;
-            document.getElementById('game-timer').innerText = `⏱️ Время: ${m}:${s < 10 ? '0'+s : s}`;
-        });
-
-        socket.on('updatePlayers', (serverPlayers) => {
-            for (let id in serverPlayers) {
-                if (id === socket.id) {
-                    kills = serverPlayers[id].kills;
-                    updateHUD();
-                    continue;
-                }
-                let p = serverPlayers[id];
-                if (!remotePlayers[id] && p.hp > 0) {
-                    let group = new THREE.Group();
-                    let b = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.4, 8), new THREE.MeshStandardMaterial({ color: 0xff0055 }));
-                    b.position.y = 0.7; b.userData = { targetId: id, zone: 'body' };
-                    group.add(b);
-                    let h = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
-                    h.position.y = 1.5; h.userData = { targetId: id, zone: 'head' };
-                    group.add(h);
-                    scene.add(group);
-                    remotePlayers[id] = group;
-                }
-                if (remotePlayers[id]) {
-                    if (p.hp <= 0) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; }
-                    else { remotePlayers[id].position.set(p.x, 0, p.z); remotePlayers[id].rotation.y = p.rotY; }
-                }
-            }
-            for (let id in remotePlayers) { if (!serverPlayers[id]) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; } }
-        });
-
-        function shoot() {
-            if(ammo <= 0 || isReloading || hp <= 0) return;
-            ammo--; updateHUD();
-            let ray = new THREE.Raycaster();
-            ray.setFromCamera(new THREE.Vector2(0,0), camera);
-            let targets = [];
-            for(let id in remotePlayers) { targets.push(...remotePlayers[id].children); }
-            let hits = ray.intersectObjects(targets);
-            if(hits.length > 0) {
-                let obj = hits[0].object.userData;
-                socket.emit('playerHit', { targetId: obj.targetId, zone: obj.zone });
-            }
-        }
-
-        function reload() {
-            if(isReloading || ammo === 30 || reserveAmmo <= 0) return;
-            isReloading = true; updateHUD();
-            setTimeout(() => {
-                let n = 30 - ammo; let t = Math.min(n, reserveAmmo);
-                ammo += t; reserveAmmo -= t; isReloading = false; updateHUD();
-            }, 1200);
-        }
-
-        function updateHUD() {
-            document.getElementById('hud-hp').innerText = `❤️ HP: ${hp}`;
-            document.getElementById('hud-ammo').innerText = isReloading ? `🔄 ПЕРЕЗАРЯДКА...` : `🔫 Патроны: ${ammo} / ${reserveAmmo}`;
-            document.getElementById('kills-counter').innerText = `💀 Убийства: ${kills}`;
-        }
-
-        socket.on('updatePlayers', (serverPlayers) => {
-            if (myId && serverPlayers[myId] && serverPlayers[myId].hp <= 0 && hp > 0) {
-                hp = 0; updateHUD();
-                document.getElementById('respawn-screen').style.display = 'flex';
-            }
-        });
-
-        document.getElementById('btn-respawn').addEventListener('click', () => socket.emit('requestRespawn'));
-
-        // СЕНСОРЫ
-        function setupTouch() {
-            document.getElementById('btn-fire').addEventListener('touchstart', (e) => { e.preventDefault(); shoot(); });
-            document.getElementById('btn-reload').addEventListener('touchstart', (e) => { e.preventDefault(); reload(); });
-
-            let zone = document.getElementById('joystick-zone');
-            let stick = document.getElementById('joystick-stick');
-            zone.addEventListener('touchstart', moveStick, {passive:false});
-            zone.addEventListener('touchmove', moveStick, {passive:false});
-            zone.addEventListener('touchend', () => { stick.style.transform = 'translate(0px,0px)'; moveDirection.forward = 0; moveDirection.right = 0; });
-
-            function moveStick(e) {
-                e.preventDefault();
-                let t = e.touches[0]; let r = zone.getBoundingClientRect();
-                let cx = r.left + r.width/2; let cy = r.top + r.height/2;
-                let dx = t.clientX - cx; let dy = t.clientY - cy;
-                let dist = Math.sqrt(dx*dx + dy*dy);
-                if(dist > 35) { dx = (dx/dist)*35; dy = (dy/dist)*35; }
-                stick.style.transform = `translate(${dx}px,${dy}px)`;
-                moveDirection.forward = -(dy/35); moveDirection.right = (dx/35);
-            }
-
-            let lx = null, ly = null;
-            window.addEventListener('touchstart', (e) => { if(e.touches[0].clientX > window.innerWidth/2) { lx = e.touches[0].clientX; ly = e.touches[0].clientY; } });
-            window.addEventListener('touchmove', (e) => {
-                if(lx === null || ly === null) return;
-                let t = e.touches[0];
-                yawObject.rotation.y -= (t.clientX - lx) * lookSpeed;
-                pitchObject.rotation.x -= (t.clientY - ly) * lookSpeed;
-                pitchObject.rotation.x = Math.max(-1.4, Math.min(1.4, pitchObject.rotation.x));
-                lx = t.clientX; ly = t.clientY;
-            }, {passive:false});
-            window.addEventListener('touchend', () => { lx = null; ly = null; });
-        }
-
-        let clock = new THREE.Clock();
-        function animate() {
-            requestAnimationFrame(animate);
-            let d = clock.getDelta(); if(d > 0.1) d = 0.1;
-            if(myId && hp > 0) {
-                let f = new THREE.Vector3(0,0,-1).applyQuaternion(yawObject.quaternion);
-                let s = new THREE.Vector3(1,0,0).applyQuaternion(yawObject.quaternion);
-                yawObject.position.x += (f.x * moveDirection.forward + s.x * moveDirection.right) * 12 * d;
-                yawObject.position.z += (f.z * moveDirection.forward + s.z * moveDirection.right) * 12 * d;
-                socket.emit('playerMove', { x: yawObject.position.x, z: yawObject.position.z, rotY: yawObject.rotation.y });
-            }
-            renderer.render(scene, camera);
-        }
-        window.addEventListener('resize', () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
-    </script>
-</body>
-</html>
+        // --- ФУНКЦИЯ ПРОВЕРКИ СТОЛКНОВЕНИЙ (КОЛЛИЗИЯ) ---
+        function checkWallCollisions(newPos) {
+            // Радиус хитбокса игрока
