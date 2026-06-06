@@ -1,0 +1,108 @@
+body {
+    margin: 0; padding: 0; overflow: hidden; background-color: #050811;
+    font-family: 'Segoe UI', Roboto, sans-serif; user-select: none; -webkit-user-select: none;
+    touch-action: none;
+}
+#canvas-container { width: 100vw; height: 100vh; position: absolute; left: 0; top: 0; z-index: 1; }
+
+/* ОКНО ВХОДА */
+#auth-screen {
+    position: absolute; width: 100vw; height: 100vh;
+    background: radial-gradient(circle, #0f172a 0%, #020617 100%);
+    z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white;
+}
+.auth-container {
+    background: rgba(30, 41, 59, 0.7); padding: 30px; border-radius: 15px; border: 2px solid #38bdf8;
+    box-shadow: 0 0 25px rgba(56, 189, 248, 0.2); text-align: center; width: 85%; max-width: 320px; backdrop-filter: blur(10px);
+}
+.auth-container h2 { margin-top: 0; margin-bottom: 25px; color: #38bdf8; text-transform: uppercase; letter-spacing: 2px; font-size: 22px; }
+.auth-input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; font-size: 16px; box-sizing: border-box; text-align: center; }
+.auth-btn { width: 100%; padding: 14px; background: linear-gradient(90deg, #ff0055, #ff00aa); border: none; border-radius: 8px; color: white; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; text-transform: uppercase; box-shadow: 0 4px 15px rgba(255, 0, 85, 0.4); }
+#auth-status { color: #38bdf8; margin-top: 15px; font-size: 14px; font-weight: 500; }
+
+/* ИГРОВОЙ ИНТЕРФЕЙС HUD */
+#hud { position: absolute; top: 12px; left: 12px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 6px; }
+.hud-bar { background: rgba(15, 23, 42, 0.75); color: white; padding: 6px 14px; border-radius: 6px; font-weight: bold; font-size: 15px; border-left: 4px solid #fff; backdrop-filter: blur(4px); min-width: 110px; }
+#hud-hp { border-left-color: #ef4444; color: #fca5a5; }
+#hud-armor { border-left-color: #3b82f6; color: #93c5fd; }
+#hud-ammo { border-left-color: #eab308; color: #fef08a; }
+
+#game-timer { 
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 10;
+    background: rgba(10, 16, 30, 0.85); border: 2px solid #00ffff; color: #00ffff; 
+    font-weight: bold; padding: 6px 20px; border-radius: 5px; font-size: 16px; 
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.5); font-variant-numeric: tabular-nums;
+}
+
+#top-right-controls { position: absolute; top: 12px; right: 12px; z-index: 10; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+#kills-counter { background: rgba(15, 23, 42, 0.75); color: #38bdf8; padding: 8px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; border: 1px solid #38bdf8; }
+
+.control-row { display: flex; gap: 6px; }
+.small-btn { background: rgba(30, 41, 59, 0.8); color: #94a3b8; border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; pointer-events: auto; }
+#btn-settings { border-color: #eab308; color: #fef08a; }
+
+/* ДИНАМИЧЕСКИЙ ПРИЦЕЛ */
+#crosshair { 
+    --crosshair-color: #00ffcc;
+    --crosshair-size: 10px;
+    position: absolute; top: 50%; left: 50%; 
+    width: var(--crosshair-size); height: var(--crosshair-size); 
+    transform: translate(-50%, -50%); z-index: 5; pointer-events: none; 
+}
+#crosshair::before, #crosshair::after { content: ''; position: absolute; background: var(--crosshair-color); }
+#crosshair::before { top: calc(50% - 1px); left: -5px; width: calc(var(--crosshair-size) + 10px); height: 2px; }
+#crosshair::after { top: -5px; left: calc(50% - 1px); width: 2px; height: calc(var(--crosshair-size) + 10px); }
+
+/* ЭЛЕМЕНТЫ УПРАВЛЕНИЯ (ПОД ТЕКСТУРЫ) */
+.draggable { position: absolute; z-index: 25; touch-action: none; user-select: none; }
+
+#joystick-zone { width: 120px; height: 120px; background: rgba(255, 255, 255, 0.08); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 50%; left: 40px; bottom: 40px; pointer-events: auto; }
+#joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: radial-gradient(circle, #38bdf8 0%, #0284c7 100%); border-radius: 50%; pointer-events: none; }
+
+.btn-action { 
+    border: none; color: white; font-weight: bold; display: flex; align-items: center; justify-content: center; 
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5); text-transform: uppercase; border-radius: 50%; pointer-events: auto; 
+    background-size: 60% 60%; background-position: center; background-repeat: no-repeat;
+}
+
+#btn-fire { width: 95px; height: 95px; background-color: rgba(239, 68, 68, 0.2); border: 3px solid #f87171; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); right: 120px; bottom: 90px; }
+#btn-jump { width: 65px; height: 65px; background-color: rgba(6, 95, 70, 0.3); border: 1px solid #059669; right: 35px; bottom: 150px; }
+#btn-crouch { width: 65px; height: 65px; background-color: rgba(30, 58, 138, 0.3); border: 1px solid #3b82f6; right: 35px; bottom: 35px; }
+#btn-reload { width: 65px; height: 65px; background-color: rgba(71, 85, 105, 0.3); border: 1px solid #64748b; right: 120px; bottom: 35px; }
+
+/* ГЛАВНОЕ МЕНЮ НАСТРОЕК */
+#settings-panel {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(11, 18, 36, 0.96); border: 2px solid #38bdf8; padding: 25px; border-radius: 16px;
+    z-index: 110; display: none; width: 85%; max-width: 360px; color: white; backdrop-filter: blur(12px); box-shadow: 0 0 35px rgba(0, 242, 255, 0.25);
+}
+#settings-panel h3 { margin: 0 0 20px 0; text-align: center; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; font-size: 18px; }
+
+.setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 14px; font-weight: 500; }
+.setting-item input[type="range"] { width: 120px; accent-color: #38bdf8; }
+.setting-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: #38bdf8; cursor: pointer; }
+.setting-item select { background: #1e293b; color: white; border: 1px solid #475569; padding: 4px 8px; border-radius: 6px; outline: none; }
+
+/* Стиль для кнопки выхода в меню */
+#btn-leave-match {
+    width: 100%; background: #ef4444; color: white; margin-bottom: 15px; font-size: 13px; padding: 10px;
+}
+#btn-leave-match:hover { background: #dc2626; }
+
+.panel-grid-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.panel-btn { padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; transition: background 0.2s; }
+
+#btn-custom-layout { grid-column: span 2; background: #eab308; color: #000; }
+#btn-save-settings { background: #10b981; color: white; }
+#btn-close-settings { background: #475569; color: white; }
+#btn-reset-all { grid-column: span 2; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid #ef4444; margin-top: 5px; }
+
+/* ОКНО РАСКЛАДКИ */
+#layout-edit-subpanel {
+    position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.95); border: 2px solid #eab308; padding: 12px 25px; border-radius: 10px;
+    z-index: 120; display: none; text-align: center; color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+#respawn-screen { position: absolute; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.85); z-index: 50; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; backdrop-filter: blur(6px); }
+.edit-mode { outline: 2px dashed #eab308 !important; background: rgba(234, 179, 8, 0.2) !important; border-radius: 50%; }
