@@ -14,7 +14,7 @@ const io = new Server(server, {
     }
 });
 
-// КЛАСС ИГРОКА ОПИСАН ПРЯМО ТУТ ДЛЯ НАДЕЖНОСТИ
+// Класс игрока встроен прямо в сервер для надежности
 class Player {
     constructor(id, nick) {
         this.id = id;
@@ -60,9 +60,11 @@ setInterval(() => {
 
 function resetMatch() {
     for (let id in players) {
-        players[id].kills = 0;
-        players[id].respawn();
-        io.to(id).emit('init', { x: players[id].x, z: players[id].z });
+        if (players[id] && typeof players[id].respawn === 'function') {
+            players[id].kills = 0;
+            players[id].respawn();
+            io.to(id).emit('init', { x: players[id].x, z: players[id].z });
+        }
     }
     io.emit('updatePlayers', players);
 }
@@ -71,35 +73,55 @@ io.on('connection', (socket) => {
     console.log(`Подключился сокет: ${socket.id}`);
     socket.emit('timerUpdate', { timeLeft });
 
+    // БРОНЕБОЙНАЯ АВТОРИЗАЦИЯ С ЗАЩИТОЙ ОТ КРЭШЕЙ
     socket.on('playerAuth', (data) => {
-        const nick = data.nick ? data.nick.trim() : "";
-        const pass = data.pass ? data.pass.trim() : "";
-
-        if (nick.length < 2 || pass.length < 3) {
-            socket.emit('authFailed', "Короткий ник или пароль!");
-            return;
-        }
-
-        if (accounts[nick]) {
-            if (accounts[nick] !== pass) {
-                socket.emit('authFailed', "Неверный пароль!");
+        try {
+            if (!data) {
+                socket.emit('authFailed', "Ошибка: Данные не получены");
                 return;
             }
-        } else {
-            accounts[nick] = pass;
-        }
 
-        for (let id in players) {
-            if (players[id].nick === nick) {
-                socket.emit('authFailed', "Ник уже занят на арене!");
+            const nick = data.nick ? String(data.nick).trim() : "";
+            const pass = data.pass ? String(data.pass).trim() : "";
+
+            if (nick.length < 2 || pass.length < 3) {
+                socket.emit('authFailed', "Слишком короткий ник или пароль!");
                 return;
             }
-        }
 
-        players[socket.id] = new Player(socket.id, nick);
-        socket.emit('authSuccess', { nick, pass });
-        socket.emit('init', { x: players[socket.id].x, z: players[socket.id].z });
-        io.emit('updatePlayers', players);
+            // Логика аккаунтов
+            if (accounts[nick]) {
+                if (accounts[nick] !== pass) {
+                    socket.emit('authFailed', "Неверный пароль для этого ника!");
+                    return;
+                }
+            } else {
+                accounts[nick] = pass;
+            }
+
+            // Проверка дубликатов на арене
+            for (let id in players) {
+                if (players[id] && players[id].nick === nick) {
+                    socket.emit('authFailed', "Этот ник уже на арене!");
+                    return;
+                }
+            }
+
+            // Создаем нового игрока
+            players[socket.id] = new Player(socket.id, nick);
+            
+            // Отправляем ОТВЕТ клиенту (чтобы кнопка "ВХОД..." исчезла!)
+            socket.emit('authSuccess', { nick, pass });
+            socket.emit('init', { x: players[socket.id].x, z: players[socket.id].z });
+            
+            // Оповещаем всех остальных
+            io.emit('updatePlayers', players);
+            console.log(`Игрок ${nick} успешно зашел на сервер!`);
+
+        } catch (error) {
+            console.error("Критическая ошибка авторизации:", error);
+            socket.emit('authFailed', "Внутренняя ошибка сервера. Попробуй еще раз.");
+        }
     });
 
     socket.on('playerMove', (data) => {
@@ -130,6 +152,7 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         if (players[socket.id]) {
+            console.log(`Игрок ${players[socket.id].nick} отключился.`);
             delete players[socket.id];
             io.emit('updatePlayers', players);
         }
