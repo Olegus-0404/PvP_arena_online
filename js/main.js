@@ -81,9 +81,8 @@ function initSocket() {
     if(statusText) statusText.innerText = "Стучимся в WebSocket-туннель...";
     if(authBtn) { authBtn.disabled = true; authBtn.style.background = '#475569'; authBtn.innerText = "ПИНГУЕМ СЕРВЕР..."; }
 
+    // Мягкое подключение: даем серверу самому выбрать оптимальный транспорт
     socket = io(SERVER_URL, {
-        transports: ['websocket'],
-        upgrade: false,
         forceNew: true,
         reconnection: true,
         reconnectionAttempts: Infinity,
@@ -95,8 +94,8 @@ function initSocket() {
         if(authBtn) { authBtn.disabled = false; authBtn.style.background = '#ec4899'; authBtn.innerText = "ПОДКЛЮЧИТЬСЯ"; }
     });
 
-    socket.on('connect_error', () => {
-        if(statusText) statusText.innerText = "Сервер спит (загрузка Render ~1 мин)...";
+    socket.on('connect_error', (error) => {
+        if(statusText) statusText.innerText = `Ошибка связи: ${error.message || 'ожидание'}. Проверьте сервер.`;
     });
     
     socket.on('authSuccess', (data) => { 
@@ -365,7 +364,7 @@ function setupControls() {
 
     document.getElementById('btn-save-hud').addEventListener('click', () => { isCustomizing = false; document.body.classList.remove('edit-mode'); customMenu.style.display = 'none'; saveHUDPositions(); });
 
-    // ИСПРАВЛЕННЫЙ ВАРИАНТ: ТЕПЕРЬ НА ТАЧЕ (TOUCHSTART) ДЛЯ МОМЕНТАЛЬНОГО ОБХОДА БЛОКИРОВОК СМАРТФОНОВ
+    // КНОПКА ФУЛЛСКРИНА НА TOUCHSTART
     document.getElementById('btn-fullscreen-toggle').addEventListener('touchstart', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -468,15 +467,4 @@ function setupControls() {
         });
     });
     window.addEventListener('touchmove', (e) => {
-        if (!isCustomizing || !dragElement) return;
-        let touch = e.touches[0]; let x = (touch.clientX - dragOffsetX) / window.gameSettings.hudScale; let y = (touch.clientY - dragOffsetY) / window.gameSettings.hudScale;
-        dragElement.style.left = x + 'px'; dragElement.style.top = y + 'px'; dragElement.style.bottom = 'auto'; dragElement.style.right = 'auto';
-    });
-    window.addEventListener('touchend', () => { dragElement = null; });
-}
-
-function saveHUDPositions() { let layout = {}; document.querySelectorAll('.hud-element').forEach(el => { layout[el.id] = { left: el.style.left, top: el.style.top }; }); localStorage.setItem('hud_layout_universal', JSON.stringify(layout)); }
-function loadHUDPositions() {
-    let saved = localStorage.getItem('hud_layout_universal'); if (!saved) return;
-    let layout = JSON.parse(saved);
-    for (let id in layout) { let el = document.getElementById(id); if (el && layout[id].left) { el.style.left = layout[id].left; el.
+        if (!isCustomizing || !dragElement)
