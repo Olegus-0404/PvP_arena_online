@@ -4,14 +4,14 @@
 }
 body, html {
     width: 100%; height: 100%; overflow: hidden;
-    background-color: #0a0f1d; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #0a0f1d; font-family: sans-serif;
 }
 
 #canvas-container {
     width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1;
 }
 
-/* Эффекты получения урона */
+/* Фикс блокировки кликов: вспышка полностью прозрачна для тапов */
 #damage-flash {
     position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
     background: rgba(239, 68, 68, 0.45); opacity: 0; pointer-events: none;
@@ -26,69 +26,61 @@ body, html {
     clip-path: polygon(35% 0%, 65% 0%, 50% 50%); border-radius: 50%;
 }
 
-/* HUD Интерфейс верхний */
+/* HUD */
 #hud-top {
     position: absolute; top: 12px; left: 0; width: 100%; display: flex;
     justify-content: space-between; align-items: center; padding: 0 20px;
-    z-index: 10; pointer-events: none;
+    z-index: 50; pointer-events: none; /* Пропускает клики сквозь контейнер */
 }
 #hud-hp, #hud-armor, #game-timer, #kills-counter {
-    background: rgba(15, 23, 42, 0.75); color: #fff; padding: 8px 16px;
-    border-radius: 8px; font-weight: bold; font-size: 15px;
+    background: rgba(15, 23, 42, 0.75); color: #fff; padding: 8px 14px;
+    border-radius: 8px; font-weight: bold; font-size: 14px;
     backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1);
 }
-#game-timer { border-color: #38bdf8; color: #38bdf8; }
 
-/* HUD Интерфейс нижний */
 #hud-bottom {
     position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
-    z-index: 10; pointer-events: none;
+    z-index: 50; pointer-events: none;
 }
 #hud-ammo {
     background: rgba(15, 23, 42, 0.85); color: #34d399; padding: 8px 20px;
-    border-radius: 20px; font-weight: bold; font-size: 16px; border: 1px solid #059669;
+    border-radius: 20px; font-weight: bold; font-size: 15px; border: 1px solid #059669;
 }
 
-/* Окна оверлеев (меню, спавн, голосование) */
+/* Окна экранов */
 .overlay {
     position: absolute; width: 100vw; height: 100vh; top: 0; left: 0;
     background: rgba(15, 23, 42, 0.85); display: flex; justify-content: center;
     align-items: center; z-index: 100; backdrop-filter: blur(6px);
+    pointer-events: auto; /* Разрешаем клики внутри меню */
 }
 .menu-box {
-    background: #1e293b; padding: 30px; border-radius: 16px; text-align: center;
-    width: 340px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 2px solid #475569;
-    color: white;
+    background: #1e293b; padding: 25px; border-radius: 16px; text-align: center;
+    width: 320px; border: 2px solid #475569; color: white;
 }
 .border-yellow { border-color: #eab308 !important; }
-.menu-box h2 { margin-bottom: 15px; font-size: 22px; letter-spacing: 1px; }
 
-/* Поля ввода и интерактивные кнопки */
 input {
     width: 100%; padding: 12px; margin-bottom: 15px; background: #0f172a;
-    border: 1px solid #475569; border-radius: 8px; color: white; outline: none; font-size: 15px;
+    border: 1px solid #475569; border-radius: 8px; color: white; outline: none;
 }
-input:focus { border-color: #38bdf8; }
 .menu-btn {
     width: 100%; padding: 12px; background: #38bdf8; border: none; border-radius: 8px;
-    color: #0f172a; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.2s;
+    color: #0f172a; font-weight: bold; cursor: pointer;
 }
-.menu-btn:active { background: #0284c7; }
 
-/* Стили системы голосования за карты */
-.vote-row { display: flex; gap: 12px; justify-content: center; margin-top: 15px; }
+.vote-row { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
 .vote-btn {
-    flex: 1; padding: 14px 10px; border: none; border-radius: 8px; color: white;
-    font-weight: bold; font-size: 14px; cursor: pointer; pointer-events: auto;
+    flex: 1; padding: 12px 5px; border: none; border-radius: 8px; color: white;
+    font-weight: bold; cursor: pointer;
 }
-.btn-blue { background: #0284c7; box-shadow: 0 0 10px rgba(2,132,199,0.4); }
-.btn-pink { background: #ec4899; box-shadow: 0 0 10px rgba(236,72,153,0.4); }
-.vote-btn:active { transform: scale(0.95); }
+.btn-blue { background: #0284c7; }
+.btn-pink { background: #ec4899; }
 
-/* Мобильные сенсорные кнопки */
+/* Управление тач-скрином */
 #touch-controls {
     position: absolute; width: 100%; height: 100%; top: 0; left: 0;
-    z-index: 20; pointer-events: none;
+    z-index: 30; pointer-events: none;
 }
 #joystick-zone {
     position: absolute; left: 40px; bottom: 40px; width: 110px; height: 110px;
@@ -97,23 +89,20 @@ input:focus { border-color: #38bdf8; }
 }
 #joystick-stick {
     position: absolute; left: 35px; top: 35px; width: 40px; height: 40px;
-    background: rgba(255,255,255,0.7); border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    background: rgba(255,255,255,0.7); border-radius: 50%;
 }
 
-/* Кнопки действий - ИСПРАВЛЕННОЕ ОТОБРАЖЕНИЕ НА ТЕЛЕФОНАХ */
 .btn-action {
     position: absolute; border: none; color: white; display: flex;
     align-items: center; justify-content: center; border-radius: 50%; pointer-events: auto;
-    background-size: 55% 55% !important; /* Намертво держит масштаб SVGконки */
-    background-position: center center !important; /* Центрирует иконку */
-    background-repeat: no-repeat !important;
-    -webkit-appearance: none; outline: none;
+    background-size: 55% 55% !important; background-position: center center !important;
+    background-repeat: no-repeat !important; -webkit-appearance: none; outline: none;
 }
 .btn-action:active { transform: scale(0.9); }
 
 #btn-fire {
     width: 95px; height: 95px; background-color: rgba(239, 68, 68, 0.25); border: 3px solid #f87171;
-    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); right: 120px; bottom: 90px;
+    right: 120px; bottom: 90px;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f87171' stroke-width='2.5'><circle cx='12' cy='12' r='10'></circle><circle cx='12' cy='12' r='1'></circle><line x1='22' y1='12' x2='18' y2='12'></line><line x1='6' y1='12' x2='2' y2='12'></line><line x1='12' y1='6' x2='12' y2='2'></line><line x1='12' y1='22' x2='12' y2='18'></line></svg>");
 }
 #btn-jump {
@@ -129,13 +118,9 @@ input:focus { border-color: #38bdf8; }
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'><polyline points='23 4 23 10 17 10'></polyline><polyline points='1 20 1 14 7 14'></polyline><path d='M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15'></path></svg>");
 }
 
-/* Утилитарные классы */
 .small-btn { padding: 6px 12px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; color: white; cursor: pointer; pointer-events: auto; font-weight: bold; }
 .text-red { color: #f87171 !important; }
 .text-yellow { color: #eab308 !important; }
 .animate-pulse { animation: pulse 2s infinite; }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
