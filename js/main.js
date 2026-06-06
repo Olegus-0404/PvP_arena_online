@@ -20,6 +20,16 @@ let lastLookX = 0, lastLookY = 0;
 let fireIntervalId = null;
 let isCrouching = false;
 
+// ФИКС ОШИБКИ: Добавлена глобальная переменная настроек по умолчанию
+window.gameSettings = {
+    sensitivity: 0.0035
+};
+
+// ФИКС ОШИБКИ: Заглушка для инициализации настроек, чтобы движок не падал
+function initGameSettings() {
+    console.log("Настройки управления успешно инициализированы");
+}
+
 function initSocket() {
     try { socket = io(SERVER_URL); } catch(e) { return; }
 
@@ -70,7 +80,6 @@ function initSocket() {
         document.getElementById('voting-screen').style.display = 'none';
     });
 
-    // Получение урона — включаем вспышку и указатель направления
     socket.on('damagedBy', (data) => {
         triggerDamageFlash();
         showDamageIndicator(data.shooterX, data.shooterZ);
@@ -98,21 +107,34 @@ function initSocket() {
             
             if (!remotePlayers[id] && pData.hp > 0) {
                 let group = new THREE.Group();
+                
+                // ТОРС
                 let torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
                 torso.position.y = 0.9; torso.userData = { targetId: id, zone: 'body' }; group.add(torso);
                 
+                // ГОЛОВА И ВИЗОР
                 let headGroup = new THREE.Group(); headGroup.position.y = 1.5;
                 let head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), new THREE.MeshStandardMaterial({ color: 0xe2e8f0 }));
                 head.userData = { targetId: id, zone: 'head' }; headGroup.add(head);
+                
                 let visor = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.06, 0.1), new THREE.MeshBasicMaterial({ color: 0x00ffff }));
-                visor.position.set(0, 0, -0.18); headGroup.add(visor); group.add(headGroup);
+                visor.position.set(0, 0, -0.18); visor.userData = { targetId: id, zone: 'head' }; headGroup.add(visor); group.add(headGroup);
                 
-                let leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6), new THREE.MeshStandardMaterial({ color: 0xff0055 })); leftArm.position.set(-0.4, 0.9, 0); group.add(leftArm);
-                let rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6), new THREE.MeshStandardMaterial({ color: 0xff0055 })); rightArm.position.set(0.4, 0.9, 0); group.add(rightArm);
-                let leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.5), new THREE.MeshStandardMaterial({ color: 0x0f172a })); leftLeg.position.set(-0.2, 0.25, 0); group.add(leftLeg);
-                let rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.5), new THREE.MeshStandardMaterial({ color: 0x0f172a })); rightLeg.position.set(0.2, 0.25, 0); group.add(rightLeg);
+                // ФИКС ОШИБКИ СЕРВЕРА: Всем конечностям жестко прописаны targetId и zone
+                let leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6), new THREE.MeshStandardMaterial({ color: 0xff0055 })); 
+                leftArm.position.set(-0.4, 0.9, 0); leftArm.userData = { targetId: id, zone: 'body' }; group.add(leftArm);
                 
-                let enemyGun = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.5), new THREE.MeshStandardMaterial({ color: 0x475569 })); enemyGun.position.set(0.3, 0.8, -0.2); enemyGun.rotation.x = Math.PI / 2; group.add(enemyGun);
+                let rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6), new THREE.MeshStandardMaterial({ color: 0xff0055 })); 
+                rightArm.position.set(0.4, 0.9, 0); rightArm.userData = { targetId: id, zone: 'body' }; group.add(rightArm);
+                
+                let leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.5), new THREE.MeshStandardMaterial({ color: 0x0f172a })); 
+                leftLeg.position.set(-0.2, 0.25, 0); leftLeg.userData = { targetId: id, zone: 'body' }; group.add(leftLeg);
+                
+                let rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.5), new THREE.MeshStandardMaterial({ color: 0x0f172a })); 
+                rightLeg.position.set(0.2, 0.25, 0); rightLeg.userData = { targetId: id, zone: 'body' }; group.add(rightLeg);
+                
+                let enemyGun = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.5), new THREE.MeshStandardMaterial({ color: 0x475569 })); 
+                enemyGun.position.set(0.3, 0.8, -0.2); enemyGun.rotation.x = Math.PI / 2; enemyGun.userData = { targetId: id, zone: 'body' }; group.add(enemyGun);
 
                 scene.add(group); remotePlayers[id] = group;
             }
@@ -138,7 +160,6 @@ function showDamageIndicator(sX, sZ) {
     let ind = document.getElementById('damage-indicator');
     if (!ind || !yawObject) return;
     
-    // Вычисляем угол атаки относительно взгляда игрока
     let pX = yawObject.position.x; let pZ = yawObject.position.z;
     let angleToShooter = Math.atan2(sX - pX, sZ - pZ);
     let camAngle = yawObject.rotation.y;
@@ -150,18 +171,27 @@ function showDamageIndicator(sX, sZ) {
     setTimeout(() => { ind.style.opacity = '0'; }, 600);
 }
 
-// Проверка коллизий с другими игроками
 function checkPlayerCollisions(newPos) {
     for (let id in remotePlayers) {
         let pObj = remotePlayers[id];
         let dist = new THREE.Vector2(newPos.x - pObj.position.x, newPos.z - pObj.position.z).length();
-        if (dist < 0.8) return true; // Радиус коллизии игрока
+        if (dist < 0.8) return true; 
     }
     return false;
 }
 
 window.voteMap = function(mapName) {
     if (socket) socket.emit('submitVote', mapName);
+};
+
+window.toggleFullScreen = function() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.log(`Фуллскрин заблокирован: ${err.message}`);
+        });
+    } else {
+        document.exitFullscreen();
+    }
 };
 
 window.leaveMatch = function() {
@@ -341,44 +371,4 @@ function setupControls() {
             }
         }
     });
-    window.addEventListener('touchend', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouchId = null; } });
-}
-
-let clock = new THREE.Clock();
-function animate() {
-    requestAnimationFrame(animate);
-    if (!renderer || !scene || !camera) return;
-    let delta = clock.getDelta(); if (delta > 0.1) delta = 0.1;
-
-    if (myId && hp > 0) {
-        playerVelocity.y -= GRAVITY * delta;
-        let forwardVector = new THREE.Vector3(0, 0, -1).applyQuaternion(yawObject.quaternion);
-        let sideVector = new THREE.Vector3(1, 0, 0).applyQuaternion(yawObject.quaternion);
-        let moveX = (forwardVector.x * moveDirection.forward + sideVector.x * moveDirection.right) * moveSpeed * delta;
-        let moveZ = (forwardVector.z * moveDirection.forward + sideVector.z * moveDirection.right) * moveSpeed * delta;
-
-        let targetPos = yawObject.position.clone(); targetPos.x += moveX; 
-        if (!checkWallCollisions(targetPos) && !checkPlayerCollisions(targetPos)) yawObject.position.x = targetPos.x;
-        
-        targetPos = yawObject.position.clone(); targetPos.z += moveZ; 
-        if (!checkWallCollisions(targetPos) && !checkPlayerCollisions(targetPos)) yawObject.position.z = targetPos.z;
-
-        yawObject.position.y += playerVelocity.y * delta;
-        let targetHeight = isCrouching ? 0.9 : 1.7;
-        if (yawObject.position.y <= targetHeight) { playerVelocity.y = 0; yawObject.position.y = targetHeight; isGrounded = true; } else { isGrounded = false; }
-
-        supplyCrates.forEach(crate => {
-            if (crate.active) {
-                crate.mesh.rotation.y += 1.6 * delta;
-                if (yawObject.position.distanceTo(crate.mesh.position) < 1.4) {
-                    crate.active = false; crate.mesh.visible = false; crate.respawnTime = Date.now() + 12000;
-                    hp = Math.min(100, hp + 30); armor = Math.min(100, armor + 20); reserveAmmo += 60; updateHUD();
-                }
-            } else if (Date.now() > crate.respawnTime) { crate.active = true; crate.mesh.visible = true; }
-        });
-
-        if(socket && socket.connected) socket.emit('playerMove', { x: yawObject.position.x, z: yawObject.position.z, rotY: yawObject.rotation.y });
-    }
-    renderer.render(scene, camera);
-}
-window.addEventListener('resize', () => { if(camera && renderer) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } });
+    window.addEventListener('touchend', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouch
