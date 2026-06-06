@@ -1,131 +1,141 @@
-body {
-    margin: 0; padding: 0; overflow: hidden; background-color: #050811;
-    font-family: 'Segoe UI', Roboto, sans-serif; user-select: none; -webkit-user-select: none;
-    touch-action: none;
+* {
+    margin: 0; padding: 0; box-sizing: border-box;
+    user-select: none; -webkit-user-select: none;
 }
-#canvas-container { width: 100vw; height: 100vh; position: absolute; left: 0; top: 0; z-index: 1; }
-
-/* ОКНО ВХОДА */
-#auth-screen {
-    position: absolute; width: 100vw; height: 100vh;
-    background: radial-gradient(circle, #0f172a 0%, #020617 100%);
-    z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white;
-}
-.auth-container {
-    background: rgba(30, 41, 59, 0.7); padding: 30px; border-radius: 15px; border: 2px solid #38bdf8;
-    box-shadow: 0 0 25px rgba(56, 189, 248, 0.2); text-align: center; width: 85%; max-width: 320px; backdrop-filter: blur(10px);
-}
-.auth-container h2 { margin-top: 0; margin-bottom: 25px; color: #38bdf8; text-transform: uppercase; letter-spacing: 2px; font-size: 22px; }
-.auth-input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; font-size: 16px; box-sizing: border-box; text-align: center; }
-.auth-btn { width: 100%; padding: 14px; background: linear-gradient(90deg, #ff0055, #ff00aa); border: none; border-radius: 8px; color: white; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; text-transform: uppercase; box-shadow: 0 4px 15px rgba(255, 0, 85, 0.4); }
-#auth-status { color: #38bdf8; margin-top: 15px; font-size: 14px; font-weight: 500; }
-
-/* ИГРОВОЙ ИНТЕРФЕЙС HUD */
-#hud { position: absolute; top: 12px; left: 12px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 6px; }
-.hud-bar { background: rgba(15, 23, 42, 0.75); color: white; padding: 6px 14px; border-radius: 6px; font-weight: bold; font-size: 15px; border-left: 4px solid #fff; backdrop-filter: blur(4px); min-width: 110px; }
-#hud-hp { border-left-color: #ef4444; color: #fca5a5; }
-#hud-armor { border-left-color: #3b82f6; color: #93c5fd; }
-#hud-ammo { border-left-color: #eab308; color: #fef08a; }
-
-#game-timer { 
-    position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 10;
-    background: rgba(10, 16, 30, 0.85); border: 2px solid #00ffff; color: #00ffff; 
-    font-weight: bold; padding: 6px 20px; border-radius: 5px; font-size: 16px; 
-    text-shadow: 0 0 5px rgba(0, 255, 255, 0.5); font-variant-numeric: tabular-nums;
+body, html {
+    width: 100%; height: 100%; overflow: hidden;
+    background-color: #0a0f1d; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-#top-right-controls { position: absolute; top: 12px; right: 12px; z-index: 10; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-#kills-counter { background: rgba(15, 23, 42, 0.75); color: #38bdf8; padding: 8px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; border: 1px solid #38bdf8; }
-
-.control-row { display: flex; gap: 6px; }
-.small-btn { background: rgba(30, 41, 59, 0.8); color: #94a3b8; border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; pointer-events: auto; }
-#btn-settings { border-color: #eab308; color: #fef08a; }
-
-/* ДИНАМИЧЕСКИЙ ПРИЦЕЛ */
-#crosshair { 
-    --crosshair-color: #00ffcc;
-    --crosshair-size: 10px;
-    position: absolute; top: 50%; left: 50%; 
-    width: var(--crosshair-size); height: var(--crosshair-size); 
-    transform: translate(-50%, -50%); z-index: 5; pointer-events: none; 
+#canvas-container {
+    width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1;
 }
-#crosshair::before, #crosshair::after { content: ''; position: absolute; background: var(--crosshair-color); }
-#crosshair::before { top: calc(50% - 1px); left: -5px; width: calc(var(--crosshair-size) + 10px); height: 2px; }
-#crosshair::after { top: -5px; left: calc(50% - 1px); width: 2px; height: calc(var(--crosshair-size) + 10px); }
 
-/* ЭЛЕМЕНТЫ УПРАВЛЕНИЯ (ПОД ТЕКСТУРЫ) */
-.draggable { position: absolute; z-index: 25; touch-action: none; user-select: none; }
-
-#joystick-zone { width: 120px; height: 120px; background: rgba(255, 255, 255, 0.08); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 50%; left: 40px; bottom: 40px; pointer-events: auto; }
-#joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: radial-gradient(circle, #38bdf8 0%, #0284c7 100%); border-radius: 50%; pointer-events: none; }
-
-.btn-action { 
-    border: none; color: white; font-weight: bold; display: flex; align-items: center; justify-content: center; 
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5); text-transform: uppercase; border-radius: 50%; pointer-events: auto; 
-    background-size: 55% 55%; background-position: center; background-repeat: no-repeat;
-    transition: transform 0.1s, background-color 0.2s;
+/* Эффекты получения урона */
+#damage-flash {
+    position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(239, 68, 68, 0.45); opacity: 0; pointer-events: none;
+    z-index: 40; transition: opacity 0.05s ease-out;
 }
-.btn-action:active { transform: scale(0.92); }
 
-/* КНОПКА АТАККИ (ПРИЦЕЛ) */
-#btn-fire { 
-    width: 95px; height: 95px; background-color: rgba(239, 68, 68, 0.25); border: 3px solid #f87171; 
+#damage-indicator {
+    position: absolute; top: 50%; left: 50%; width: 140px; height: 140px;
+    transform: translate(-50%, -50%); opacity: 0; pointer-events: none; z-index: 35;
+    transition: opacity 0.15s ease-out;
+    background: radial-gradient(circle, transparent 55%, rgba(239, 68, 68, 0.7) 70%);
+    clip-path: polygon(35% 0%, 65% 0%, 50% 50%); border-radius: 50%;
+}
+
+/* HUD Интерфейс верхний */
+#hud-top {
+    position: absolute; top: 12px; left: 0; width: 100%; display: flex;
+    justify-content: space-between; align-items: center; padding: 0 20px;
+    z-index: 10; pointer-events: none;
+}
+#hud-hp, #hud-armor, #game-timer, #kills-counter {
+    background: rgba(15, 23, 42, 0.75); color: #fff; padding: 8px 16px;
+    border-radius: 8px; font-weight: bold; font-size: 15px;
+    backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1);
+}
+#game-timer { border-color: #38bdf8; color: #38bdf8; }
+
+/* HUD Интерфейс нижний */
+#hud-bottom {
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 10; pointer-events: none;
+}
+#hud-ammo {
+    background: rgba(15, 23, 42, 0.85); color: #34d399; padding: 8px 20px;
+    border-radius: 20px; font-weight: bold; font-size: 16px; border: 1px solid #059669;
+}
+
+/* Окна оверлеев (меню, спавн, голосование) */
+.overlay {
+    position: absolute; width: 100vw; height: 100vh; top: 0; left: 0;
+    background: rgba(15, 23, 42, 0.85); display: flex; justify-content: center;
+    align-items: center; z-index: 100; backdrop-filter: blur(6px);
+}
+.menu-box {
+    background: #1e293b; padding: 30px; border-radius: 16px; text-align: center;
+    width: 340px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 2px solid #475569;
+    color: white;
+}
+.border-yellow { border-color: #eab308 !important; }
+.menu-box h2 { margin-bottom: 15px; font-size: 22px; letter-spacing: 1px; }
+
+/* Поля ввода и интерактивные кнопки */
+input {
+    width: 100%; padding: 12px; margin-bottom: 15px; background: #0f172a;
+    border: 1px solid #475569; border-radius: 8px; color: white; outline: none; font-size: 15px;
+}
+input:focus { border-color: #38bdf8; }
+.menu-btn {
+    width: 100%; padding: 12px; background: #38bdf8; border: none; border-radius: 8px;
+    color: #0f172a; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.2s;
+}
+.menu-btn:active { background: #0284c7; }
+
+/* Стили системы голосования за карты */
+.vote-row { display: flex; gap: 12px; justify-content: center; margin-top: 15px; }
+.vote-btn {
+    flex: 1; padding: 14px 10px; border: none; border-radius: 8px; color: white;
+    font-weight: bold; font-size: 14px; cursor: pointer; pointer-events: auto;
+}
+.btn-blue { background: #0284c7; box-shadow: 0 0 10px rgba(2,132,199,0.4); }
+.btn-pink { background: #ec4899; box-shadow: 0 0 10px rgba(236,72,153,0.4); }
+.vote-btn:active { transform: scale(0.95); }
+
+/* Мобильные сенсорные кнопки */
+#touch-controls {
+    position: absolute; width: 100%; height: 100%; top: 0; left: 0;
+    z-index: 20; pointer-events: none;
+}
+#joystick-zone {
+    position: absolute; left: 40px; bottom: 40px; width: 110px; height: 110px;
+    background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.25);
+    border-radius: 50%; pointer-events: auto;
+}
+#joystick-stick {
+    position: absolute; left: 35px; top: 35px; width: 40px; height: 40px;
+    background: rgba(255,255,255,0.7); border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+/* Кнопки действий - ИСПРАВЛЕННОЕ ОТОБРАЖЕНИЕ НА ТЕЛЕФОНАХ */
+.btn-action {
+    position: absolute; border: none; color: white; display: flex;
+    align-items: center; justify-content: center; border-radius: 50%; pointer-events: auto;
+    background-size: 55% 55% !important; /* Намертво держит масштаб SVGконки */
+    background-position: center center !important; /* Центрирует иконку */
+    background-repeat: no-repeat !important;
+    -webkit-appearance: none; outline: none;
+}
+.btn-action:active { transform: scale(0.9); }
+
+#btn-fire {
+    width: 95px; height: 95px; background-color: rgba(239, 68, 68, 0.25); border: 3px solid #f87171;
     box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); right: 120px; bottom: 90px;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f87171' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'></circle><circle cx='12' cy='12' r='1'></circle><line x1='22' y1='12' x2='18' y2='12'></line><line x1='6' y1='12' x2='2' y2='12'></line><line x1='12' y1='6' x2='12' y2='2'></line><line x1='12' y1='22' x2='12' y2='18'></line></svg>");
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f87171' stroke-width='2.5'><circle cx='12' cy='12' r='10'></circle><circle cx='12' cy='12' r='1'></circle><line x1='22' y1='12' x2='18' y2='12'></line><line x1='6' y1='12' x2='2' y2='12'></line><line x1='12' y1='6' x2='12' y2='2'></line><line x1='12' y1='22' x2='12' y2='18'></line></svg>");
 }
-#btn-fire:active { background-color: rgba(239, 68, 68, 0.5); }
-
-/* КНОПКА ПРЫЖКА (СТРЕЛКА ВВЕРХ) */
-#btn-jump { 
-    width: 65px; height: 65px; background-color: rgba(6, 95, 70, 0.35); border: 1px solid #059669; 
-    right: 35px; bottom: 150px; 
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2334d399' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><line x1='12' y1='19' x2='12' y2='5'></line><polyline points='5 12 12 5 19 12'></polyline></svg>");
+#btn-jump {
+    width: 65px; height: 65px; background-color: rgba(6, 95, 70, 0.35); border: 1px solid #059669; right: 35px; bottom: 150px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2334d399' stroke-width='2.5'><line x1='12' y1='19' x2='12' y2='5'></line><polyline points='5 12 12 5 19 12'></polyline></svg>");
 }
-
-/* КНОПКА ПРИСЕДАНИЯ (СТРЕЛКА ВНИЗ) */
-#btn-crouch { 
-    width: 65px; height: 65px; background-color: rgba(30, 58, 138, 0.35); border: 1px solid #3b82f6; 
-    right: 35px; bottom: 35px; 
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2360a5fa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><line x1='12' y1='5' x2='12' y2='19'></line><polyline points='19 12 12 19 5 12'></polyline></svg>");
+#btn-crouch {
+    width: 65px; height: 65px; background-color: rgba(30, 58, 138, 0.35); border: 1px solid #3b82f6; right: 35px; bottom: 35px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2360a5fa' stroke-width='2.5'><line x1='12' y1='5' x2='12' y2='19'></line><polyline points='19 12 12 19 5 12'></polyline></svg>");
+}
+#btn-reload {
+    width: 65px; height: 65px; background-color: rgba(71, 85, 105, 0.35); border: 1px solid #64748b; right: 120px; bottom: 35px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'><polyline points='23 4 23 10 17 10'></polyline><polyline points='1 20 1 14 7 14'></polyline><path d='M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15'></path></svg>");
 }
 
-/* КНОПКА ПЕРЕЗАРЯДКИ (СТРЕЛОЧКИ ПО КРУГУ) */
-#btn-reload { 
-    width: 65px; height: 65px; background-color: rgba(71, 85, 105, 0.35); border: 1px solid #64748b; 
-    right: 120px; bottom: 35px; 
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='23 4 23 10 17 10'></polyline><polyline points='1 20 1 14 7 14'></polyline><path d='M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15'></path></svg>");
+/* Утилитарные классы */
+.small-btn { padding: 6px 12px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; color: white; cursor: pointer; pointer-events: auto; font-weight: bold; }
+.text-red { color: #f87171 !important; }
+.text-yellow { color: #eab308 !important; }
+.animate-pulse { animation: pulse 2s infinite; }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
 }
-
-/* ГЛАВНОЕ МЕНЮ НАСТРОЕК */
-#settings-panel {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    background: rgba(11, 18, 36, 0.96); border: 2px solid #38bdf8; padding: 25px; border-radius: 16px;
-    z-index: 110; display: none; width: 85%; max-width: 360px; color: white; backdrop-filter: blur(12px); box-shadow: 0 0 35px rgba(0, 242, 255, 0.25);
-}
-#settings-panel h3 { margin: 0 0 20px 0; text-align: center; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; font-size: 18px; }
-
-.setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 14px; font-weight: 500; }
-.setting-item input[type="range"] { width: 120px; accent-color: #38bdf8; }
-.setting-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: #38bdf8; cursor: pointer; }
-.setting-item select { background: #1e293b; color: white; border: 1px solid #475569; padding: 4px 8px; border-radius: 6px; outline: none; }
-
-#btn-leave-match { width: 100%; background: #ef4444; color: white; margin-bottom: 15px; font-size: 13px; padding: 10px; }
-#btn-leave-match:hover { background: #dc2626; }
-
-.panel-grid-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-.panel-btn { padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; transition: background 0.2s; }
-
-#btn-custom-layout { grid-column: span 2; background: #eab308; color: #000; }
-#btn-save-settings { background: #10b981; color: white; }
-#btn-close-settings { background: #475569; color: white; }
-#btn-reset-all { grid-column: span 2; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid #ef4444; margin-top: 5px; }
-
-/* ОКНО РАСКЛАДКИ */
-#layout-edit-subpanel {
-    position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-    background: rgba(15, 23, 42, 0.95); border: 2px solid #eab308; padding: 12px 25px; border-radius: 10px;
-    z-index: 120; display: none; text-align: center; color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-}
-
-#respawn-screen { position: absolute; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.85); z-index: 50; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; backdrop-filter: blur(6px); }
-.edit-mode { outline: 2px dashed #eab308 !important; background: rgba(234, 179, 8, 0.2) !important; border-radius: 50%; }
