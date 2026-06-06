@@ -11,7 +11,6 @@
 <body>
 
     <div id="damage-flash"></div>
-
     <div id="damage-indicator"></div>
 
     <div id="canvas-container"></div>
@@ -21,7 +20,10 @@
         <div id="hud-armor">🛡️ Броня: 100</div>
         <div id="game-timer">Матч: 03:00</div>
         <div id="kills-counter">💀 Убийства: 0</div>
-        <button class="small-btn text-red" onclick="leaveMatch()">Выйти</button>
+        <div style="display: flex; gap: 5px; pointer-events: auto;">
+            <button class="small-btn text-yellow" onclick="toggleFullScreen()">📺 Экран</button>
+            <button class="small-btn text-red" onclick="leaveMatch()">Выйти</button>
+        </div>
     </div>
 
     <div id="hud-bottom">
@@ -50,12 +52,8 @@
             <h2 class="text-yellow animate-pulse">МАТЧ ЗАВЕРШЕН</h2>
             <p style="margin-bottom: 20px; color: #94a3b8;">Голосование за следующую локацию:</p>
             <div class="vote-row">
-                <button class="vote-btn btn-blue" onclick="voteMap('arena')">
-                    🏟️ Арена (<span id="vote-arena-count">0</span>)
-                </button>
-                <button class="vote-btn btn-pink" onclick="voteMap('maze')">
-                    🧬 Лабиринт (<span id="vote-maze-count">0</span>)
-                </button>
+                <button class="vote-btn btn-blue" onclick="voteMap('arena')">🏟️ Арена (<span id="vote-arena-count">0</span>)</button>
+                <button class="vote-btn btn-pink" onclick="voteMap('maze')">🧬 Лабиринт (<span id="vote-maze-count">0</span>)</button>
             </div>
         </div>
     </div>
@@ -64,13 +62,9 @@
         <div id="joystick-zone">
             <div id="joystick-stick"></div>
         </div>
-
         <button id="btn-reload" class="btn-action"></button>
-
         <button id="btn-fire" class="btn-action"></button>
-
         <button id="btn-crouch" class="btn-action"></button>
-
         <button id="btn-jump" class="btn-action"></button>
     </div>
 
