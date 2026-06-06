@@ -1,4 +1,4 @@
-// УБЕДИСЬ, ЧТО ЭТОТ URL ВЕДЕТ НА ТВОЙ СЕРВЕР (БЕЗ СЛЭША В КОНЦЕ!)
+// ВСТАВЬ СЮДА СВОЙ URL ИЗ ПАНЕЛИ RENDER (ОБЯЗАТЕЛЬНО БЕЗ СЛЭША НА КОНЦЕ!)
 const SERVER_URL = "https://pvp-arena-online.onrender.com"; 
 let socket = null;
 
@@ -25,21 +25,18 @@ const RADAR_PING_INTERVAL = 2500;
 
 window.gameSettings = { sensitivity: 0.0035, hudScale: 1.0 };
 
-// Выбор режима на стартовом экране
 window.selectGameMode = function(mode) {
     currentGameMode = mode;
     document.getElementById('mode-coop-select').classList.toggle('active', mode === 'coop');
     document.getElementById('mode-pvp-select').classList.toggle('active', mode === 'pvp');
 };
 
-// Функция генерации текстуры с Ником, ХП, Броней и СТРЕЛОЧКОЙ (видны сквозь стены для союзников)
 function createCharacterLabel(text, hp, armor, isEnemy) {
     const canvas = document.createElement('canvas');
     canvas.width = 256; canvas.height = 110; 
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Голубая стрелка НАД ником (только для союзников)
     if (!isEnemy) {
         ctx.fillStyle = '#38bdf8'; 
         ctx.beginPath(); ctx.moveTo(128, 5); ctx.lineTo(118, 20); ctx.lineTo(138, 20); ctx.closePath(); ctx.fill();
@@ -49,28 +46,22 @@ function createCharacterLabel(text, hp, armor, isEnemy) {
     const barY = isEnemy ? 34 : 55;
     const armorY = isEnemy ? 56 : 77;
 
-    // 2. Никнейм
     ctx.font = 'Bold 22px sans-serif';
     ctx.fillStyle = isEnemy ? '#ef4444' : '#ffffff';
     ctx.textAlign = 'center'; ctx.fillText(text, 128, textY);
 
     const barX = 28; const barW = 200;
 
-    // 3. Плашка ХП
     ctx.fillStyle = '#1e293b'; ctx.fillRect(barX, barY, barW, 18);
     ctx.fillStyle = '#10b981'; let hpPercent = Math.max(0, Math.min(100, hp)) / 100; ctx.fillRect(barX, barY, barW * hpPercent, 18);
 
-    // Цифры ХП поверх плашки
     ctx.font = 'Bold 13px sans-serif'; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
     ctx.fillText(`${Math.max(0, hp)} HP`, 128, barY + 14);
 
-    // 4. Плашка Брони
     ctx.fillStyle = '#1e293b'; ctx.fillRect(barX, armorY, barW, 8);
     ctx.fillStyle = '#3b82f6'; let armorPercent = Math.max(0, Math.min(100, armor)) / 100; ctx.fillRect(barX, armorY, barW * armorPercent, 8);
 
     const texture = new THREE.CanvasTexture(canvas);
-    
-    // ЭФФЕКТ РЕНТГЕНА: Для союзников полностью отключаем проверку глубины (видны сквозь стены)
     const material = new THREE.SpriteMaterial({ 
         map: texture,
         depthTest: isEnemy ? true : false,
@@ -83,28 +74,30 @@ function createCharacterLabel(text, hp, armor, isEnemy) {
     return sprite;
 }
 
-// УМНОЕ ИСПРАВЛЕННОЕ ПОДКЛЮЧЕНИЕ К СЕРВЕРУ
 function initSocket() {
     const statusText = document.getElementById('auth-status');
     const authBtn = document.getElementById('btn-auth');
 
-    if(statusText) statusText.innerText = "Установка связи с сервером...";
+    if(statusText) statusText.innerText = "Стучимся в WebSocket-туннель...";
     if(authBtn) { authBtn.disabled = true; authBtn.style.background = '#475569'; authBtn.innerText = "ПИНГУЕМ СЕРВЕР..."; }
 
-    // Инициализируем socket.io с явным указанием транспортов, чтобы обойти блокировки HTTPS
+    // ЖЕСТКАЯ НАСТРОЙКА ДЛЯ ТЕЛЕФОНОВ И GITHUB PAGES
     socket = io(SERVER_URL, {
-        transports: ['websocket', 'polling'],
-        timeout: 5000,
-        reconnectionAttempts: 10
+        transports: ['websocket'],
+        upgrade: false,
+        forceNew: true,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 2000
     });
 
     socket.on('connect', () => { 
-        if(statusText) statusText.innerText = "Сервер онлайн! Заходите в бой."; 
+        if(statusText) statusText.innerText = "Сервер онлайн! Входите в бой."; 
         if(authBtn) { authBtn.disabled = false; authBtn.style.background = '#ec4899'; authBtn.innerText = "ПОДКЛЮЧИТЬСЯ"; }
     });
 
     socket.on('connect_error', () => {
-        if(statusText) statusText.innerText = "Сервер спит (загрузка бэкенда Render ~1 мин)...";
+        if(statusText) statusText.innerText = "Сервер спит (загрузка Render ~1 мин)...";
     });
     
     socket.on('authSuccess', (data) => { 
@@ -353,7 +346,6 @@ function updateHUD() {
 document.getElementById('btn-respawn').addEventListener('click', () => { if(socket) socket.emit('requestRespawn'); });
 document.getElementById('btn-skip-break').addEventListener('click', () => { if(socket && socket.connected) socket.emit('skipBreakVote'); });
 
-// МЕНЮ ПАУЗЫ И HUD РЕДАКТОР
 function setupControls() {
     const jZone = document.getElementById('joystick-zone'), stick = document.getElementById('joystick-stick');
     const menuTrigger = document.getElementById('btn-menu-trigger'), customMenu = document.getElementById('customizer-menu');
@@ -391,8 +383,6 @@ function setupControls() {
         document.getElementById('auth-screen').style.display = 'flex'; if(socket) socket.disconnect();
         setTimeout(initSocket, 500);
     });
-
-    document.getElementById('btn-fullscreen-toggle').addEventListener('click', () => { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(()=>{}); } else { document.exitFullscreen(); } });
 
     document.getElementById('btn-fire').addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startAutofire(); } });
     document.getElementById('btn-fire').addEventListener('touchend', (e) => { if(!isCustomizing){ e.preventDefault(); stopAutofire(); } });
