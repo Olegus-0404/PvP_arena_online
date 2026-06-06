@@ -1,161 +1,178 @@
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
-
-// Подключаем Socket.io версии 4.7.2 с полной свободой для CORS
 const io = require('socket.io')(http, {
-  cors: {
-    origin: "*", 
-    methods: ["GET", "POST"],
-    credentials: true
-  }
+  cors: { origin: "*", methods: ["GET", "POST"], credentials: true }
 });
 
 let players = {};
-let currentMap = "arena"; // Начальная карта
-let gameTimeLeft = 180;   // 3 минуты на раунд
-let isVotingMode = false;
-let mapVotes = { arena: 0, maze: 0 };
-let votedPlayers = new Set();
-
-// Спавн-точки для карт
-const spawnPoints = {
-  arena: [
-    { x: 0, z: 15 }, { x: 15, z: -15 }, { x: -15, z: -15 }, { x: 0, z: -20 }
-  ],
-  maze: [
-    { x: -35, z: -35 }, { x: 35, z: 35 }, { x: -35, z: 35 }, { x: 35, z: -35 }
-  ]
+let bots = {};
+let gameState = {
+  wave: 1,
+  botsLeft: 0,
+  waveActive: false,
+  timerBeforeWave: 10, // Время на передышку между волнами (сек)
+  isBreak: true
 };
 
-function getRandomSpawn() {
-  const points = spawnPoints[currentMap] || spawnPoints.arena;
-  const p = points[Math.floor(Math.random() * points.length)];
-  return { x: p.x + (Math.random() * 2 - 1), z: p.z + (Math.random() * 2 - 1), map: currentMap };
+let botIdCounter = 0;
+
+// Точки спавна для ботов
+const botSpawnPoints = [
+  {x: -20, z: -20}, {x: 20, z: -20}, {x: -20, z: 20}, {x: 20, z: 20},
+  {x: 0, z: -30}, {x: 0, z: 30}, {x: -30, z: 0}, {x: 30, z: 0}
+];
+
+function startWave() {
+  gameState.isBreak = false;
+  gameState.waveActive = true;
+  // Количество ботов зависит от номера волны и числа игроков
+  let playerCount = Object.keys(players).length || 1;
+  gameState.botsLeft = gameState.wave * 4 + playerCount * 2;
+  
+  bots = {};
+  for (let i = 0; i < gameState.botsLeft; i++) {
+    botIdCounter++;
+    let spawn = botSpawnPoints[Math.floor(Math.random() * botSpawnPoints.length)];
+    bots["bot_" + botIdCounter] = {
+      id: "bot_" + botIdCounter,
+      x: spawn.x + (Math.random() * 4 - 2),
+      z: spawn.z + (Math.random() * 4 - 2),
+      hp: 50 + gameState.wave * 10, // С каждой волной боты жирнее
+      speed: 4 + Math.min(4, gameState.wave * 0.3) // И чуть быстрее
+    };
+  }
+  io.emit('waveStarted', { wave: gameState.wave, bots: bots });
 }
 
-// Таймер матча
-setInterval(() => {
-  if (gameTimeLeft > 0) {
-    gameTimeLeft--;
-    io.emit('timerUpdate', { timeLeft: gameTimeLeft, isVoting: isVotingMode });
-  } else {
-    if (!isVotingMode) {
-      // Время вышло — запускаем голосование за карту
-      isVotingMode = true;
-      gameTimeLeft = 15; // 15 секунд на голосование
-      mapVotes = { arena: 0, maze: 0 };
-      votedPlayers.clear();
-      io.emit('startVoting');
-    } else {
-      // Голосование завершено — считаем результаты
-      isVotingMode = false;
-      gameTimeLeft = 180; // Сброс на 3 минуты
-      
-      currentMap = mapVotes.maze > mapVotes.arena ? "maze" : "arena";
-      io.emit('endVoting');
-
-      // Респавним всех на новой карте
-      for (let id in players) {
-        players[id].hp = 100;
-        players[id].armor = 100;
-        let s = getRandomSpawn();
-        players[id].x = s.x;
-        players[id].z = s.z;
-        io.to(id).emit('init', s);
-      }
+function nextWaveCountdown() {
+  gameState.isBreak = true;
+  gameState.waveActive = false;
+  gameState.timerBeforeWave = 10;
+  
+  // Хилим и восполняем припасы всем выжившим игрокам в конце волны!
+  for (let id in players) {
+    if (players[id].hp > 0) {
+      players[id].hp = 100;
+      players[id].armor = 100;
     }
   }
-}, 1000);
+  io.emit('waveCleared', { nextWaveIn: gameState.timerBeforeWave });
+}
+
+// Главный игровой цикл сервера (ИИ ботов и таймеры)
+setInterval(() => {
+  // Если передышка между волнами
+  if (gameState.isBreak) {
+    if (gameState.timerBeforeWave > 0) {
+      gameState.timerBeforeWave--;
+      io.emit('timerUpdate', { timeLeft: gameState.timerBeforeWave, isBreak: true, wave: gameState.wave });
+    } else {
+      startWave();
+    }
+  }
+
+  // Если идет волна — двигаем ботов к ближайшему игроку
+  if (gameState.waveActive) {
+    let pIds = Object.keys(players).filter(id => players[id].hp > 0);
+    
+    if (pIds.length > 0) {
+      for (let bId in bots) {
+        let bot = bots[bId];
+        // Находим ближайшего живого игрока
+        let closestPlayer = null;
+        let minDist = 9999;
+        
+        pIds.forEach(pId => {
+          let p = players[pId];
+          let dist = Math.sqrt((p.x - bot.x)**2 + (p.z - bot.z)**2);
+          if (dist < minDist) { minDist = dist; closestPlayer = p; }
+        });
+
+        if (closestPlayer) {
+          // Вычисляем вектор движения к игроку (упрощенно за 1 тик)
+          let dx = closestPlayer.x - bot.x;
+          let dz = closestPlayer.z - bot.z;
+          let angle = Math.atan2(dx, dz);
+          
+          // Движение (учитываем тикрейт 30 раз в сек)
+          bot.x += Math.sin(angle) * (bot.speed / 30);
+          bot.z += Math.cos(angle) * (bot.speed / 30);
+          bot.rotY = angle;
+
+          // Если бот подошел вплотную — наносит урон игроку
+          if (minDist < 1.2) {
+            let targetPlayer = players[closestPlayer.id];
+            if (targetPlayer && targetPlayer.hp > 0 && (!bot.lastAttack || Date.now() - bot.lastAttack > 1000)) {
+              bot.lastAttack = Date.now();
+              let dmg = 10 + gameState.wave * 2;
+              if (targetPlayer.armor > 0) {
+                targetPlayer.armor = Math.max(0, targetPlayer.armor - Math.floor(dmg * 0.4));
+                targetPlayer.hp -= Math.floor(dmg * 0.6);
+              } else {
+                targetPlayer.hp -= dmg;
+              }
+              io.to(closestPlayer.id).emit('damagedBy', { shooterX: bot.x, shooterZ: bot.z });
+            }
+          }
+        }
+      }
+    }
+    io.emit('updateBots', bots);
+    io.emit('timerUpdate', { timeLeft: Object.keys(bots).length, isBreak: false, wave: gameState.wave });
+  }
+}, 1000 / 30);
 
 io.on('connection', (socket) => {
-
   socket.on('playerAuth', (data) => {
-    let nickname = (data.nick || "Игрок").substring(0, 14);
-    
-    players[socket.id] = {
-      id: socket.id,
-      nick: nickname,
-      x: 0, z: 0, rotY: 0,
-      hp: 100, armor: 100,
-      kills: 0
-    };
-
+    let nickname = (data.nick || "Боец").substring(0, 14);
+    players[socket.id] = { id: socket.id, nick: nickname, x: 0, z: 0, rotY: 0, hp: 100, armor: 100, kills: 0 };
     socket.emit('authSuccess', { nick: nickname, pass: data.pass || "1234" });
-    
-    let spawn = getRandomSpawn();
-    players[socket.id].x = spawn.x;
-    players[socket.id].z = spawn.z;
-    
-    socket.emit('init', spawn);
+    socket.emit('init', { x: 0, z: 0, map: "arena" });
+    // Синхронизируем текущее состояние волны для зашедшего
+    socket.emit('syncWave', { wave: gameState.wave, isBreak: gameState.isBreak });
   });
 
   socket.on('playerMove', (data) => {
     if (players[socket.id] && players[socket.id].hp > 0) {
-      players[socket.id].x = data.x;
-      players[socket.id].z = data.z;
-      players[socket.id].rotY = data.rotY;
+      players[socket.id].x = data.x; players[socket.id].z = data.z; players[socket.id].rotY = data.rotY;
     }
   });
 
-  // Фикс регистрации попаданий и урона
   socket.on('playerHit', (data) => {
     let shooter = players[socket.id];
-    let target = players[data.targetId];
+    if (!shooter || shooter.hp <= 0) return;
 
-    if (!shooter || shooter.hp <= 0 || !target || target.hp <= 0) return;
+    // Проверяем попадание по БОТУ
+    if (bots[data.targetId]) {
+      let bot = bots[data.targetId];
+      let damage = data.zone === 'head' ? 60 : 25;
+      bot.hp -= damage;
 
-    // Считаем урон: в голову 55, в тело 20
-    let damage = data.zone === 'head' ? 55 : 20;
-
-    // Просчет брони
-    if (target.armor > 0) {
-      let absorbed = Math.floor(damage * 0.4);
-      target.armor = Math.max(0, target.armor - absorbed);
-      target.hp -= (damage - absorbed);
-    } else {
-      target.hp -= damage;
-    }
-
-    // Отправляем таргету вспышку урона
-    io.to(data.targetId).emit('damagedBy');
-
-    if (target.hp <= 0) {
-      target.hp = 0;
-      shooter.kills++;
+      if (bot.hp <= 0) {
+        delete bots[data.targetId];
+        shooter.kills++;
+        
+        // Если ботов больше не осталось — запускаем отсчет следующей волны
+        if (Object.keys(bots).length === 0) {
+          gameState.wave++;
+          nextWaveCountdown();
+        }
+      }
     }
   });
 
   socket.on('requestRespawn', () => {
     if (players[socket.id] && players[socket.id].hp <= 0) {
-      players[socket.id].hp = 100;
-      players[socket.id].armor = 100;
-      socket.emit('init', getRandomSpawn());
+      players[socket.id].hp = 100; players[socket.id].armor = 100;
+      socket.emit('init', { x: 0, z: 0 });
     }
   });
 
-  socket.on('submitVote', (mapName) => {
-    if (isVotingMode && !votedPlayers.has(socket.id)) {
-      if (mapVotes[mapName] !== undefined) {
-        mapVotes[mapName]++;
-        votedPlayers.add(socket.id);
-        io.emit('votesUpdated', mapVotes);
-      }
-    }
-  });
-
-  socket.on('disconnect', () => {
-    delete players[socket.id];
-    votedPlayers.delete(socket.id);
-  });
+  socket.on('disconnect', () => { delete players[socket.id]; });
 });
 
-// Отправка позиций игроков 30 раз в секунду (тикрэйт)
-setInterval(() => {
-  io.emit('updatePlayers', players);
-}, 1000 / 30);
+setInterval(() => { io.emit('updatePlayers', players); }, 1000 / 30);
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => {
-  console.log(`Сервер пашет на порту ${PORT}`);
-});
+http.listen(PORT, () => { console.log(`Coop сервер пашет на порту ${PORT}`); });
