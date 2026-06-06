@@ -62,13 +62,39 @@ body {
 .btn-action { 
     border: none; color: white; font-weight: bold; display: flex; align-items: center; justify-content: center; 
     box-shadow: 0 4px 10px rgba(0,0,0,0.5); text-transform: uppercase; border-radius: 50%; pointer-events: auto; 
-    background-size: 60% 60%; background-position: center; background-repeat: no-repeat;
+    background-size: 55% 55%; background-position: center; background-repeat: no-repeat;
+    transition: transform 0.1s, background-color 0.2s;
+}
+.btn-action:active { transform: scale(0.92); }
+
+/* КНОПКА АТАККИ (ПРИЦЕЛ) */
+#btn-fire { 
+    width: 95px; height: 95px; background-color: rgba(239, 68, 68, 0.25); border: 3px solid #f87171; 
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); right: 120px; bottom: 90px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f87171' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'></circle><circle cx='12' cy='12' r='1'></circle><line x1='22' y1='12' x2='18' y2='12'></line><line x1='6' y1='12' x2='2' y2='12'></line><line x1='12' y1='6' x2='12' y2='2'></line><line x1='12' y1='22' x2='12' y2='18'></line></svg>");
+}
+#btn-fire:active { background-color: rgba(239, 68, 68, 0.5); }
+
+/* КНОПКА ПРЫЖКА (СТРЕЛКА ВВЕРХ) */
+#btn-jump { 
+    width: 65px; height: 65px; background-color: rgba(6, 95, 70, 0.35); border: 1px solid #059669; 
+    right: 35px; bottom: 150px; 
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2334d399' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><line x1='12' y1='19' x2='12' y2='5'></line><polyline points='5 12 12 5 19 12'></polyline></svg>");
 }
 
-#btn-fire { width: 95px; height: 95px; background-color: rgba(239, 68, 68, 0.2); border: 3px solid #f87171; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); right: 120px; bottom: 90px; }
-#btn-jump { width: 65px; height: 65px; background-color: rgba(6, 95, 70, 0.3); border: 1px solid #059669; right: 35px; bottom: 150px; }
-#btn-crouch { width: 65px; height: 65px; background-color: rgba(30, 58, 138, 0.3); border: 1px solid #3b82f6; right: 35px; bottom: 35px; }
-#btn-reload { width: 65px; height: 65px; background-color: rgba(71, 85, 105, 0.3); border: 1px solid #64748b; right: 120px; bottom: 35px; }
+/* КНОПКА ПРИСЕДАНИЯ (СТРЕЛКА ВНИЗ) */
+#btn-crouch { 
+    width: 65px; height: 65px; background-color: rgba(30, 58, 138, 0.35); border: 1px solid #3b82f6; 
+    right: 35px; bottom: 35px; 
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2360a5fa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><line x1='12' y1='5' x2='12' y2='19'></line><polyline points='19 12 12 19 5 12'></polyline></svg>");
+}
+
+/* КНОПКА ПЕРЕЗАРЯДКИ (СТРЕЛОЧКИ ПО КРУГУ) */
+#btn-reload { 
+    width: 65px; height: 65px; background-color: rgba(71, 85, 105, 0.35); border: 1px solid #64748b; 
+    right: 120px; bottom: 35px; 
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='23 4 23 10 17 10'></polyline><polyline points='1 20 1 14 7 14'></polyline><path d='M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15'></path></svg>");
+}
 
 /* ГЛАВНОЕ МЕНЮ НАСТРОЕК */
 #settings-panel {
@@ -83,10 +109,7 @@ body {
 .setting-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: #38bdf8; cursor: pointer; }
 .setting-item select { background: #1e293b; color: white; border: 1px solid #475569; padding: 4px 8px; border-radius: 6px; outline: none; }
 
-/* Стиль для кнопки выхода в меню */
-#btn-leave-match {
-    width: 100%; background: #ef4444; color: white; margin-bottom: 15px; font-size: 13px; padding: 10px;
-}
+#btn-leave-match { width: 100%; background: #ef4444; color: white; margin-bottom: 15px; font-size: 13px; padding: 10px; }
 #btn-leave-match:hover { background: #dc2626; }
 
 .panel-grid-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
