@@ -37,7 +37,7 @@ function initSocket() {
     });
     
     socket.on('authFailed', (msg) => { 
-        document.getElementById('btn-auth').innerText = "Войти"; 
+        document.getElementById('btn-auth').innerText = "ВОЙТИ"; 
         document.getElementById('auth-status').innerText = msg; 
     });
     
@@ -51,9 +51,9 @@ function initSocket() {
     });
     
     socket.on('timerUpdate', (data) => { 
-        const timerEl = document.getElementById('game-timer');
-        if (timerEl) {
-            timerEl.innerText = data.isVoting ? `Голосование: ${data.timeLeft}с` : `Матч: ${Math.floor(data.timeLeft/60)}:${data.timeLeft%60 < 10 ? '0'+data.timeLeft%60 : data.timeLeft%60}`;
+        const timerText = document.getElementById('val-timer');
+        if (timerText) {
+            timerText.innerText = data.isVoting ? `Голоса: ${data.timeLeft}с` : `${Math.floor(data.timeLeft/60)}:${data.timeLeft%60 < 10 ? '0'+data.timeLeft%60 : data.timeLeft%60}`;
         }
     });
 
@@ -68,7 +68,7 @@ function initSocket() {
     });
 
     socket.on('endVoting', () => { document.getElementById('voting-screen').style.display = 'none'; });
-    socket.on('damagedBy', (data) => { triggerDamageFlash(); });
+    socket.on('damagedBy', () => { triggerDamageFlash(); });
 
     socket.on('updatePlayers', (serverPlayers) => {
         if (!scene) return;
@@ -89,7 +89,6 @@ function initSocket() {
                 let torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
                 torso.position.y = 0.9; torso.userData = { targetId: id, zone: 'body' }; group.add(torso);
                 
-                // ФИКС ХЕДШОТОВ: Вешаем userData напрямую на меши головы
                 let head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), new THREE.MeshStandardMaterial({ color: 0xe2e8f0 }));
                 head.position.y = 1.5; head.userData = { targetId: id, zone: 'head' }; group.add(head);
                 
@@ -155,7 +154,6 @@ function createWeapon() {
     weaponGroup.position.set(0.22, -0.2, -0.45); camera.add(weaponGroup); weaponMesh = weaponGroup;
 }
 
-// ФИКС КАРТЫ ЛАБИРИНТ: Центр (0,0) полностью очищен от коробок
 function buildMap(mapType = "arena") {
     if (!scene) return;
     mapObjects.forEach(obj => scene.remove(obj)); mapObjects = []; colliders = [];
@@ -240,16 +238,18 @@ function startReload() {
     }, 1200);
 }
 
+// Изменение цифр БЕЗ удаления SVG-иконок
 function updateHUD() {
-    if(document.getElementById('hud-hp')) document.getElementById('hud-hp').innerText = `❤️ HP: ${hp}`;
-    if(document.getElementById('hud-armor')) document.getElementById('hud-armor').innerText = `🛡️ Броня: ${armor}`;
-    if(document.getElementById('hud-ammo')) document.getElementById('hud-ammo').innerText = isReloading ? `🔄 ЗАРЯДКА...` : `🔫 Патроны: ${ammo} / ${reserveAmmo}`;
-    if(document.getElementById('kills-counter')) document.getElementById('kills-counter').innerText = `💀 Убийства: ${kills}`;
+    if(document.getElementById('val-hp')) document.getElementById('val-hp').innerText = hp;
+    if(document.getElementById('val-armor')) document.getElementById('val-armor').innerText = armor;
+    if(document.getElementById('val-ammo')) {
+        document.getElementById('val-ammo').innerText = isReloading ? `ЗАРЯДКА...` : `${ammo} / ${reserveAmmo}`;
+    }
+    if(document.getElementById('val-kills')) document.getElementById('val-kills').innerText = kills;
 }
 
 if(document.getElementById('btn-respawn')) document.getElementById('btn-respawn').addEventListener('click', () => { if(socket) socket.emit('requestRespawn'); });
 
-// ГЛОБАЛЬНЫЙ МОДУЛЬ НАСТРОЕК И ПЕРЕМЕЩЕНИЯ ЭЛЕМЕНТОВ (HUD CUSTOMIZER)
 function setupControls() {
     const jZone = document.getElementById('joystick-zone'), stick = document.getElementById('joystick-stick');
     const menuTrigger = document.getElementById('btn-menu-trigger'), customMenu = document.getElementById('customizer-menu');
@@ -257,7 +257,7 @@ function setupControls() {
     // Кнопка меню
     menuTrigger.addEventListener('touchstart', (e) => {
         e.preventDefault(); e.stopPropagation();
-        if (isCustomizing) return; // В режиме редактирования кнопку можно перетаскивать
+        if (isCustomizing) return; 
         isCustomizing = true;
         stopAutofire();
         document.body.classList.add('edit-mode');
@@ -280,7 +280,7 @@ function setupControls() {
         location.reload();
     });
 
-    // Обработка логики игровых кнопок
+    // Обработка кнопок действий
     document.getElementById('btn-fire').addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startAutofire(); } });
     document.getElementById('btn-fire').addEventListener('touchend', (e) => { if(!isCustomizing){ e.preventDefault(); stopAutofire(); } });
     document.getElementById('btn-reload').addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startReload(); } });
@@ -293,7 +293,7 @@ function setupControls() {
         }
     });
 
-    // Джойстик перемещения
+    // Мобильный джойстик
     jZone.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.stopPropagation(); let t = e.targetTouches[0]; joystickTouchId = t.identifier; updateJoystick(t); } });
     jZone.addEventListener('touchmove', (e) => { if(!isCustomizing){ e.stopPropagation(); for(let t of e.touches) { if(t.identifier === joystickTouchId) updateJoystick(t); } } });
     jZone.addEventListener('touchend', () => { if(!isCustomizing){ joystickTouchId = null; stick.style.transform = `translate(0px, 0px)`; moveDirection.forward = 0; moveDirection.right = 0; } });
@@ -305,10 +305,9 @@ function setupControls() {
         stick.style.transform = `translate(${dx}px, ${dy}px)`; moveDirection.forward = -(dy / 40); moveDirection.right = (dx / 40);
     }
 
-    // Движение камеры пальцем (ИГНОРИРУЕТСЯ В РЕЖИМЕ КАСТОМИЗАЦИИ)
+    // Движение камеры пальцем (поддержка мультитача)
     window.addEventListener('touchstart', (e) => {
         if (isCustomizing || e.target.closest('#customizer-menu') || e.target.closest('.overlay')) return;
-        // Камера теперь вращается одновременно с нажатием на любые кнопки!
         for(let t of e.changedTouches) { if(lookTouchId === null) { lookTouchId = t.identifier; lastLookX = t.clientX; lastLookY = t.clientY; } }
     });
     window.addEventListener('touchmove', (e) => {
@@ -325,7 +324,7 @@ function setupControls() {
     });
     window.addEventListener('touchend', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouchId = null; } });
 
-    // ЛОГИКА ДРАГ-ЭНД-ДРОПА ДЛЯ КАСТОМИЗАЦИИ ВСЕХ КНОПОК И ТЕКСТОВ
+    // СИСТЕМА ПЕРЕТАСКИВАНИЯ (Drag & Drop)
     let dragElement = null, dragOffsetX = 0, dragOffsetY = 0;
 
     document.querySelectorAll('.hud-element').forEach(el => {
@@ -336,7 +335,7 @@ function setupControls() {
             let rect = el.getBoundingClientRect();
             dragOffsetX = touch.clientX - rect.left;
             dragOffsetY = touch.clientY - rect.top;
-            el.style.transform = "none"; // сбрасываем центрирование
+            el.style.transform = "none";
         });
     });
 
@@ -346,7 +345,6 @@ function setupControls() {
         let x = touch.clientX - dragOffsetX;
         let y = touch.clientY - dragOffsetY;
         
-        // Ограничиваем рамками экрана
         x = Math.max(0, Math.min(window.innerWidth - dragElement.offsetWidth, x));
         y = Math.max(0, Math.min(window.innerHeight - dragElement.offsetHeight, y));
 
