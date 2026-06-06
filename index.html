@@ -2,70 +2,109 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>3D Кибер Арена</title>
-    <link rel="stylesheet" href="css/style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+        #canvas-container { width: 100%; height: 100%; position: absolute; z-index: 1; }
+        
+        /* Кроссхейр (Прицел) */
+        #crosshair {
+            position: absolute; top: 50%; left: 50%;
+            width: 16px; height: 16px;
+            transform: translate(-50%, -50%);
+            z-index: 10; pointer-events: none;
+        }
+        #crosshair::before, #crosshair::after {
+            content: ''; position: absolute; background: #00ffcc;
+        }
+        #crosshair::before { top: 7px; left: 0; width: 16px; height: 2px; }
+        #crosshair::after { top: 0; left: 7px; width: 2px; height: 16px; }
+
+        /* Все элементы интерфейса теперь имеют абсолютное позиционирование для кастомизации */
+        .hud-element { position: absolute; z-index: 5; transition: box-shadow 0.2s; }
+        .edit-mode .hud-element { box-shadow: 0 0 0 2px #ef4444 !important; background: rgba(239, 68, 68, 0.2) !important; }
+        
+        /* Начальные позиции блоков (как на скринах) */
+        #hud-hp { left: 20px; top: 20px; background: rgba(15, 23, 42, 0.6); color: #fff; padding: 10px 15px; border-radius: 8px; border-left: 4px solid #ef4444; }
+        #hud-armor { left: 160px; top: 20px; background: rgba(15, 23, 42, 0.6); color: #fff; padding: 10px 15px; border-radius: 8px; border-left: 4px solid #3b82f6; }
+        #game-timer { left: 50%; top: 20px; transform: translateX(-50%); background: rgba(15, 23, 42, 0.6); color: #00ffff; padding: 10px 20px; border-radius: 8px; font-weight: bold; }
+        #kills-counter { right: 220px; top: 20px; background: rgba(15, 23, 42, 0.6); color: #fff; padding: 10px 15px; border-radius: 8px; }
+        #btn-menu-trigger { right: 20px; top: 20px; background: rgba(245, 158, 11, 0.3); color: #f59e0b; border: 1px solid #f59e0b; padding: 10px 15px; border-radius: 8px; font-weight: bold; }
+        #hud-ammo { left: 50%; bottom: 20px; transform: translateX(-50%); background: rgba(15, 23, 42, 0.6); color: #10b981; padding: 8px 20px; border-radius: 20px; border: 1px solid #10b981; }
+
+        /* Элементы управления */
+        #joystick-zone { left: 40px; bottom: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); }
+        #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: #3b82f6; border-radius: 50%; }
+        
+        .btn-action { width: 65px; height: 65px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; }
+        #btn-fire { right: 110px; bottom: 90px; background: rgba(239, 68, 68, 0.4); border: 2px solid #ef4444; width: 80px; height: 80px; }
+        #btn-reload { right: 110px; bottom: 15px; background: rgba(71, 85, 105, 0.4); border: 2px solid #64748b; }
+        #btn-jump { right: 25px; bottom: 140px; background: rgba(16, 185, 129, 0.4); border: 2px solid #10b981; }
+        #btn-crouch { right: 25px; bottom: 40px; background: rgba(30, 58, 138, 0.3); border: 2px solid #1d4ed8; }
+
+        /* Экраны и Оверлеи */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(10, 15, 29, 0.9); color: white; }
+        .input-field { background: #1e293b; border: 1px solid #38bdf8; padding: 12px; color: white; border-radius: 6px; margin-bottom: 12px; width: 260px; text-align: center; font-size: 16px; }
+        .btn-ui { background: #ec4899; color: white; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }
+        
+        /* Окно Кастомизации */
+        #customizer-menu { display: none; background: rgba(15, 23, 42, 0.95); border: 2px solid #f59e0b; padding: 20px; border-radius: 12px; text-align: center; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 30; }
+        
+        #damage-flash { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(239,68,68,1); opacity:0; pointer-events:none; z-index:15; }
+        #voting-screen { display: none; }
+        #respawn-screen { display: none; }
+    </style>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-    <div id="damage-flash"></div>
-    <div id="damage-indicator"></div>
-
     <div id="canvas-container"></div>
+    <div id="crosshair"></div>
+    <div id="damage-flash"></div>
 
-    <div id="hud-top">
-        <div id="hud-hp">❤️ HP: 100</div>
-        <div id="hud-armor">🛡️ Броня: 100</div>
-        <div id="game-timer">Матч: 03:00</div>
-        <div id="kills-counter">💀 Убийства: 0</div>
-        <div style="display: flex; gap: 5px; pointer-events: auto;">
-            <button class="small-btn text-yellow" onclick="toggleFullScreen()">📺 Экран</button>
-            <button class="small-btn text-red" onclick="leaveMatch()">Выйти</button>
-        </div>
-    </div>
+    <div id="hud-hp" class="hud-element">❤️ HP: 100</div>
+    <div id="hud-armor" class="hud-element">🛡️ Броня: 100</div>
+    <div id="game-timer" class="hud-element">Матч: 0:00</div>
+    <div id="kills-counter" class="hud-element">💀 Убийства: 0</div>
+    <button id="btn-menu-trigger" class="hud-element">⚙️ НАСТРОЙКИ</button>
+    <div id="hud-ammo" class="hud-element">🔫 Патроны: 30 / 120</div>
 
-    <div id="hud-bottom">
-        <div id="hud-ammo">🔫 Патроны: 30 / 120</div>
-    </div>
+    <div id="joystick-zone" class="hud-element"><div id="joystick-stick"></div></div>
+    <div id="btn-fire" class="hud-element btn-action">🎯</div>
+    <div id="btn-reload" class="hud-element btn-action">🔄</div>
+    <div id="btn-jump" class="hud-element btn-action">↑</div>
+    <div id="btn-crouch" class="hud-element btn-action">↓</div>
 
     <div id="auth-screen" class="overlay">
-        <div class="menu-box">
-            <h2>КИБЕР АРЕНА 3D</h2>
-            <div id="auth-status">Введите ник и пароль для входа</div>
-            <input type="text" id="input-nick" placeholder="Ваш никнейм" maxlength="14">
-            <input type="password" id="input-pass" placeholder="Пароль">
-            <button id="btn-auth" class="menu-btn">Войти / Создать</button>
-        </div>
+        <h2>ВХОД В КИБЕР-АРЕНУ</h2><br>
+        <input type="text" id="input-nick" class="input-field" placeholder="Никнейм" value="Олег">
+        <input type="password" id="input-pass" class="input-field" placeholder="Пароль" value="1234">
+        <button id="btn-auth" class="btn-ui">ВХОД...</button>
+        <p id="auth-status" style="margin-top: 15px; color: #64748b;">Подключение...</p>
     </div>
 
-    <div id="respawn-screen" class="overlay" style="display: none;">
-        <div class="menu-box">
-            <h2 class="text-red">ВЫ ПОГИБЛИ</h2>
-            <button id="btn-respawn" class="menu-btn">Возродиться</button>
-        </div>
+    <div id="customizer-menu">
+        <h3 style="color: #f59e0b; margin-bottom: 10px;">МЕНЮ НАСТРОЕК</h3>
+        <p style="color: #94a3b8; font-size: 14px; margin-bottom: 15px;">Тащи элементы пальцем, чтобы изменить их положение!</p>
+        <button id="btn-save-hud" class="btn-ui" style="background: #10b981; margin-bottom: 10px; width: 100%;">Сохранить HUD</button>
+        <button id="btn-reset-hud" class="btn-ui" style="background: #ef4444; margin-bottom: 10px; width: 100%;">Сбросить позиции</button>
+        <button id="btn-exit-match" class="btn-ui" style="background: #374151; width: 100%;">Выйти в меню</button>
     </div>
 
-    <div id="voting-screen" class="overlay" style="display: none;">
-        <div class="menu-box border-yellow">
-            <h2 class="text-yellow animate-pulse">МАТЧ ЗАВЕРШЕН</h2>
-            <p style="margin-bottom: 20px; color: #94a3b8;">Голосование за следующую локацию:</p>
-            <div class="vote-row">
-                <button class="vote-btn btn-blue" onclick="voteMap('arena')">🏟️ Арена (<span id="vote-arena-count">0</span>)</button>
-                <button class="vote-btn btn-pink" onclick="voteMap('maze')">🧬 Лабиринт (<span id="vote-maze-count">0</span>)</button>
-            </div>
-        </div>
+    <div id="respawn-screen" class="overlay">
+        <h2>Ты погиб</h2>
+        <button id="btn-respawn" class="btn-ui" style="margin-top:20px;">Возродиться</button>
     </div>
 
-    <div id="touch-controls">
-        <div id="joystick-zone">
-            <div id="joystick-stick"></div>
+    <div id="voting-screen" class="overlay">
+        <h2>Голосование за карту</h2>
+        <div style="display:flex; gap:20px; margin-top:20px;">
+            <button class="btn-ui" onclick="voteMap('arena')">Арена (<span id="vote-arena-count">0</span>)</button>
+            <button class="btn-ui" onclick="voteMap('maze')" style="background:#3b82f6;">Лабиринт (<span id="vote-maze-count">0</span>)</button>
         </div>
-        <button id="btn-reload" class="btn-action"></button>
-        <button id="btn-fire" class="btn-action"></button>
-        <button id="btn-crouch" class="btn-action"></button>
-        <button id="btn-jump" class="btn-action"></button>
     </div>
 
     <script src="js/main.js"></script>
