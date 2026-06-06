@@ -6,32 +6,29 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-
-// Будем сохранять файл в системную папку /tmp, куда у Node.js на Render есть полный доступ
 const USERS_FILE = path.join('/tmp', 'users_backup.json');
 
-let registeredUsers = {
-    "admin": "1234" // Аккаунт по умолчанию
-};
-
+let registeredUsers = { "admin": "1234" };
 let players = {};
 let mapVotes = { arena: 0, factory: 0, city: 0 };
 let votedPlayers = new Set();
 let currentMap = 'arena';
-let matchKillsLimit = 15;
-let isMatchEnded = false;
 
-// Пытаемся прочитать сохраненных игроков при запуске сервера
+// Настройки таймера (3 минуты = 180 секунд)
+let roundTimeLeft = 180; 
+let isMatchEnded = false;
+let timerInterval = null;
+
+// Загрузка аккаунтов
 if (fs.existsSync(USERS_FILE)) {
     try {
         registeredUsers = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-        console.log('База данных игроков успешно загружена из сохранения.');
+        console.log('База данных игроков успешно загружена.');
     } catch (e) {
         console.log('Не удалось прочитать сохранение, используем память.');
     }
 }
 
-// Функция для записи новых игроков на «диск»
 function saveUsersToFile() {
     try {
         fs.writeFileSync(USERS_FILE, JSON.stringify(registeredUsers, null, 2), 'utf8');
@@ -40,10 +37,29 @@ function saveUsersToFile() {
     }
 }
 
+// Запуск игрового таймера раунда
+function startRoundTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    roundTimeLeft = 180; // 3 минуты
+    isMatchEnded = false;
+
+    timerInterval = setInterval(() => {
+        if (roundTimeLeft > 0 && !isMatchEnded) {
+            roundTimeLeft--;
+            // Отправляем каждую секунду время всем подключенным игрокам
+            io.emit('timerUpdate', { timeLeft: roundTimeLeft });
+        } else if (roundTimeLeft <= 0 && !isMatchEnded) {
+            endMatch();
+        }
+    }, 1000);
+}
+
+// Запускаем таймер сразу при старте сервера
+startRoundTimer();
+
 io.on('connection', (socket) => {
     console.log(`Подключился клиент: ${socket.id}`);
 
-    // --- ОБРАБОТКА РЕГИСТРАЦИИ И ВХОДА ---
     socket.on('playerAuth', (data) => {
         const { nick, pass } = data;
         if (!nick || !pass) return socket.emit('authFailed', 'Заполните поля!');
@@ -55,7 +71,6 @@ io.on('connection', (socket) => {
                 socket.emit('authFailed', 'Этот ник занят. Неверный пароль!');
             }
         } else {
-            // Если игрока нет, сохраняем его в память и дублируем в файл
             registeredUsers[nick] = pass;
             saveUsersToFile();
             loginPlayer(socket, nick, pass);
@@ -66,8 +81,8 @@ io.on('connection', (socket) => {
         players[socket.id] = {
             id: socket.id,
             nick: nick,
-            x: (Math.random() - 0.5) * 30,
-            z: (Math.random() - 0.5) * 30,
+            x: (Math.random() - 0.5) * 40,
+            z: (Math.random() - 0.5) * 40,
             hp: 100,
             armor: 100,
             kills: 0,
@@ -77,10 +92,11 @@ io.on('connection', (socket) => {
         socket.emit('authSuccess', { nick, pass });
         socket.emit('init', { x: players[socket.id].x, z: players[socket.id].z });
         socket.emit('mapChange', currentMap);
+        // Сразу шлем текущее время раунда новому игроку
+        socket.emit('timerUpdate', { timeLeft: roundTimeLeft });
         io.emit('updatePlayers', players);
     }
 
-    // Движение игрока
     socket.on('playerMove', (data) => {
         if (players[socket.id] && players[socket.id].hp > 0 && !isMatchEnded) {
             players[socket.id].x = data.x;
@@ -90,7 +106,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- ОБРАБОТКА УРОНА ---
     socket.on('playerHit', (data) => {
         const targetId = data.targetId;
         const zone = data.zone;
@@ -98,7 +113,6 @@ io.on('connection', (socket) => {
         if (players[targetId] && players[targetId].hp > 0 && !isMatchEnded) {
             if (zone === 'head') {
                 players[targetId].hp = 0;
-                console.log(`Игрок ${players[socket.id]?.nick} попал в голову ${players[targetId].nick}!`);
             } else {
                 let damage = 25;
                 if (players[targetId].armor > 0) {
@@ -117,22 +131,19 @@ io.on('connection', (socket) => {
                 players[targetId].hp = 0;
                 if (players[socket.id]) {
                     players[socket.id].kills++;
-                    if (players[socket.id].kills >= matchKillsLimit && !isMatchEnded) {
-                        endMatch();
-                    }
                 }
             }
             io.emit('updatePlayers', players);
         }
     });
 
-    // Респавн
     socket.on('requestRespawn', () => {
         if (players[socket.id] && players[socket.id].hp <= 0) {
             players[socket.id].hp = 100;
             players[socket.id].armor = 100;
-            players[socket.id].x = (Math.random() - 0.5) * 30;
-            players[socket.id].z = (Math.random() - 0.5) * 30;
+            // Спавн в случайной точке большой карты
+            players[socket.id].x = (Math.random() - 0.5) * 70;
+            players[socket.id].z = (Math.random() - 0.5) * 70;
             socket.emit('init', { x: players[socket.id].x, z: players[socket.id].z });
             io.emit('updatePlayers', players);
         }
@@ -155,19 +166,21 @@ io.on('connection', (socket) => {
 
 function endMatch() {
     isMatchEnded = true;
+    clearInterval(timerInterval);
+
     const leaderboard = Object.values(players)
         .sort((a, b) => b.kills - a.kills)
         .map(p => ({ id: p.id, nick: p.nick, kills: p.kills }));
 
     io.emit('matchEnd', { leaderboard });
 
+    // Время на голосование за карту — 10 секунд
     setTimeout(() => {
         let winnerMap = 'arena';
         if (mapVotes.factory > mapVotes.arena && mapVotes.factory > mapVotes.city) winnerMap = 'factory';
         if (mapVotes.city > mapVotes.arena && mapVotes.city > mapVotes.factory) winnerMap = 'city';
 
         currentMap = winnerMap;
-        isMatchEnded = false;
         mapVotes = { arena: 0, factory: 0, city: 0 };
         votedPlayers.clear();
 
@@ -175,12 +188,15 @@ function endMatch() {
             players[id].kills = 0;
             players[id].hp = 100;
             players[id].armor = 100;
-            players[id].x = (Math.random() - 0.5) * 30;
-            players[id].z = (Math.random() - 0.5) * 30;
+            players[id].x = (Math.random() - 0.5) * 70;
+            players[id].z = (Math.random() - 0.5) * 70;
         });
 
         io.emit('mapChange', currentMap);
         io.emit('updatePlayers', players);
+        
+        // Запуск нового раунда на 3 минуты
+        startRoundTimer();
     }, 10000);
 }
 
