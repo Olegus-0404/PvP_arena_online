@@ -20,12 +20,10 @@ let lastLookX = 0, lastLookY = 0;
 let fireIntervalId = null;
 let isCrouching = false;
 
-// ФИКС ОШИБКИ: Добавлена глобальная переменная настроек по умолчанию
 window.gameSettings = {
     sensitivity: 0.0035
 };
 
-// ФИКС ОШИБКИ: Заглушка для инициализации настроек, чтобы движок не падал
 function initGameSettings() {
     console.log("Настройки управления успешно инициализированы");
 }
@@ -108,11 +106,9 @@ function initSocket() {
             if (!remotePlayers[id] && pData.hp > 0) {
                 let group = new THREE.Group();
                 
-                // ТОРС
                 let torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
                 torso.position.y = 0.9; torso.userData = { targetId: id, zone: 'body' }; group.add(torso);
                 
-                // ГОЛОВА И ВИЗОР
                 let headGroup = new THREE.Group(); headGroup.position.y = 1.5;
                 let head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), new THREE.MeshStandardMaterial({ color: 0xe2e8f0 }));
                 head.userData = { targetId: id, zone: 'head' }; headGroup.add(head);
@@ -120,7 +116,6 @@ function initSocket() {
                 let visor = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.06, 0.1), new THREE.MeshBasicMaterial({ color: 0x00ffff }));
                 visor.position.set(0, 0, -0.18); visor.userData = { targetId: id, zone: 'head' }; headGroup.add(visor); group.add(headGroup);
                 
-                // ФИКС ОШИБКИ СЕРВЕРА: Всем конечностям жестко прописаны targetId и zone
                 let leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6), new THREE.MeshStandardMaterial({ color: 0xff0055 })); 
                 leftArm.position.set(-0.4, 0.9, 0); leftArm.userData = { targetId: id, zone: 'body' }; group.add(leftArm);
                 
@@ -279,7 +274,8 @@ function checkWallCollisions(newPos) {
 
 const authBtn = document.getElementById('btn-auth');
 if (authBtn) {
-    authBtn.addEventListener('click', () => {
+    authBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         let nickname = document.getElementById('input-nick').value.trim(); 
         let password = document.getElementById('input-pass').value.trim();
         if(nickname.length < 2 || password.length < 3) return;
@@ -324,29 +320,34 @@ function updateHUD() {
     if(document.getElementById('kills-counter')) document.getElementById('kills-counter').innerText = `💀 Убийства: ${kills}`;
 }
 
-if(document.getElementById('btn-respawn')) document.getElementById('btn-respawn').addEventListener('click', () => { if(socket) socket.emit('requestRespawn'); });
+if(document.getElementById('btn-respawn')) document.getElementById('btn-respawn').addEventListener('click', (e) => { e.stopPropagation(); if(socket) socket.emit('requestRespawn'); });
 
+// ИСПРАВЛЕННАЯ СИСТЕМА ОБРАБОТКИ СЕНСОРА БЕЗ БЛОКИРОВОК КЛИКОВ
 function setupControls() {
     const jZone = document.getElementById('joystick-zone'), stick = document.getElementById('joystick-stick');
-    if(document.getElementById('btn-fire')) {
-        document.getElementById('btn-fire').addEventListener('touchstart', (e) => { e.preventDefault(); startAutofire(); });
-        document.getElementById('btn-fire').addEventListener('touchend', (e) => { e.preventDefault(); stopAutofire(); });
-    }
-    if(document.getElementById('btn-reload')) document.getElementById('btn-reload').addEventListener('touchstart', (e) => { e.preventDefault(); startReload(); });
-    if(document.getElementById('btn-jump')) document.getElementById('btn-jump').addEventListener('touchstart', (e) => { e.preventDefault(); if(isGrounded) playerVelocity.y = JUMP_FORCE; });
     
+    if(document.getElementById('btn-fire')) {
+        document.getElementById('btn-fire').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); startAutofire(); }, {passive: false});
+        document.getElementById('btn-fire').addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); stopAutofire(); }, {passive: false});
+    }
+    if(document.getElementById('btn-reload')) {
+        document.getElementById('btn-reload').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); startReload(); }, {passive: false});
+    }
+    if(document.getElementById('btn-jump')) {
+        document.getElementById('btn-jump').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); if(isGrounded) playerVelocity.y = JUMP_FORCE; }, {passive: false});
+    }
     if(document.getElementById('btn-crouch')) {
         document.getElementById('btn-crouch').addEventListener('touchstart', (e) => { 
-            e.preventDefault(); isCrouching = !isCrouching;
+            e.preventDefault(); e.stopPropagation(); isCrouching = !isCrouching;
             moveSpeed = isCrouching ? 6 : 14;
             document.getElementById('btn-crouch').style.backgroundColor = isCrouching ? "rgba(59, 130, 246, 0.6)" : "rgba(30, 58, 138, 0.3)";
-        });
+        }, {passive: false});
     }
 
     if(jZone && stick) {
-        jZone.addEventListener('touchstart', (e) => { e.stopPropagation(); let t = e.targetTouches[0]; joystickTouchId = t.identifier; updateJoystick(t); });
-        jZone.addEventListener('touchmove', (e) => { e.stopPropagation(); for(let t of e.touches) { if(t.identifier === joystickTouchId) updateJoystick(t); } });
-        jZone.addEventListener('touchend', () => { joystickTouchId = null; stick.style.transform = `translate(0px, 0px)`; moveDirection.forward = 0; moveDirection.right = 0; });
+        jZone.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); let t = e.targetTouches[0]; joystickTouchId = t.identifier; updateJoystick(t); }, {passive: false});
+        jZone.addEventListener('touchmove', (e) => { e.preventDefault(); e.stopPropagation(); for(let t of e.touches) { if(t.identifier === joystickTouchId) updateJoystick(t); } }, {passive: false});
+        jZone.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); joystickTouchId = null; stick.style.transform = `translate(0px, 0px)`; moveDirection.forward = 0; moveDirection.right = 0; }, {passive: false});
     }
 
     function updateJoystick(touch) {
@@ -356,8 +357,9 @@ function setupControls() {
         stick.style.transform = `translate(${dx}px, ${dy}px)`; moveDirection.forward = -(dy / 40); moveDirection.right = (dx / 40);
     }
 
+    // Вращение камеры работает строго ВНЕ интерфейсных окон и кнопок управления
     window.addEventListener('touchstart', (e) => {
-        if (e.target.closest('#joystick-zone') || e.target.closest('.btn-action') || e.target.closest('.small-btn') || e.target.closest('#voting-screen')) return;
+        if (e.target.closest('#joystick-zone') || e.target.closest('.btn-action') || e.target.closest('.small-btn') || e.target.closest('.overlay')) return;
         for(let t of e.changedTouches) { if(lookTouchId === null) { lookTouchId = t.identifier; lastLookX = t.clientX; lastLookY = t.clientY; } }
     });
     window.addEventListener('touchmove', (e) => {
@@ -371,4 +373,44 @@ function setupControls() {
             }
         }
     });
-    window.addEventListener('touchend', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouch
+    window.addEventListener('touchend', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouchId = null; } });
+}
+
+let clock = new THREE.Clock();
+function animate() {
+    requestAnimationFrame(animate);
+    if (!renderer || !scene || !camera) return;
+    let delta = clock.getDelta(); if (delta > 0.1) delta = 0.1;
+
+    if (myId && hp > 0) {
+        playerVelocity.y -= GRAVITY * delta;
+        let forwardVector = new THREE.Vector3(0, 0, -1).applyQuaternion(yawObject.quaternion);
+        let sideVector = new THREE.Vector3(1, 0, 0).applyQuaternion(yawObject.quaternion);
+        let moveX = (forwardVector.x * moveDirection.forward + sideVector.x * moveDirection.right) * moveSpeed * delta;
+        let moveZ = (forwardVector.z * moveDirection.forward + sideVector.z * moveDirection.right) * moveSpeed * delta;
+
+        let targetPos = yawObject.position.clone(); targetPos.x += moveX; 
+        if (!checkWallCollisions(targetPos) && !checkPlayerCollisions(targetPos)) yawObject.position.x = targetPos.x;
+        
+        targetPos = yawObject.position.clone(); targetPos.z += moveZ; 
+        if (!checkWallCollisions(targetPos) && !checkPlayerCollisions(targetPos)) yawObject.position.z = targetPos.z;
+
+        yawObject.position.y += playerVelocity.y * delta;
+        let targetHeight = isCrouching ? 0.9 : 1.7;
+        if (yawObject.position.y <= targetHeight) { playerVelocity.y = 0; yawObject.position.y = targetHeight; isGrounded = true; } else { isGrounded = false; }
+
+        supplyCrates.forEach(crate => {
+            if (crate.active) {
+                crate.mesh.rotation.y += 1.6 * delta;
+                if (yawObject.position.distanceTo(crate.mesh.position) < 1.4) {
+                    crate.active = false; crate.mesh.visible = false; crate.respawnTime = Date.now() + 12000;
+                    hp = Math.min(100, hp + 30); armor = Math.min(100, armor + 20); reserveAmmo += 60; updateHUD();
+                }
+            } else if (Date.now() > crate.respawnTime) { crate.active = true; crate.mesh.visible = true; }
+        });
+
+        if(socket && socket.connected) socket.emit('playerMove', { x: yawObject.position.x, z: yawObject.position.z, rotY: yawObject.rotation.y });
+    }
+    renderer.render(scene, camera);
+}
+window.addEventListener('resize', () => { if(camera && renderer) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } });
