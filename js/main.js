@@ -78,15 +78,17 @@ function initSocket() {
     const statusText = document.getElementById('auth-status');
     const authBtn = document.getElementById('btn-auth');
 
-    if(statusText) statusText.innerText = "Стучимся в WebSocket-туннель...";
+    if(statusText) statusText.innerText = "Устанавливаем соединение с сервером...";
     if(authBtn) { authBtn.disabled = true; authBtn.style.background = '#475569'; authBtn.innerText = "ПИНГУЕМ СЕРВЕР..."; }
 
-    // Мягкое подключение: даем серверу самому выбрать оптимальный транспорт
+    // Универсальные настройки подключения для стабильной связи с Render
     socket = io(SERVER_URL, {
+        transports: ['polling', 'websocket'],
         forceNew: true,
         reconnection: true,
         reconnectionAttempts: Infinity,
-        reconnectionDelay: 2000
+        reconnectionDelay: 1000,
+        timeout: 20000
     });
 
     socket.on('connect', () => { 
@@ -95,7 +97,8 @@ function initSocket() {
     });
 
     socket.on('connect_error', (error) => {
-        if(statusText) statusText.innerText = `Ошибка связи: ${error.message || 'ожидание'}. Проверьте сервер.`;
+        if(statusText) statusText.innerText = `Ошибка связи: ${error.message}. Проверьте сервер.`;
+        console.error("Socket Error:", error);
     });
     
     socket.on('authSuccess', (data) => { 
@@ -364,7 +367,7 @@ function setupControls() {
 
     document.getElementById('btn-save-hud').addEventListener('click', () => { isCustomizing = false; document.body.classList.remove('edit-mode'); customMenu.style.display = 'none'; saveHUDPositions(); });
 
-    // КНОПКА ФУЛЛСКРИНА НА TOUCHSTART
+    // Бронебойный полноэкранный режим на быстрое касание
     document.getElementById('btn-fullscreen-toggle').addEventListener('touchstart', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -463,8 +466,4 @@ function setupControls() {
         el.addEventListener('touchstart', (e) => {
             if (!isCustomizing || el.id === "btn-menu-trigger") return; 
             dragElement = el; let touch = e.touches[0]; let rect = el.getBoundingClientRect();
-            dragOffsetX = touch.clientX - rect.left; dragOffsetY = touch.clientY - rect.top; el.style.transform = "none";
-        });
-    });
-    window.addEventListener('touchmove', (e) => {
-        if (!isCustomizing || !dragElement)
+            dragOffsetX = touch.clientX - rect.left; dragOffsetY = touch.clientY - rect
