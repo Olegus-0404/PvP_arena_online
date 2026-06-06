@@ -81,7 +81,6 @@ function initSocket() {
     if(statusText) statusText.innerText = "Стучимся в WebSocket-туннель...";
     if(authBtn) { authBtn.disabled = true; authBtn.style.background = '#475569'; authBtn.innerText = "ПИНГУЕМ СЕРВЕР..."; }
 
-    // ЖЕСТКАЯ НАСТРОЙКА ДЛЯ ТЕЛЕФОНОВ И GITHUB PAGES
     socket = io(SERVER_URL, {
         transports: ['websocket'],
         upgrade: false,
@@ -365,6 +364,17 @@ function setupControls() {
     });
 
     document.getElementById('btn-save-hud').addEventListener('click', () => { isCustomizing = false; document.body.classList.remove('edit-mode'); customMenu.style.display = 'none'; saveHUDPositions(); });
+
+    // Логика переключения на весь экран внутри меню
+    document.getElementById('btn-fullscreen-toggle').addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    });
 
     document.getElementById('btn-menu-switch-coop').addEventListener('click', () => {
         if(currentGameMode === 'coop') return;
