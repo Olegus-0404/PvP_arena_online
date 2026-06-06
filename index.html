@@ -48,10 +48,17 @@
         .small-btn { background: rgba(30, 41, 59, 0.8); color: #94a3b8; border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; pointer-events: auto; }
         #btn-settings { border-color: #eab308; color: #fef08a; }
 
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; }
-        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #00ffcc; }
-        #crosshair::before { top: 4px; left: -5px; width: 20px; height: 2px; }
-        #crosshair::after { top: -5px; left: 4px; width: 2px; height: 20px; }
+        /* НОВЫЙ ДИНАМИЧЕСКИЙ ПРИЦЕЛ С ПОДДЕРЖКОЙ НАСТРОЕК */
+        #crosshair { 
+            --crosshair-color: #00ffcc;
+            --crosshair-size: 10px;
+            position: absolute; top: 50%; left: 50%; 
+            width: var(--crosshair-size); height: var(--crosshair-size); 
+            transform: translate(-50%, -50%); z-index: 5; pointer-events: none; 
+        }
+        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: var(--crosshair-color); }
+        #crosshair::before { top: calc(50% - 1px); left: -5px; width: calc(var(--crosshair-size) + 10px); height: 2px; }
+        #crosshair::after { top: -5px; left: calc(50% - 1px); width: 2px; height: calc(var(--crosshair-size) + 10px); }
 
         /* ЭЛЕМЕНТЫ УПРАВЛЕНИЯ */
         .draggable { position: absolute; z-index: 25; touch-action: none; user-select: none; }
@@ -66,23 +73,40 @@
         #btn-crouch { width: 65px; height: 65px; background: #1e3a8a; border: 1px solid #3b82f6; font-size: 10px; right: 35px; bottom: 35px; }
         #btn-reload { width: 65px; height: 65px; background: #475569; border: 1px solid #64748b; font-size: 10px; right: 120px; bottom: 35px; }
 
-        /* ОКНО НАСТРОЕК */
+        /* ПРОДВИНУТОЕ ГЛАВНОЕ МЕНЮ НАСТРОЕК */
         #settings-panel {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(15, 23, 42, 0.95); border: 2px solid #eab308; padding: 20px; border-radius: 12px;
-            z-index: 110; display: none; text-align: center; color: white; backdrop-filter: blur(8px); box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            background: rgba(11, 18, 36, 0.96); border: 2px solid #38bdf8; padding: 25px; border-radius: 16px;
+            z-index: 110; display: none; width: 85%; max-width: 360px; color: white; backdrop-filter: blur(12px); box-shadow: 0 0 35px rgba(0, 242, 255, 0.25);
         }
-        #settings-panel p { margin: 0 0 15px 0; font-size: 14px; color: #94a3b8; }
-        .panel-btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-        #btn-save-layout { background: #10b981; color: white; }
-        #btn-reset-layout { background: #ef4444; color: white; }
+        #settings-panel h3 { margin: 0 0 20px 0; text-align: center; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; font-size: 18px; }
+        
+        .setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 14px; font-weight: 500; }
+        .setting-item input[type="range"] { width: 120px; accent-color: #38bdf8; }
+        .setting-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: #38bdf8; cursor: pointer; }
+        .setting-item select { background: #1e293b; color: white; border: 1px solid #475569; padding: 4px 8px; border-radius: 6px; outline: none; }
+        
+        .panel-grid-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 20px; }
+        .panel-btn { padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; transition: background 0.2s; }
+        
+        #btn-custom-layout { grid-column: span 2; background: #eab308; color: #000; }
+        #btn-save-settings { background: #10b981; color: white; }
+        #btn-close-settings { background: #475569; color: white; }
+        #btn-reset-all { grid-column: span 2; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid #ef4444; margin-top: 5px; }
+
+        /* МИНИ-ОКНО СОХРАНЕНИЯ РАСКЛАДКИ */
+        #layout-edit-subpanel {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.95); border: 2px solid #eab308; padding: 12px 25px; border-radius: 10px;
+            z-index: 120; display: none; text-align: center; color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
 
         #respawn-screen { position: absolute; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.85); z-index: 50; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; backdrop-filter: blur(6px); }
-        
         .edit-mode { outline: 2px dashed #eab308 !important; background: rgba(234, 179, 8, 0.2) !important; border-radius: 50%; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="settings.js"></script>
 </head>
 <body>
 
@@ -102,10 +126,50 @@
     </div>
 
     <div id="settings-panel">
-        <h3>🔧 Режим настройки кастомизации</h3>
-        <p>Перетаскивай кнопки пальцем в любое удобное место.</p>
-        <button id="btn-save-layout" class="panel-btn">Сохранить</button>
-        <button id="btn-reset-layout" class="panel-btn">Сброс</button>
+        <h3>⚙️ Настройки игры</h3>
+        
+        <div class="setting-item">
+            <span>Чувствительность (<span id="setting-sens-value">5.0</span>)</span>
+            <input type="range" id="setting-sens" min="1" max="15" step="0.5" value="5">
+        </div>
+        
+        <div class="setting-item">
+            <span>Инверсия мыши (Y)</span>
+            <input type="checkbox" id="setting-invert">
+        </div>
+
+        <div class="setting-item">
+            <span>Цвет прицела</span>
+            <select id="setting-color">
+                <option value="#00ffcc">Бирюзовый</option>
+                <option value="#ef4444">Красный</option>
+                <option value="#10b981">Зеленый</option>
+                <option value="#eab308">Желтый</option>
+                <option value="#ffffff">Белый</option>
+            </select>
+        </div>
+
+        <div class="setting-item">
+            <span>Размер прицела</span>
+            <input type="range" id="setting-size" min="6" max="24" step="2" value="10">
+        </div>
+
+        <div class="setting-item">
+            <span>Атмосферный Туман</span>
+            <input type="checkbox" id="setting-fog" checked>
+        </div>
+
+        <div class="panel-grid-buttons">
+            <button id="btn-custom-layout" class="panel-btn">✏️ Изменить раскладку HUD</button>
+            <button id="btn-save-settings" class="panel-btn">Сохранить</button>
+            <button id="btn-close-settings" class="panel-btn">Отмена</button>
+            <button id="btn-reset-all" class="panel-btn">🚨 Полный сброс данных</button>
+        </div>
+    </div>
+
+    <div id="layout-edit-subpanel">
+        <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: bold; color: #eab308;">🛠️ Режим редактирования кнопок</p>
+        <button id="btn-save-layout" class="panel-btn" style="background:#10b981; color:white; padding: 6px 15px;">Готово</button>
     </div>
 
     <div id="hud">
@@ -135,14 +199,13 @@
     <div id="canvas-container"></div>
 
     <script>
+        // НАСТРОЙКА СЕРВЕРА
         const SERVER_URL = "https://pvp-arena-online.onrender.com"; 
-        
         let socket;
         try { socket = io(SERVER_URL); } catch(e) { console.error(e); }
 
         let myId = null, myNick = "", myPass = "";
         let hp = 100, armor = 0, ammo = 30, reserveAmmo = 120, kills = 0, isReloading = false, isCrouching = false;
-        let isEditMode = false;
         
         let scene, camera, renderer, weaponMesh;
         let yawObject = new THREE.Object3D(), pitchObject = new THREE.Object3D();
@@ -151,7 +214,7 @@
         let playerVelocity = new THREE.Vector3();
         let isGrounded = true;
         
-        const GRAVITY = 28; const JUMP_FORCE = 11; let moveSpeed = 14; let lookSpeed = 0.0035;
+        const GRAVITY = 28; const JUMP_FORCE = 11; let moveSpeed = 14;
         let colliders = [];
 
         let joystickTouchId = null;
@@ -192,14 +255,21 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            initEngine(); loadSavedLayout(); setupControls(); setupLayoutEditor();
+            initEngine(); 
+            // ЗАПУСКАЕМ ИНИЦИАЛИЗАЦИЮ НАСТРОЕК ИЗ ВНЕШНЕГО ФАЙЛА
+            initGameSettings(); 
+            setupControls();
             if(localStorage.getItem('n') && localStorage.getItem('p')) {
                 document.getElementById('input-nick').value = localStorage.getItem('n'); document.getElementById('input-pass').value = localStorage.getItem('p');
             }
         });
 
         function initEngine() {
-            scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0f1d); scene.fog = new THREE.FogExp2(0x0a0f1d, 0.015);
+            scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0f1d);
+            // Делаем сцену глобальной, чтобы settings.js мог управлять туманом напрямую
+            window.scene = scene;
+            scene.fog = new THREE.FogExp2(0x0a0f1d, 0.015);
+            
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             pitchObject.add(camera); yawObject.add(pitchObject); scene.add(yawObject);
 
@@ -232,7 +302,6 @@
             let mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: color })); mesh.position.set(x, y, z); scene.add(mesh); mapObjects.push(mesh); colliders.push(new THREE.Box3().setFromObject(mesh));
         }
 
-        // Спавн ящиков с припасами
         function spawnCrates() {
             const cratePoints = [
                 new THREE.Vector3(0, 0.5, 12), new THREE.Vector3(-15, 0.5, -12),
@@ -267,7 +336,7 @@
         });
 
         function performShot() {
-            if (isReloading || hp <= 0 || isEditMode) return;
+            if (isReloading || hp <= 0 || window.isEditMode) return;
             if (ammo <= 0) { stopAutofire(); startReload(); return; }
 
             ammo--; updateHUD();
@@ -282,11 +351,11 @@
             if (ammo <= 0) { stopAutofire(); startReload(); }
         }
 
-        function startAutofire() { if (fireIntervalId !== null) return; performShot(); fireIntervalId = setInterval(performShot, 75); } // Скорость M4A1 (75мс)
+        function startAutofire() { if (fireIntervalId !== null) return; performShot(); fireIntervalId = setInterval(performShot, 75); }
         function stopAutofire() { if (fireIntervalId !== null) { clearInterval(fireIntervalId); fireIntervalId = null; } }
 
         function startReload() {
-            if (isReloading || ammo === 30 || reserveAmmo <= 0 || isEditMode) return;
+            if (isReloading || ammo === 30 || reserveAmmo <= 0 || window.isEditMode) return;
             isReloading = true; updateHUD();
             setTimeout(() => {
                 let needed = 30 - ammo; let transfer = Math.min(needed, reserveAmmo);
@@ -307,17 +376,16 @@
             const jZone = document.getElementById('joystick-zone');
             const stick = document.getElementById('joystick-stick');
 
-            // Нажатия на кнопки действий
             const fireBtn = document.getElementById('btn-fire');
-            fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if(!isEditMode) startAutofire(); });
+            fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if(!window.isEditMode) startAutofire(); });
             fireBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopAutofire(); });
             fireBtn.addEventListener('touchcancel', (e) => { e.preventDefault(); stopAutofire(); });
 
             document.getElementById('btn-reload').addEventListener('touchstart', (e) => { e.preventDefault(); startReload(); });
-            document.getElementById('btn-jump').addEventListener('touchstart', (e) => { e.preventDefault(); if(isGrounded && !isEditMode) playerVelocity.y = JUMP_FORCE; });
+            document.getElementById('btn-jump').addEventListener('touchstart', (e) => { e.preventDefault(); if(isGrounded && !window.isEditMode) playerVelocity.y = JUMP_FORCE; });
             
             document.getElementById('btn-crouch').addEventListener('touchstart', (e) => { 
-                e.preventDefault(); if (isEditMode) return;
+                e.preventDefault(); if (window.isEditMode) return;
                 isCrouching = !isCrouching;
                 if(isCrouching) { moveSpeed = 6; document.getElementById('btn-crouch').style.background = "#3b82f6"; } 
                 else { moveSpeed = 14; document.getElementById('btn-crouch').style.background = "#1e3a8a"; }
@@ -325,13 +393,12 @@
 
             document.getElementById('btn-fullscreen').addEventListener('click', () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); });
 
-            // ДЖОЙСТИК (СТРОГАЯ ЗОНА)
             jZone.addEventListener('touchstart', (e) => {
-                if (isEditMode) return; e.stopPropagation();
+                if (window.isEditMode) return; e.stopPropagation();
                 let t = e.targetTouches[0]; joystickTouchId = t.identifier; updateJoystick(t);
             });
             jZone.addEventListener('touchmove', (e) => {
-                if (isEditMode) return; e.stopPropagation();
+                if (window.isEditMode) return; e.stopPropagation();
                 for(let t of e.touches) { if(t.identifier === joystickTouchId) updateJoystick(t); }
             });
             jZone.addEventListener('touchend', () => { joystickTouchId = null; stick.style.transform = `translate(0px, 0px)`; moveDirection.forward = 0; moveDirection.right = 0; });
@@ -343,23 +410,28 @@
                 stick.style.transform = `translate(${dx}px, ${dy}px)`; moveDirection.forward = -(dy / 40); moveDirection.right = (dx / 40);
             }
 
-            // ГЛОБАЛЬНЫЙ СКВОЗНОЙ ОБЗОР (РАБОТАЕТ ДАЖЕ ПРИ ЗАЖАТИИ КНОПОК!)
+            // УПРАВЛЕНИЕ КАМЕРОЙ С ИСПОЛЬЗОВАНИЕМ ЛОКАЛЬНЫХ НАСТРОЕК (SENSITIVITY И INVERTY)
             window.addEventListener('touchstart', (e) => {
-                if (isEditMode) return;
-                // Игнорируем джойстик и верхние кнопки настроек
-                if (e.target.closest('#joystick-zone') || e.target.closest('#settings-panel') || e.target.closest('.small-btn')) return;
-                
+                if (window.isEditMode) return;
+                if (e.target.closest('#joystick-zone') || e.target.closest('#settings-panel') || e.target.closest('#layout-edit-subpanel') || e.target.closest('.small-btn')) return;
                 for(let t of e.changedTouches) {
                     if(lookTouchId === null) { lookTouchId = t.identifier; lastLookX = t.clientX; lastLookY = t.clientY; }
                 }
             });
 
             window.addEventListener('touchmove', (e) => {
-                if (isEditMode) return;
+                if (window.isEditMode) return;
                 for(let t of e.changedTouches) {
                     if(t.identifier === lookTouchId) {
                         let dx = t.clientX - lastLookX; let dy = t.clientY - lastLookY;
-                        yawObject.rotation.y -= dx * lookSpeed; pitchObject.rotation.x -= dy * lookSpeed;
+                        
+                        // Используем настройки из сохраненного конфига
+                        let currentSens = window.gameSettings.sensitivity;
+                        let invertFactor = window.gameSettings.invertY ? -1 : 1;
+
+                        yawObject.rotation.y -= dx * currentSens; 
+                        pitchObject.rotation.x -= dy * currentSens * invertFactor;
+                        
                         pitchObject.rotation.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitchObject.rotation.x));
                         lastLookX = t.clientX; lastLookY = t.clientY;
                     }
@@ -368,43 +440,6 @@
 
             window.addEventListener('touchend', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouchId = null; } });
             window.addEventListener('touchcancel', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouchId = null; } });
-        }
-
-        function setupLayoutEditor() {
-            const btnSettings = document.getElementById('btn-settings');
-            const panel = document.getElementById('settings-panel');
-            const draggables = document.querySelectorAll('.draggable');
-
-            btnSettings.addEventListener('click', () => { isEditMode = true; panel.style.display = 'block'; draggables.forEach(el => el.classList.add('edit-mode')); });
-            document.getElementById('btn-save-layout').addEventListener('click', () => {
-                isEditMode = false; panel.style.display = 'none'; draggables.forEach(el => el.classList.remove('edit-mode'));
-                let layout = {};
-                draggables.forEach(el => { layout[el.id] = { left: el.style.left, top: el.style.top, right: el.style.right, bottom: el.style.bottom }; });
-                localStorage.setItem('cyber_arena_layout', JSON.stringify(layout));
-            });
-            document.getElementById('btn-reset-layout').addEventListener('click', () => { localStorage.removeItem('cyber_arena_layout'); location.reload(); });
-
-            draggables.forEach(el => {
-                let activeDrag = false;
-                el.addEventListener('touchstart', () => { if (isEditMode) activeDrag = true; });
-                window.addEventListener('touchmove', (e) => {
-                    if (!isEditMode || !activeDrag) return;
-                    let touch = e.touches[0]; el.style.right = 'auto'; el.style.bottom = 'auto';
-                    el.style.left = (touch.clientX - el.offsetWidth / 2) + 'px'; el.style.top = (touch.clientY - el.offsetHeight / 2) + 'px';
-                });
-                window.addEventListener('touchend', () => { activeDrag = false; });
-            });
-        }
-
-        function loadSavedLayout() {
-            let saved = localStorage.getItem('cyber_arena_layout');
-            if (saved) {
-                let layout = JSON.parse(saved);
-                for (let id in layout) {
-                    let el = document.getElementById(id);
-                    if (el) { el.style.left = layout[id].left; el.style.top = layout[id].top; el.style.right = layout[id].right; el.style.bottom = layout[id].bottom; }
-                }
-            }
         }
 
         let clock = new THREE.Clock();
@@ -426,7 +461,6 @@
                 let targetHeight = isCrouching ? 0.9 : 1.7;
                 if (yawObject.position.y <= targetHeight) { playerVelocity.y = 0; yawObject.position.y = targetHeight; isGrounded = true; } else { isGrounded = false; }
 
-                // ПРОВЕРКА СБОРЩИКА ЯЩИКОВ СНАБЖЕНИЯ
                 supplyCrates.forEach(crate => {
                     if (crate.active) {
                         crate.mesh.rotation.y += 1.6 * delta;
@@ -435,7 +469,7 @@
                         let dist = yawObject.position.distanceTo(crate.mesh.position);
                         if (dist < 1.4) {
                             crate.active = false; crate.mesh.visible = false;
-                            crate.respawnTime = Date.now() + 12000; // Респавн через 12 секунд
+                            crate.respawnTime = Date.now() + 12000;
                             
                             hp = Math.min(100, hp + 30);
                             armor = Math.min(100, armor + 20);
