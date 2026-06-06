@@ -8,41 +8,58 @@ app.use(cors());
 
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+    cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-// Класс игрока встроен прямо в сервер для надежности
+let currentMap = "arena"; 
+let mapVotes = { arena: 0, maze: 0 };
+let isVotingMode = false;
+let votingTimeout = null;
+
 class Player {
     constructor(id, nick) {
         this.id = id;
         this.nick = nick;
         this.hp = 100;
+        this.armor = 100; 
         this.kills = 0;
-        this.x = (Math.random() * 40) - 20;
-        this.z = (Math.random() * 40) - 20;
+        this.x = (Math.random() * 30) - 15;
+        this.z = (Math.random() * 30) - 15;
         this.rotY = 0;
     }
     updatePosition(x, z, rotY) {
-        if (this.hp > 0) {
+        if (this.hp > 0 && !isVotingMode) {
             this.x = x;
             this.z = z;
             this.rotY = rotY;
         }
     }
     takeDamage(zone) {
-        if (this.hp <= 0) return false;
-        let damage = (zone === 'head') ? 100 : 20;
-        this.hp -= damage;
+        if (this.hp <= 0 || isVotingMode) return false;
+        
+        let baseDamage = 20;
+        let damage = (zone === 'head') ? Math.floor(baseDamage * 1.7) : baseDamage;
+        
+        if (this.armor > 0) {
+            if (this.armor >= damage) {
+                this.armor -= damage;
+            } else {
+                let remainingDamage = damage - this.armor;
+                this.armor = 0;
+                this.hp -= remainingDamage;
+            }
+        } else {
+            this.hp -= damage;
+        }
+
         if (this.hp < 0) this.hp = 0;
-        return this.hp === 0;
+        return this.hp === 0; 
     }
     respawn() {
         this.hp = 100;
-        this.x = (Math.random() * 40) - 20;
-        this.z = (Math.random() * 40) - 20;
+        this.armor = 100; 
+        this.x = (Math.random() * 30) - 15;
+        this.z = (Math.random() * 30) - 15;
         this.rotY = 0;
     }
 }
@@ -53,106 +70,129 @@ const MATCH_DURATION = 180;
 let timeLeft = MATCH_DURATION;
 
 setInterval(() => {
-    if (timeLeft > 0) timeLeft--;
-    else { timeLeft = MATCH_DURATION; resetMatch(); }
-    io.emit('timerUpdate', { timeLeft });
+    if (isVotingMode) return;
+    if (timeLeft > 0) {
+        timeLeft--;
+        io.emit('timerUpdate', { timeLeft, isVoting: false });
+    } else {
+        startMapVoting();
+    }
 }, 1000);
 
-function resetMatch() {
+function startMapVoting() {
+    isVotingMode = true;
+    mapVotes = { arena: 0, maze: 0 };
+    io.emit('startVoting', { maps: ['arena', 'maze'] });
+
+    let voteTimeLeft = 10;
+    let voteInterval = setInterval(() => {
+        voteTimeLeft--;
+        io.emit('timerUpdate', { timeLeft: voteTimeLeft, isVoting: true });
+        if (voteTimeLeft <= 0) {
+            clearInterval(voteInterval);
+            endMapVoting();
+        }
+    }, 1000);
+}
+
+function endMapVoting() {
+    isVotingMode = false;
+    timeLeft = MATCH_DURATION;
+    
+    currentMap = (mapVotes.maze > mapVotes.arena) ? "maze" : "arena";
+    
     for (let id in players) {
-        if (players[id] && typeof players[id].respawn === 'function') {
+        if (players[id]) {
             players[id].kills = 0;
             players[id].respawn();
-            io.to(id).emit('init', { x: players[id].x, z: players[id].z });
+            io.to(id).emit('init', { x: players[id].x, z: players[id].z, map: currentMap });
         }
     }
+    io.emit('endVoting', { winner: currentMap });
     io.emit('updatePlayers', players);
 }
 
 io.on('connection', (socket) => {
-    console.log(`Подключился сокет: ${socket.id}`);
-    socket.emit('timerUpdate', { timeLeft });
+    socket.emit('timerUpdate', { timeLeft, isVoting: isVotingMode });
+    if (isVotingMode) socket.emit('startVoting', { maps: ['arena', 'maze'] });
 
-    // БРОНЕБОЙНАЯ АВТОРИЗАЦИЯ С ЗАЩИТОЙ ОТ КРЭШЕЙ
     socket.on('playerAuth', (data) => {
         try {
-            if (!data) {
-                socket.emit('authFailed', "Ошибка: Данные не получены");
-                return;
-            }
-
+            if (!data) return;
             const nick = data.nick ? String(data.nick).trim() : "";
             const pass = data.pass ? String(data.pass).trim() : "";
 
             if (nick.length < 2 || pass.length < 3) {
-                socket.emit('authFailed', "Слишком короткий ник или пароль!");
+                socket.emit('authFailed', "Слишком короткие данные!");
                 return;
             }
 
-            // Логика аккаунтов
             if (accounts[nick]) {
                 if (accounts[nick] !== pass) {
-                    socket.emit('authFailed', "Неверный пароль для этого ника!");
+                    socket.emit('authFailed', "Неверный пароль!");
                     return;
                 }
             } else {
                 accounts[nick] = pass;
             }
 
-            // Проверка дубликатов на арене
             for (let id in players) {
                 if (players[id] && players[id].nick === nick) {
-                    socket.emit('authFailed', "Этот ник уже на арене!");
+                    socket.emit('authFailed', "Ник уже в игре!");
                     return;
                 }
             }
 
-            // Создаем нового игрока
             players[socket.id] = new Player(socket.id, nick);
             
-            // Отправляем ОТВЕТ клиенту (чтобы кнопка "ВХОД..." исчезла!)
             socket.emit('authSuccess', { nick, pass });
-            socket.emit('init', { x: players[socket.id].x, z: players[socket.id].z });
-            
-            // Оповещаем всех остальных
+            socket.emit('init', { x: players[socket.id].x, z: players[socket.id].z, map: currentMap });
             io.emit('updatePlayers', players);
-            console.log(`Игрок ${nick} успешно зашел на сервер!`);
-
         } catch (error) {
-            console.error("Критическая ошибка авторизации:", error);
-            socket.emit('authFailed', "Внутренняя ошибка сервера. Попробуй еще раз.");
+            socket.emit('authFailed', "Ошибка сервера.");
         }
     });
 
     socket.on('playerMove', (data) => {
-        if (players[socket.id]) {
+        if (players[socket.id] && !isVotingMode) {
             players[socket.id].updatePosition(data.x, data.z, data.rotY);
             socket.broadcast.emit('updatePlayers', players);
+        }
+    });
+
+    socket.on('submitVote', (mapName) => {
+        if (isVotingMode && mapVotes[mapName] !== undefined) {
+            mapVotes[mapName]++;
+            io.emit('votesUpdated', mapVotes);
         }
     });
 
     socket.on('playerHit', (data) => {
         const shooter = players[socket.id];
         const target = players[data.targetId];
-        if (!shooter || shooter.hp <= 0 || !target || target.hp <= 0) return;
+        if (!shooter || shooter.hp <= 0 || !target || target.hp <= 0 || isVotingMode) return;
 
-        if (target.takeDamage(data.zone)) {
+        let isDead = target.takeDamage(data.zone);
+        
+        // Отправляем цели инфу о том, КТО в неё выстрелил, чтобы посчитать направление
+        io.to(data.targetId).emit('damagedBy', { shooterX: shooter.x, shooterZ: shooter.z });
+
+        if (isDead) {
             shooter.kills++;
         }
         io.emit('updatePlayers', players);
     });
 
     socket.on('requestRespawn', () => {
-        if (players[socket.id] && players[socket.id].hp <= 0) {
+        if (players[socket.id] && players[socket.id].hp <= 0 && !isVotingMode) {
             players[socket.id].respawn();
-            socket.emit('init', { x: players[socket.id].x, z: players[socket.id].z });
+            socket.emit('init', { x: players[socket.id].x, z: players[socket.id].z, map: currentMap });
             io.emit('updatePlayers', players);
         }
     });
 
     socket.on('disconnect', () => {
         if (players[socket.id]) {
-            console.log(`Игрок ${players[socket.id].nick} отключился.`);
             delete players[socket.id];
             io.emit('updatePlayers', players);
         }
@@ -160,4 +200,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Сервер активен на порту ${PORT}`));
+server.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
