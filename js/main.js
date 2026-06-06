@@ -19,12 +19,12 @@ let lookTouchId = null;
 let lastLookX = 0, lastLookY = 0;
 let fireIntervalId = null;
 
-// Инициализация сетевых событий (Запускается сразу при старте страницы)
+// Инициализация сокетов
 function initSocket() {
     try { 
         socket = io(SERVER_URL); 
     } catch(e) { 
-        console.error("Ошибка инициализации сокетов:", e); 
+        console.error("Ошибка сокетов:", e); 
         document.getElementById('auth-status').innerText = "Ошибка сети";
         return;
     }
@@ -50,19 +50,26 @@ function initSocket() {
     });
     
     socket.on('init', (spawnPos) => { 
-        yawObject.position.set(spawnPos.x, 1.7, spawnPos.z); 
+        if (yawObject) {
+            yawObject.position.set(spawnPos.x, 1.7, spawnPos.z); 
+        }
         hp = 100; armor = 0; ammo = 30; reserveAmmo = 120; 
         updateHUD(); 
         document.getElementById('respawn-screen').style.display = 'none'; 
     });
     
     socket.on('timerUpdate', (data) => { 
-        const m = Math.floor(data.timeLeft / 60); 
-        const s = data.timeLeft % 60; 
-        document.getElementById('game-timer').innerText = `${m < 10 ? '0' + m : m}:${s < 10 ? '0' + s : s}`; 
+        const timerEl = document.getElementById('game-timer');
+        if (timerEl) {
+            const m = Math.floor(data.timeLeft / 60); 
+            const s = data.timeLeft % 60; 
+            timerEl.innerText = `${m < 10 ? '0' + m : m}:${s < 10 ? '0' + s : s}`; 
+        }
     });
 
     socket.on('updatePlayers', (serverPlayers) => {
+        if (!scene) return; // Защита, если сцена еще не готова
+        
         if (myId && serverPlayers[myId]) {
             kills = serverPlayers[myId].kills;
             if (serverPlayers[myId].hp <= 0 && hp > 0) { 
@@ -93,16 +100,13 @@ function initSocket() {
     });
 }
 
-// ФУНКЦИЯ ВЫХОДА В МЕНЮ
 window.leaveMatch = function() {
-    if (socket) {
-        socket.disconnect(); 
-    }
+    if (socket) socket.disconnect(); 
     myId = null;
     stopAutofire();
     
-    for (let id in remotePlayers) {
-        scene.remove(remotePlayers[id]);
+    if (scene) {
+        for (let id in remotePlayers) { scene.remove(remotePlayers[id]); }
     }
     remotePlayers = {};
 
@@ -110,23 +114,29 @@ window.leaveMatch = function() {
     document.getElementById('btn-auth').innerText = "Войти / Создать";
     document.getElementById('auth-status').innerText = "Вы покинули матч.";
     
-    // Сразу подключаем сокет обратно, чтобы меню ждало нового ввода данных
     initSocket();
 };
 
 window.addEventListener('DOMContentLoaded', () => {
     initEngine(); 
-    initSocket(); // <--- Важно! Сокет стартует сразу
+    initSocket(); 
     initGameSettings(); 
     setupControls();
     
     if(localStorage.getItem('n') && localStorage.getItem('p')) {
-        document.getElementById('input-nick').value = localStorage.getItem('n'); 
-        document.getElementById('input-pass').value = localStorage.getItem('p');
+        const nickInput = document.getElementById('input-nick');
+        const passInput = document.getElementById('input-pass');
+        if (nickInput && passInput) {
+            nickInput.value = localStorage.getItem('n'); 
+            passInput.value = localStorage.getItem('p');
+        }
     }
 });
 
 function initEngine() {
+    const container = document.getElementById('canvas-container');
+    if (!container) return;
+
     scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0f1d);
     window.scene = scene;
     scene.fog = new THREE.FogExp2(0x0a0f1d, 0.015);
@@ -135,7 +145,7 @@ function initEngine() {
     pitchObject.add(camera); yawObject.add(pitchObject); scene.add(yawObject);
 
     renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight);
-    document.getElementById('canvas-container').appendChild(renderer.domElement);
+    container.appendChild(renderer.domElement);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.4));
     let dirLight = new THREE.DirectionalLight(0x38bdf8, 0.8); dirLight.position.set(20, 40, 20); scene.add(dirLight);
@@ -144,6 +154,7 @@ function initEngine() {
 }
 
 function createWeapon() {
+    if (!camera) return;
     let weaponGroup = new THREE.Group();
     let barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.6, 8), new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 })); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0, -0.3); weaponGroup.add(barrel);
     let bodyGen = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.45), new THREE.MeshStandardMaterial({ color: 0x1e293b })); bodyGen.position.set(0, -0.02, -0.1); weaponGroup.add(bodyGen);
@@ -152,6 +163,7 @@ function createWeapon() {
 }
 
 function buildMap() {
+    if (!scene) return;
     mapObjects.forEach(obj => scene.remove(obj)); mapObjects = []; colliders = [];
     let floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8 })); floor.rotation.x = -Math.PI / 2; scene.add(floor); mapObjects.push(floor);
     let grid = new THREE.GridHelper(100, 50, 0x38bdf8, 0x1f2937); grid.position.y = 0.01; scene.add(grid); mapObjects.push(grid);
@@ -164,12 +176,13 @@ function createObstacle(x, y, z, w, h, d, color) {
 }
 
 function spawnCrates() {
+    if (!scene) return;
     const cratePoints = [
         new THREE.Vector3(0, 0.5, 12), new THREE.Vector3(-15, 0.5, -12),
         new THREE.Vector3(15, 0.5, -12), new THREE.Vector3(22, 0.5, 22),
         new THREE.Vector3(-22, 0.5, -22)
     ];
-    cratePoints.forEach((pos, i) => {
+    cratePoints.forEach((pos) => {
         let mesh = new THREE.Mesh(
             new THREE.BoxGeometry(0.7, 0.7, 0.7),
             new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.5, roughness: 0.2, emissive: 0x451a03 })
@@ -189,25 +202,27 @@ function checkWallCollisions(newPos) {
     return false;
 }
 
-// Исправленная кнопка авторизации: отправляет данные без задержек
-document.getElementById('btn-auth').addEventListener('click', () => {
-    if (window.isEditMode) return;
-    
-    let nickname = document.getElementById('input-nick').value.trim(); 
-    let password = document.getElementById('input-pass').value.trim();
-    if(nickname.length < 2 || password.length < 3) return;
-    
-    document.getElementById('btn-auth').innerText = "Вход..."; 
-    myNick = nickname; 
-    myPass = password;
-    
-    if (socket && socket.connected) {
-        socket.emit('playerAuth', { nick: nickname, pass: password });
-    } else {
-        document.getElementById('btn-auth').innerText = "Войти / Создать";
-        document.getElementById('auth-status').innerText = "Нет связи с сервером. Попробуйте позже.";
-    }
-});
+const authBtn = document.getElementById('btn-auth');
+if (authBtn) {
+    authBtn.addEventListener('click', () => {
+        if (window.isEditMode) return;
+        
+        let nickname = document.getElementById('input-nick').value.trim(); 
+        let password = document.getElementById('input-pass').value.trim();
+        if(nickname.length < 2 || password.length < 3) return;
+        
+        authBtn.innerText = "Вход..."; 
+        myNick = nickname; 
+        myPass = password;
+        
+        if (socket && socket.connected) {
+            socket.emit('playerAuth', { nick: nickname, pass: password });
+        } else {
+            authBtn.innerText = "Войти / Создать";
+            document.getElementById('auth-status').innerText = "Нет связи с сервером.";
+        }
+    });
+}
 
 function performShot() {
     if (isReloading || hp <= 0 || window.isEditMode || !myId) return;
@@ -238,44 +253,61 @@ function startReload() {
 }
 
 function updateHUD() {
-    document.getElementById('hud-hp').innerText = `❤️ HP: ${hp}`;
-    document.getElementById('hud-armor').innerText = `🛡️ Броня: ${armor}`;
-    document.getElementById('hud-ammo').innerText = isReloading ? `🔄 ПЕРЕЗАРЯДКА...` : `🔫 Патроны: ${ammo} / ${reserveAmmo}`;
-    document.getElementById('kills-counter').innerText = `💀 Убийства: ${kills}`;
+    const elHp = document.getElementById('hud-hp');
+    const elArmor = document.getElementById('hud-armor');
+    const elAmmo = document.getElementById('hud-ammo');
+    const elKills = document.getElementById('kills-counter');
+
+    if(elHp) elHp.innerText = `❤️ HP: ${hp}`;
+    if(elArmor) elArmor.innerText = `🛡️ Броня: ${armor}`;
+    if(elAmmo) elAmmo.innerText = isReloading ? `🔄 ПЕРЕЗАРЯДКА...` : `🔫 Патроны: ${ammo} / ${reserveAmmo}`;
+    if(elKills) elKills.innerText = `💀 Убийства: ${kills}`;
 }
 
-document.getElementById('btn-respawn').addEventListener('click', () => { if(socket) socket.emit('requestRespawn'); });
+const respawnBtn = document.getElementById('btn-respawn');
+if(respawnBtn) respawnBtn.addEventListener('click', () => { if(socket) socket.emit('requestRespawn'); });
 
 function setupControls() {
     const jZone = document.getElementById('joystick-zone');
     const stick = document.getElementById('joystick-stick');
-
     const fireBtn = document.getElementById('btn-fire');
-    fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if(!window.isEditMode) startAutofire(); });
-    fireBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopAutofire(); });
-    fireBtn.addEventListener('touchcancel', (e) => { e.preventDefault(); stopAutofire(); });
 
-    document.getElementById('btn-reload').addEventListener('touchstart', (e) => { e.preventDefault(); startReload(); });
-    document.getElementById('btn-jump').addEventListener('touchstart', (e) => { e.preventDefault(); if(isGrounded && !window.isEditMode) playerVelocity.y = JUMP_FORCE; });
+    if(fireBtn) {
+        fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if(!window.isEditMode) startAutofire(); });
+        fireBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopAutofire(); });
+        fireBtn.addEventListener('touchcancel', (e) => { e.preventDefault(); stopAutofire(); });
+    }
+
+    const reloadBtn = document.getElementById('btn-reload');
+    if(reloadBtn) reloadBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startReload(); });
     
-    document.getElementById('btn-crouch').addEventListener('touchstart', (e) => { 
-        e.preventDefault(); if (window.isEditMode) return;
-        isCrouching = !isCrouching;
-        if(isCrouching) { moveSpeed = 6; document.getElementById('btn-crouch').style.backgroundColor = "rgba(59, 130, 246, 0.6)"; } 
-        else { moveSpeed = 14; document.getElementById('btn-crouch').style.backgroundColor = "rgba(30, 58, 138, 0.3)"; }
-    });
+    const jumpBtn = document.getElementById('btn-jump');
+    if(jumpBtn) jumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if(isGrounded && !window.isEditMode) playerVelocity.y = JUMP_FORCE; });
+    
+    const crouchBtn = document.getElementById('btn-crouch');
+    if(crouchBtn) {
+        crouchBtn.addEventListener('touchstart', (e) => { 
+            e.preventDefault(); if (window.isEditMode) return;
+            isCrouching = !isCrouching;
+            if(isCrouching) { moveSpeed = 6; crouchBtn.style.backgroundColor = "rgba(59, 130, 246, 0.6)"; } 
+            else { moveSpeed = 14; crouchBtn.style.backgroundColor = "rgba(30, 58, 138, 0.3)"; }
+        });
+    }
 
-    document.getElementById('btn-fullscreen').addEventListener('click', () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); });
+    const fsBtn = document.getElementById('btn-fullscreen');
+    if(fsBtn) fsBtn.addEventListener('click', () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); });
 
-    jZone.addEventListener('touchstart', (e) => {
-        if (window.isEditMode) return; e.stopPropagation();
-        let t = e.targetTouches[0]; joystickTouchId = t.identifier; updateJoystick(t);
-    });
-    jZone.addEventListener('touchmove', (e) => {
-        if (window.isEditMode) return; e.stopPropagation();
-        for(let t of e.touches) { if(t.identifier === joystickTouchId) updateJoystick(t); }
-    });
-    jZone.addEventListener('touchend', () => { joystickTouchId = null; stick.style.transform = `translate(0px, 0px)`; moveDirection.forward = 0; moveDirection.right = 0; });
+    if(jZone && stick) {
+        jZone.addEventListener('touchstart', (e) => {
+            if (window.isEditMode) return; e.stopPropagation();
+            let t = e.targetTouches[0]; joystickTouchId = t.identifier; updateJoystick(t);
+        });
+        jZone.addEventListener('touchmove', (e) => {
+            if (window.isEditMode) return; e.stopPropagation();
+            for(let t of e.touches) { if(t.identifier === joystickTouchId) updateJoystick(t); }
+        });
+        jZone.addEventListener('touchend', () => { joystickTouchId = null; stick.style.transform = `translate(0px, 0px)`; moveDirection.forward = 0; moveDirection.right = 0; });
+    }
 
     function updateJoystick(touch) {
         let rect = jZone.getBoundingClientRect();
@@ -297,8 +329,8 @@ function setupControls() {
         for(let t of e.changedTouches) {
             if(t.identifier === lookTouchId) {
                 let dx = t.clientX - lastLookX; let dy = t.clientY - lastLookY;
-                let currentSens = window.gameSettings.sensitivity;
-                let invertFactor = window.gameSettings.invertY ? -1 : 1;
+                let currentSens = window.gameSettings ? window.gameSettings.sensitivity : 0.0035;
+                let invertFactor = (window.gameSettings && window.gameSettings.invertY) ? -1 : 1;
 
                 yawObject.rotation.y -= dx * currentSens; 
                 pitchObject.rotation.x -= dy * currentSens * invertFactor;
@@ -316,6 +348,8 @@ function setupControls() {
 let clock = new THREE.Clock();
 function animate() {
     requestAnimationFrame(animate);
+    if (!renderer || !scene || !camera) return; // Не рендерим, если компоненты не собрались
+    
     let delta = clock.getDelta(); if (delta > 0.1) delta = 0.1;
 
     if (myId && hp > 0) {
@@ -355,4 +389,10 @@ function animate() {
     }
     renderer.render(scene, camera);
 }
-window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+window.addEventListener('resize', () => { 
+    if(camera && renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight; 
+        camera.updateProjectionMatrix(); 
+        renderer.setSize(window.innerWidth, window.innerHeight); 
+    }
+});
