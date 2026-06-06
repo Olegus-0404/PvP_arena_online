@@ -1,5 +1,6 @@
+// УБЕДИСЬ, ЧТО ЭТОТ URL ВЕДЕТ НА ТВОЙ СЕРВЕР (БЕЗ СЛЭША В КОНЦЕ!)
 const SERVER_URL = "https://pvp-arena-online.onrender.com"; 
-let socket;
+let socket = null;
 
 let myId = null, myNick = "", myPass = "", currentGameMode = "coop";
 let hp = 100, armor = 100, ammo = 30, reserveAmmo = 120, kills = 0, isReloading = false;
@@ -34,58 +35,38 @@ window.selectGameMode = function(mode) {
 // Функция генерации текстуры с Ником, ХП, Броней и СТРЕЛОЧКОЙ (видны сквозь стены для союзников)
 function createCharacterLabel(text, hp, armor, isEnemy) {
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 110; 
+    canvas.width = 256; canvas.height = 110; 
     const ctx = canvas.getContext('2d');
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // 1. Голубая стрелка НАД ником (только для союзников)
     if (!isEnemy) {
         ctx.fillStyle = '#38bdf8'; 
-        ctx.beginPath();
-        ctx.moveTo(128, 5);
-        ctx.lineTo(118, 20);
-        ctx.lineTo(138, 20);
-        ctx.closePath();
-        ctx.fill();
+        ctx.beginPath(); ctx.moveTo(128, 5); ctx.lineTo(118, 20); ctx.lineTo(138, 20); ctx.closePath(); ctx.fill();
     }
 
-    // Сдвиг по вертикали в зависимости от наличия стрелочки
     const textY = isEnemy ? 24 : 45;
     const barY = isEnemy ? 34 : 55;
     const armorY = isEnemy ? 56 : 77;
 
-    // 2. Никнейм (Красный для врагов, Белый для союзников)
+    // 2. Никнейм
     ctx.font = 'Bold 22px sans-serif';
     ctx.fillStyle = isEnemy ? '#ef4444' : '#ffffff';
-    ctx.textAlign = 'center';
-    ctx.fillText(text, 128, textY);
+    ctx.textAlign = 'center'; ctx.fillText(text, 128, textY);
 
-    const barX = 28;
-    const barW = 200;
+    const barX = 28; const barW = 200;
 
-    // 3. Зеленая плашка ХП
-    ctx.fillStyle = '#1e293b'; 
-    ctx.fillRect(barX, barY, barW, 18);
-    
-    ctx.fillStyle = '#10b981'; 
-    let hpPercent = Math.max(0, Math.min(100, hp)) / 100;
-    ctx.fillRect(barX, barY, barW * hpPercent, 18);
+    // 3. Плашка ХП
+    ctx.fillStyle = '#1e293b'; ctx.fillRect(barX, barY, barW, 18);
+    ctx.fillStyle = '#10b981'; let hpPercent = Math.max(0, Math.min(100, hp)) / 100; ctx.fillRect(barX, barY, barW * hpPercent, 18);
 
     // Цифры ХП поверх плашки
-    ctx.font = 'Bold 13px sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
+    ctx.font = 'Bold 13px sans-serif'; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
     ctx.fillText(`${Math.max(0, hp)} HP`, 128, barY + 14);
 
-    // 4. Синяя плашка Брони
-    ctx.fillStyle = '#1e293b'; 
-    ctx.fillRect(barX, armorY, barW, 8);
-    
-    ctx.fillStyle = '#3b82f6'; 
-    let armorPercent = Math.max(0, Math.min(100, armor)) / 100;
-    ctx.fillRect(barX, armorY, barW * armorPercent, 8);
+    // 4. Плашка Брони
+    ctx.fillStyle = '#1e293b'; ctx.fillRect(barX, armorY, barW, 8);
+    ctx.fillStyle = '#3b82f6'; let armorPercent = Math.max(0, Math.min(100, armor)) / 100; ctx.fillRect(barX, armorY, barW * armorPercent, 8);
 
     const texture = new THREE.CanvasTexture(canvas);
     
@@ -102,10 +83,29 @@ function createCharacterLabel(text, hp, armor, isEnemy) {
     return sprite;
 }
 
+// УМНОЕ ИСПРАВЛЕННОЕ ПОДКЛЮЧЕНИЕ К СЕРВЕРУ
 function initSocket() {
-    try { socket = io(SERVER_URL); } catch(e) { return; }
+    const statusText = document.getElementById('auth-status');
+    const authBtn = document.getElementById('btn-auth');
 
-    socket.on('connect', () => { document.getElementById('auth-status').innerText = "Сервер онлайн! Выберите данные и заходите."; });
+    if(statusText) statusText.innerText = "Установка связи с сервером...";
+    if(authBtn) { authBtn.disabled = true; authBtn.style.background = '#475569'; authBtn.innerText = "ПИНГУЕМ СЕРВЕР..."; }
+
+    // Инициализируем socket.io с явным указанием транспортов, чтобы обойти блокировки HTTPS
+    socket = io(SERVER_URL, {
+        transports: ['websocket', 'polling'],
+        timeout: 5000,
+        reconnectionAttempts: 10
+    });
+
+    socket.on('connect', () => { 
+        if(statusText) statusText.innerText = "Сервер онлайн! Заходите в бой."; 
+        if(authBtn) { authBtn.disabled = false; authBtn.style.background = '#ec4899'; authBtn.innerText = "ПОДКЛЮЧИТЬСЯ"; }
+    });
+
+    socket.on('connect_error', () => {
+        if(statusText) statusText.innerText = "Сервер спит (загрузка бэкенда Render ~1 мин)...";
+    });
     
     socket.on('authSuccess', (data) => { 
         localStorage.setItem('n', data.nick); localStorage.setItem('p', data.pass);
@@ -129,10 +129,7 @@ function initSocket() {
         if (currentGameMode === 'coop') {
             if (data.isBreak) {
                 timerText.innerHTML = `ПЕРЕРЫВ<br>${data.timeLeft}с`;
-                if(skipBtn) {
-                    skipBtn.style.display = 'block';
-                    document.getElementById('skip-votes-count').innerText = data.votes || 0;
-                }
+                if(skipBtn) { skipBtn.style.display = 'block'; document.getElementById('skip-votes-count').innerText = data.votes || 0; }
             } else {
                 timerText.innerHTML = `ВОЛНА ${data.wave}<br>БОТОВ: ${data.timeLeft}`;
                 if(skipBtn) skipBtn.style.display = 'none';
@@ -143,17 +140,9 @@ function initSocket() {
         }
     });
 
-    socket.on('waveCleared', () => {
-        stopAutofire();
-        hp = 100; armor = 100; reserveAmmo = 120; updateHUD();
-    });
+    socket.on('waveCleared', () => { stopAutofire(); hp = 100; armor = 100; reserveAmmo = 120; updateHUD(); });
+    socket.on('damagedBy', (data) => { triggerDamageFlash(); if (data && data.shooterX !== undefined) createDamageArrow(data.shooterX, data.shooterZ); });
 
-    socket.on('damagedBy', (data) => { 
-        triggerDamageFlash(); 
-        if (data && data.shooterX !== undefined) createDamageArrow(data.shooterX, data.shooterZ);
-    });
-
-    // Отрисовка игроков и обновление их рентген-плашек над головами
     socket.on('updatePlayers', (serverPlayers) => {
         if (!scene) return;
         if (myId && serverPlayers[myId]) {
@@ -171,28 +160,20 @@ function initSocket() {
             if (!remotePlayers[id] && pData.hp > 0) {
                 let group = new THREE.Group();
                 let color = isEnemyPlayer ? 0xff0055 : 0x3b82f6;
-                
                 let torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), new THREE.MeshStandardMaterial({ color: color }));
                 torso.position.y = 0.9; torso.userData = { targetId: id, zone: 'body' }; group.add(torso);
-                
                 let head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), new THREE.MeshStandardMaterial({ color: 0xe2e8f0 }));
                 head.position.y = 1.5; head.userData = { targetId: id, zone: 'head' }; group.add(head);
 
-                // Высота 2.2, чтобы стрелочка парила ровно над головой
                 let label = createCharacterLabel(pData.nick, pData.hp, pData.armor, isEnemyPlayer);
                 label.position.y = 2.2; label.name = "player_label"; group.add(label);
-                
                 scene.add(group); remotePlayers[id] = group;
             }
             if (remotePlayers[id]) {
                 if (pData.hp <= 0) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; } 
                 else { 
-                    remotePlayers[id].position.set(pData.x, 0, pData.z); 
-                    remotePlayers[id].rotation.y = pData.rotY;
-
-                    let oldLabel = remotePlayers[id].getObjectByName("player_label");
-                    if (oldLabel) remotePlayers[id].remove(oldLabel);
-
+                    remotePlayers[id].position.set(pData.x, 0, pData.z); remotePlayers[id].rotation.y = pData.rotY;
+                    let oldLabel = remotePlayers[id].getObjectByName("player_label"); if (oldLabel) remotePlayers[id].remove(oldLabel);
                     let newLabel = createCharacterLabel(pData.nick, pData.hp, pData.armor, isEnemyPlayer);
                     newLabel.position.y = 2.2; newLabel.name = "player_label"; remotePlayers[id].add(newLabel);
                 }
@@ -201,7 +182,6 @@ function initSocket() {
         updateMinimap(serverPlayers, remoteBots);
     });
 
-    // Обработка ботов
     socket.on('updateBots', (serverBots) => {
         if (!scene || currentGameMode !== 'coop') return;
         for (let id in serverBots) {
@@ -210,22 +190,16 @@ function initSocket() {
                 let group = new THREE.Group();
                 let torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
                 torso.position.y = 0.9; torso.userData = { targetId: id, zone: 'body' }; group.add(torso);
-                
                 let head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), new THREE.MeshStandardMaterial({ color: 0x10b981 }));
                 head.position.y = 1.5; head.userData = { targetId: id, zone: 'head' }; group.add(head);
 
                 let label = createCharacterLabel("ЗОМБИ БОТ", bData.hp, 0, true);
                 label.position.y = 2.0; label.name = "bot_label"; group.add(label);
-
                 scene.add(group); remoteBots[id] = group;
             }
             if (remoteBots[id]) {
-                remoteBots[id].position.set(bData.x, 0, bData.z);
-                remoteBots[id].rotation.y = bData.rotY;
-
-                let oldLabel = remoteBots[id].getObjectByName("bot_label");
-                if (oldLabel) remoteBots[id].remove(oldLabel);
-
+                remoteBots[id].position.set(bData.x, 0, bData.z); remoteBots[id].rotation.y = bData.rotY;
+                let oldLabel = remoteBots[id].getObjectByName("bot_label"); if (oldLabel) remoteBots[id].remove(oldLabel);
                 let newLabel = createCharacterLabel("ЗОМБИ БОТ", bData.hp, 0, true);
                 newLabel.position.y = 2.0; newLabel.name = "bot_label"; remoteBots[id].add(newLabel);
             }
@@ -235,59 +209,47 @@ function initSocket() {
 }
 
 function updateMinimap(serverPlayers, currentBots) {
-    const radar = document.getElementById('minimap-radar');
-    if (!radar || !yawObject) return;
+    const radar = document.getElementById('minimap-radar'); if (!radar || !yawObject) return;
     document.querySelectorAll('.radar-dot:not(.dot-me)').forEach(el => el.remove());
-
     const radarRadius = 55; const mapScale = 1.6;
     let myX = yawObject.position.x; let myZ = yawObject.position.z; let myRot = yawObject.rotation.y;
-
-    let doEnemyPing = false;
-    if (Date.now() - lastRadarPingTime > RADAR_PING_INTERVAL) { doEnemyPing = true; lastRadarPingTime = Date.now(); }
+    let doEnemyPing = false; if (Date.now() - lastRadarPingTime > RADAR_PING_INTERVAL) { doEnemyPing = true; lastRadarPingTime = Date.now(); }
 
     for (let id in serverPlayers) {
         if (id === socket.id || serverPlayers[id].hp <= 0) continue;
         let className = currentGameMode === 'pvp' ? 'dot-enemy' : 'dot-teammate';
         let dot = createRadarDot(serverPlayers[id].x, serverPlayers[id].z, myX, myZ, myRot, radarRadius, mapScale, className, radar);
-        if(dot && currentGameMode === 'pvp') {
-            dot.style.opacity = '1';
-            setTimeout(() => { if(dot) dot.style.opacity = '0'; }, 1800);
-        }
+        if(dot && currentGameMode === 'pvp') { dot.style.opacity = '1'; setTimeout(() => { if(dot) dot.style.opacity = '0'; }, 1800); }
     }
     if (currentGameMode === 'coop') {
         for (let id in currentBots) {
             let botPos = currentBots[id].position;
             let dot = createRadarDot(botPos.x, botPos.z, myX, myZ, myRot, radarRadius, mapScale, 'dot-enemy', radar);
-            if (dot && doEnemyPing) {
-                dot.style.opacity = '1';
-                setTimeout(() => { if(dot) dot.style.opacity = '0'; }, 1800);
-            }
+            if (dot && doEnemyPing) { dot.style.opacity = '1'; setTimeout(() => { if(dot) dot.style.opacity = '0'; }, 1800); }
         }
     }
 }
 
 function createRadarDot(objX, objZ, myX, myZ, myRot, radarRadius, mapScale, className, radarContainer) {
     let dx = objX - myX, dz = objZ - myZ;
-    let rotX = dx * Math.cos(-myRot) - dz * Math.sin(-myRot);
-    let rotY = dx * Math.sin(-myRot) + dz * Math.cos(-myRot);
+    let rotX = dx * Math.cos(-myRot) - dz * Math.sin(-myRot); let rotY = dx * Math.sin(-myRot) + dz * Math.cos(-myRot);
     let pixelX = radarRadius + rotX * mapScale, pixelY = radarRadius + rotY * mapScale;
     let dist = Math.sqrt((pixelX - radarRadius)**2 + (pixelY - radarRadius)**2);
     if (dist < radarRadius - 4) {
         let dot = document.createElement('div'); dot.className = `radar-dot ${className}`;
+        dot.style.position = 'absolute'; dot.style.width = '4px'; dot.style.height = '4px'; dot.style.borderRadius = '50%';
+        if(className==='dot-teammate') dot.style.background = '#3b82f6'; else dot.style.background = '#ef4444';
         dot.style.left = pixelX + 'px'; dot.style.top = pixelY + 'px';
         radarContainer.appendChild(dot); return dot;
     }
     return null;
 }
 
-function triggerDamageFlash() {
-    let flash = document.getElementById('damage-flash'); if (flash) { flash.style.opacity = '0.4'; setTimeout(() => flash.style.opacity = '0', 150); }
-}
+function triggerDamageFlash() { let flash = document.getElementById('damage-flash'); if (flash) { flash.style.opacity = '0.4'; setTimeout(() => flash.style.opacity = '0', 150); } }
 
 function createDamageArrow(shooterX, shooterZ) {
-    const container = document.getElementById('damage-indicators-container');
-    if (!container || !yawObject) return;
-    const arrow = document.createElement('div'); arrow.className = 'damage-arrow'; container.appendChild(arrow);
+    const container = document.getElementById('damage-indicators-container'); if (!container || !yawObject) return;
+    const arrow = document.createElement('div'); arrow.className = 'damage-arrow'; arrow.style.position = 'absolute'; arrow.style.width = '0'; arrow.style.height = '0'; arrow.style.borderLeft = '8px solid transparent'; arrow.style.borderRight = '8px solid transparent'; arrow.style.borderBottom = '20px solid #ef4444'; container.appendChild(arrow);
     function updateArrow() {
         if (!arrow.parentNode) return;
         let angle = Math.atan2(shooterX - yawObject.position.x, shooterZ - yawObject.position.z);
@@ -301,14 +263,9 @@ function createDamageArrow(shooterX, shooterZ) {
 window.addEventListener('DOMContentLoaded', () => {
     initEngine(); initSocket(); setupControls(); loadHUDPositions();
     let savedScale = localStorage.getItem('game_hud_scale');
-    if (savedScale) {
-        window.gameSettings.hudScale = parseFloat(savedScale);
-        document.getElementById('scale-slider').value = savedScale;
-        applyHUDScale(savedScale);
-    }
+    if (savedScale) { window.gameSettings.hudScale = parseFloat(savedScale); document.getElementById('scale-slider').value = savedScale; applyHUDScale(savedScale); }
     if(localStorage.getItem('n') && localStorage.getItem('p')) {
-        document.getElementById('input-nick').value = localStorage.getItem('n'); 
-        document.getElementById('input-pass').value = localStorage.getItem('p');
+        document.getElementById('input-nick').value = localStorage.getItem('n'); document.getElementById('input-pass').value = localStorage.getItem('p');
     }
 });
 
@@ -316,8 +273,7 @@ function applyHUDScale(scale) { document.getElementById('hud-scalable-wrapper').
 
 function initEngine() {
     const container = document.getElementById('canvas-container'); if (!container) return;
-    scene = new THREE.Scene(); scene.background = new THREE.Color(0x05070f);
-    scene.fog = new THREE.FogExp2(0x05070f, 0.02);
+    scene = new THREE.Scene(); scene.background = new THREE.Color(0x05070f); scene.fog = new THREE.FogExp2(0x05070f, 0.02);
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     pitchObject.add(camera); yawObject.add(pitchObject); scene.add(yawObject);
     renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight);
@@ -356,9 +312,9 @@ function checkWallCollisions(newPos) {
 
 document.getElementById('btn-auth').addEventListener('click', () => {
     let nickname = document.getElementById('input-nick').value.trim(); let password = document.getElementById('input-pass').value.trim();
-    if(nickname.length < 2) return;
+    if(nickname.length < 2 || !socket || !socket.connected) return;
     myNick = nickname; myPass = password;
-    if (socket && socket.connected) socket.emit('playerAuth', { nick: nickname, pass: password, mode: currentGameMode });
+    socket.emit('playerAuth', { nick: nickname, pass: password, mode: currentGameMode });
 });
 
 function performShot() {
@@ -366,22 +322,15 @@ function performShot() {
     if (ammo <= 0) { stopAutofire(); startReload(); return; }
     ammo--; updateHUD();
     if(weaponMesh) { weaponMesh.position.z = -0.33; setTimeout(() => weaponMesh.position.z = -0.4, 40); }
-    
     let raycaster = new THREE.Raycaster(); raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
     let targets = [];
-    
-    if (currentGameMode === 'coop') {
-        for (let id in remoteBots) { targets.push(...remoteBots[id].children); }
-    } else {
-        for (let id in remotePlayers) { targets.push(...remotePlayers[id].children); }
-    }
+    if (currentGameMode === 'coop') { for (let id in remoteBots) { targets.push(...remoteBots[id].children); } } 
+    else { for (let id in remotePlayers) { targets.push(...remotePlayers[id].children); } }
     
     let intersects = raycaster.intersectObjects(targets);
     if (intersects.length > 0 && socket) {
         let hitObj = intersects[0].object;
-        if (hitObj.userData && hitObj.userData.targetId) {
-            socket.emit('playerHit', { targetId: hitObj.userData.targetId, zone: hitObj.userData.zone });
-        }
+        if (hitObj.userData && hitObj.userData.targetId) { socket.emit('playerHit', { targetId: hitObj.userData.targetId, zone: hitObj.userData.zone }); }
     }
 }
 
@@ -391,10 +340,7 @@ function stopAutofire() { if (fireIntervalId !== null) { clearInterval(fireInter
 function startReload() {
     if (isReloading || ammo === 30 || reserveAmmo <= 0) return;
     isReloading = true; updateHUD();
-    setTimeout(() => {
-        let needed = 30 - ammo; let transfer = Math.min(needed, reserveAmmo);
-        ammo += transfer; reserveAmmo -= transfer; isReloading = false; updateHUD();
-    }, 1200);
+    setTimeout(() => { let needed = 30 - ammo; let transfer = Math.min(needed, reserveAmmo); ammo += transfer; reserveAmmo -= transfer; isReloading = false; updateHUD(); }, 1200);
 }
 
 function updateHUD() {
@@ -405,12 +351,9 @@ function updateHUD() {
 }
 
 document.getElementById('btn-respawn').addEventListener('click', () => { if(socket) socket.emit('requestRespawn'); });
+document.getElementById('btn-skip-break').addEventListener('click', () => { if(socket && socket.connected) socket.emit('skipBreakVote'); });
 
-document.getElementById('btn-skip-break').addEventListener('click', () => {
-    if(socket && socket.connected) socket.emit('skipBreakVote');
-});
-
-// УПРАВЛЕНИЕ, МЕНЮ ПАУЗЫ И РЕДАКТОР HUD
+// МЕНЮ ПАУЗЫ И HUD РЕДАКТОР
 function setupControls() {
     const jZone = document.getElementById('joystick-zone'), stick = document.getElementById('joystick-stick');
     const menuTrigger = document.getElementById('btn-menu-trigger'), customMenu = document.getElementById('customizer-menu');
@@ -419,65 +362,38 @@ function setupControls() {
         let val = e.target.value; window.gameSettings.hudScale = parseFloat(val); applyHUDScale(val); localStorage.setItem('game_hud_scale', val);
     });
 
-    // НАЖАТИЕ НА КНОПКУ МЕНЮ (ШЕСТЕРЕНКА)
     menuTrigger.addEventListener('touchstart', (e) => {
-        e.preventDefault(); e.stopPropagation(); 
-        if (isCustomizing) return; 
-        
-        isCustomizing = true; 
-        stopAutofire(); 
-
+        e.preventDefault(); e.stopPropagation(); if (isCustomizing) return; 
+        isCustomizing = true; stopAutofire(); 
         document.getElementById('menu-user-nick').innerText = myNick || "Боец";
         const modeBadge = document.getElementById('menu-user-mode');
-        if (currentGameMode === 'coop') {
-            modeBadge.innerText = "РЕЖИМ: ЗАЧИСТКА ВОЛН";
-            modeBadge.style.color = "#10b981";
-        } else {
-            modeBadge.innerText = "РЕЖИМ: КОМАНДНЫЙ БОЙ";
-            modeBadge.style.color = "#ef4444";
-        }
-
-        document.body.classList.add('edit-mode'); 
-        customMenu.style.display = 'block';
+        if (currentGameMode === 'coop') { modeBadge.innerText = "РЕЖИМ: ЗАЧИСТКА ВОЛН"; modeBadge.style.color = "#10b981"; } 
+        else { modeBadge.innerText = "РЕЖИМ: КОМАНДНЫЙ БОЙ"; modeBadge.style.color = "#ef4444"; }
+        document.body.classList.add('edit-mode'); customMenu.style.display = 'block';
     });
 
-    // ВЕРНУТЬСЯ В БОЙ
-    document.getElementById('btn-save-hud').addEventListener('click', () => {
-        isCustomizing = false; 
-        document.body.classList.remove('edit-mode'); 
-        customMenu.style.display = 'none'; 
-        saveHUDPositions();
-    });
+    document.getElementById('btn-save-hud').addEventListener('click', () => { isCustomizing = false; document.body.classList.remove('edit-mode'); customMenu.style.display = 'none'; saveHUDPositions(); });
 
-    // СМЕНА РЕЖИМА НА ЛЕТУ: КООП
     document.getElementById('btn-menu-switch-coop').addEventListener('click', () => {
         if(currentGameMode === 'coop') return;
         isCustomizing = false; document.body.classList.remove('edit-mode'); customMenu.style.display = 'none';
-        currentGameMode = 'coop';
-        if (socket && socket.connected) socket.emit('playerAuth', { nick: myNick, pass: myPass, mode: 'coop' });
+        currentGameMode = 'coop'; if (socket && socket.connected) socket.emit('playerAuth', { nick: myNick, pass: myPass, mode: 'coop' });
     });
 
-    // СМЕНА РЕЖИМА НА ЛЕТУ: PVP
     document.getElementById('btn-menu-switch-pvp').addEventListener('click', () => {
         if(currentGameMode === 'pvp') return;
         isCustomizing = false; document.body.classList.remove('edit-mode'); customMenu.style.display = 'none';
-        currentGameMode = 'pvp';
-        if (socket && socket.connected) socket.emit('playerAuth', { nick: myNick, pass: myPass, mode: 'pvp' });
+        currentGameMode = 'pvp'; if (socket && socket.connected) socket.emit('playerAuth', { nick: myNick, pass: myPass, mode: 'pvp' });
     });
 
-    // ВЫХОД НА СТАРТОВЫЙ ЭКРАН
     document.getElementById('btn-logout').addEventListener('click', () => {
         isCustomizing = false; document.body.classList.remove('edit-mode'); customMenu.style.display = 'none';
-        document.getElementById('auth-screen').style.display = 'flex';
-        if(socket) socket.disconnect();
+        document.getElementById('auth-screen').style.display = 'flex'; if(socket) socket.disconnect();
         setTimeout(initSocket, 500);
     });
 
-    document.getElementById('btn-fullscreen-toggle').addEventListener('click', () => {
-        if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(()=>{}); } else { document.exitFullscreen(); }
-    });
+    document.getElementById('btn-fullscreen-toggle').addEventListener('click', () => { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(()=>{}); } else { document.exitFullscreen(); } });
 
-    // Кнопки стрельбы и перемещения
     document.getElementById('btn-fire').addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startAutofire(); } });
     document.getElementById('btn-fire').addEventListener('touchend', (e) => { if(!isCustomizing){ e.preventDefault(); stopAutofire(); } });
     document.getElementById('btn-reload').addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startReload(); } });
@@ -491,8 +407,7 @@ function setupControls() {
     jZone.addEventListener('touchend', () => { if(!isCustomizing){ joystickTouchId = null; stick.style.transform = `translate(0px, 0px)`; moveDirection.forward = 0; moveDirection.right = 0; } });
 
     function updateJoystick(touch) {
-        let rect = jZone.getBoundingClientRect();
-        let dx = touch.clientX - (rect.left + rect.width / 2), dy = touch.clientY - (rect.top + rect.height / 2);
+        let rect = jZone.getBoundingClientRect(); let dx = touch.clientX - (rect.left + rect.width / 2), dy = touch.clientY - (rect.top + rect.height / 2);
         let dist = Math.sqrt(dx*dx + dy*dy); if (dist > 40) { dx = (dx / dist) * 40; dy = (dy / dist) * 40; }
         stick.style.transform = `translate(${dx}px, ${dy}px)`; moveDirection.forward = -(dy / 40); moveDirection.right = (dx / 40);
     }
@@ -505,8 +420,7 @@ function setupControls() {
         if (isCustomizing) return;
         for(let t of e.changedTouches) {
             if(t.identifier === lookTouchId) {
-                let dx = t.clientX - lastLookX, dy = t.clientY - lastLookY;
-                let sens = window.gameSettings.sensitivity;
+                let dx = t.clientX - lastLookX, dy = t.clientY - lastLookY; let sens = window.gameSettings.sensitivity;
                 yawObject.rotation.y -= dx * sens; pitchObject.rotation.x -= dy * sens;
                 pitchObject.rotation.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitchObject.rotation.x));
                 lastLookX = t.clientX; lastLookY = t.clientY;
@@ -525,37 +439,40 @@ function setupControls() {
     });
     window.addEventListener('touchmove', (e) => {
         if (!isCustomizing || !dragElement) return;
-        let touch = e.touches[0];
-        let x = (touch.clientX - dragOffsetX) / window.gameSettings.hudScale;
-        let y = (touch.clientY - dragOffsetY) / window.gameSettings.hudScale;
-        dragElement.style.left = x + 'px'; dragElement.style.top = y + 'px';
-        dragElement.style.bottom = 'auto'; dragElement.style.right = 'auto';
+        let touch = e.touches[0]; let x = (touch.clientX - dragOffsetX) / window.gameSettings.hudScale; let y = (touch.clientY - dragOffsetY) / window.gameSettings.hudScale;
+        dragElement.style.left = x + 'px'; dragElement.style.top = y + 'px'; dragElement.style.bottom = 'auto'; dragElement.style.right = 'auto';
     });
     window.addEventListener('touchend', () => { dragElement = null; });
 }
 
-function saveHUDPositions() {
-    let layout = {}; document.querySelectorAll('.hud-element').forEach(el => { layout[el.id] = { left: el.style.left, top: el.style.top }; });
-    localStorage.setItem('hud_layout_universal', JSON.stringify(layout));
-}
-
+function saveHUDPositions() { let layout = {}; document.querySelectorAll('.hud-element').forEach(el => { layout[el.id] = { left: el.style.left, top: el.style.top }; }); localStorage.setItem('hud_layout_universal', JSON.stringify(layout)); }
 function loadHUDPositions() {
     let saved = localStorage.getItem('hud_layout_universal'); if (!saved) return;
     let layout = JSON.parse(saved);
-    for (let id in layout) {
-        let el = document.getElementById(id);
-        if (el && layout[id].left) { el.style.left = layout[id].left; el.style.top = layout[id].top; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.transform = 'none'; }
-    }
+    for (let id in layout) { let el = document.getElementById(id); if (el && layout[id].left) { el.style.left = layout[id].left; el.style.top = layout[id].top; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.transform = 'none'; } }
 }
 
 let clock = new THREE.Clock();
 function animate() {
-    requestAnimationFrame(animate);
-    if (!renderer || !scene || !camera) return;
+    requestAnimationFrame(animate); if (!renderer || !scene || !camera) return;
     let delta = clock.getDelta(); if (delta > 0.1) delta = 0.1;
 
     if (myId && hp > 0 && !isCustomizing) {
         playerVelocity.y -= GRAVITY * delta;
         let forwardVector = new THREE.Vector3(0, 0, -1).applyQuaternion(yawObject.quaternion);
         let sideVector = new THREE.Vector3(1, 0, 0).applyQuaternion(yawObject.quaternion);
-        let moveX = (forwardVector
+        let moveX = (forwardVector.x * moveDirection.forward + sideVector.x * moveDirection.right) * moveSpeed * delta;
+        let moveZ = (forwardVector.z * moveDirection.forward + sideVector.z * moveDirection.right) * moveSpeed * delta;
+
+        let targetPos = yawObject.position.clone(); targetPos.x += moveX; if (!checkWallCollisions(targetPos)) yawObject.position.x = targetPos.x;
+        targetPos = yawObject.position.clone(); targetPos.z += moveZ; if (!checkWallCollisions(targetPos)) yawObject.position.z = targetPos.z;
+
+        yawObject.position.y += playerVelocity.y * delta;
+        let targetHeight = isCrouching ? 0.9 : 1.7;
+        if (yawObject.position.y <= targetHeight) { playerVelocity.y = 0; yawObject.position.y = targetHeight; isGrounded = true; } else { isGrounded = false; }
+
+        if(socket && socket.connected) socket.emit('playerMove', { x: yawObject.position.x, z: yawObject.position.z, rotY: yawObject.rotation.y });
+    }
+    renderer.render(scene, camera);
+}
+window.addEventListener('resize', () => { if(camera && renderer) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } });
