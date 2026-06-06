@@ -48,7 +48,7 @@
 <body>
 
     <div id="game-container">
-        <div id="auth-screen" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(10,15,30,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; color: white; display: none;">
+        <div id="auth-screen" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(10,15,30,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; color: white;">
             <h2 style="margin-bottom: 20px; color: #00aaff; text-shadow: 0 0 10px #00aaff;">ВХОД В КИБЕР-АРЕНУ</h2>
             <input type="text" id="auth-nick" placeholder="Ваш Никнейм" style="padding: 10px; margin: 10px; width: 250px; border-radius: 5px; border: 1px solid #00aaff; background: #1a233d; color: white; text-align: center;">
             <input type="password" id="auth-pass" placeholder="Пароль" style="padding: 10px; margin: 10px; width: 250px; border-radius: 5px; border: 1px solid #00aaff; background: #1a233d; color: white; text-align: center;">
@@ -119,7 +119,7 @@
             };
         }
 
-        // Подключение к серверу (Замени на IP своего Realme, если тестируешь локально)
+        // Подключение к твоему серверу на Render
         const socket = io('https://pvp-arena-online.onrender.com'); 
 
         // --- СИСТЕМА АВТО-АВТОРИЗАЦИИ (LOCALSTORAGE) ---
@@ -129,19 +129,29 @@
         const savedNick = localStorage.getItem('game_nick');
         const savedPass = localStorage.getItem('game_pass');
 
+        // Если в памяти есть данные, сразу пробуем войти скрытно
         if (savedNick && savedPass) {
             socket.emit('playerAuth', { nick: savedNick, pass: savedPass });
         } else {
             authScreen.style.display = 'flex';
         }
 
+        // Кнопка ручной отправки
         document.getElementById('btn-auth-submit').addEventListener('click', () => {
             const nick = document.getElementById('auth-nick').value.trim();
             const pass = document.getElementById('auth-pass').value.trim();
+
             if (nick.length < 3 || pass.length < 4) {
                 authError.innerText = "Ник от 3 символов, пароль от 4!";
                 return;
             }
+
+            if (!socket.connected) {
+                authError.innerText = "Нет связи с сервером. Подожди немного (Render просыпается)...";
+                return;
+            }
+
+            authError.innerText = "Отправка данных...";
             socket.emit('playerAuth', { nick, pass });
         });
 
@@ -149,6 +159,7 @@
             localStorage.setItem('game_nick', data.nick);
             localStorage.setItem('game_pass', data.pass);
             authScreen.style.display = 'none';
+            authError.innerText = "";
         });
 
         socket.on('authFailed', (message) => {
@@ -260,16 +271,16 @@
                 wallMeshes.push(collisionMesh);
             }
 
-            createStructure(6, 0.5, 6, 0, 0); // Центр
-            createStructure(3, 7, 3, -15, -15); // Башни
+            createStructure(6, 0.5, 6, 0, 0); 
+            createStructure(3, 7, 3, -15, -15); 
             createStructure(3, 7, 3, 15, -15);
             createStructure(3, 7, 3, -15, 15);
             createStructure(3, 7, 3, 15, 15);
-            createStructure(8, 3, 1.5, 0, -12); // Укрытия
+            createStructure(8, 3, 1.5, 0, -12); 
             createStructure(8, 3, 1.5, 0, 12);
             createStructure(1.5, 3, 8, -12, 0);
             createStructure(1.5, 3, 8, 12, 0);
-            createStructure(100, 5, 2, 0, -49); // Границы карты
+            createStructure(100, 5, 2, 0, -49); 
             createStructure(100, 5, 2, 0, 49);
             createStructure(2, 5, 100, -49, 0);
             createStructure(2, 5, 100, 49, 0);
@@ -312,7 +323,7 @@
             return { group: barGroup, hpMesh: hpMesh, canvas: canvas, texture: texture, ctx: ctx };
         }
 
-        // --- УПРАВЛЕНИЕ ---
+        // --- МОБИЛЬНОЕ УПРАВЛЕНИЕ ---
         setupJoystick('move-pad', (dx, dy) => { moveInput.x = dx; moveInput.y = dy; });
         setupLookPad('look-pad');
 
@@ -352,7 +363,7 @@
         const shootBtn = document.getElementById('btn-shoot');
         shootBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if(isDead || isReloading) return;
+            if(isDead || isReloading || authScreen.style.display !== 'none') return;
             isShootingPressed = true;
             fireBullet();
             shootInterval = setInterval(() => { if(isShootingPressed) fireBullet(); }, 150);
@@ -380,7 +391,7 @@
             ammo--;
             updateHUD();
 
-            weaponGroup.position.z = 0.08; // Отдача
+            weaponGroup.position.z = 0.08; 
 
             if (ammo === 0) { isShootingPressed = false; clearInterval(shootInterval); startAutoReload(); }
 
@@ -473,7 +484,6 @@
                 opponents[id].ctx.clearRect(0, 0, 128, 32);
                 opponents[id].ctx.fillStyle = '#ffffff';
                 opponents[id].ctx.font = 'Bold 16px Arial';
-                // Отображаем ник и здоровье над врагом
                 opponents[id].ctx.fillText(`${serverPlayers[id].nick || 'Игрок'}: ${currentHp}`, 64, 22);
                 opponents[id].texture.needsUpdate = true;
             });
@@ -508,9 +518,8 @@
             
             supplyCrates.forEach(crate => { crate.rotation.y += 0.015; crate.position.y = 0.5 + Math.sin(time) * 0.08; });
 
-            weaponGroup.position.z += (0 - weaponGroup.position.z) * 0.2; // Плавный возврат ствола
+            weaponGroup.position.z += (0 - weaponGroup.position.z) * 0.2; 
 
-            // Покачивание оружия при ходьбе
             if (!isDead && (Math.abs(moveInput.x) > 0.1 || Math.abs(moveInput.y) > 0.1)) {
                 weaponGroup.position.y = Math.sin(performance.now() * 0.01) * 0.015;
                 weaponGroup.position.x = Math.cos(performance.now() * 0.005) * 0.01;
@@ -519,7 +528,6 @@
                 weaponGroup.position.x += (0 - weaponGroup.position.x) * 0.1;
             }
 
-            // Анимация ног оппонентов
             const legWave = Math.sin(performance.now() * 0.012);
             Object.values(opponents).forEach(op => {
                 if(op.hbGroup) op.hbGroup.quaternion.copy(camera.quaternion);
@@ -575,7 +583,7 @@
                 camera.position.x = Math.max(-48, Math.min(48, camera.position.x));
                 camera.position.z = Math.max(-48, Math.min(48, camera.position.z));
 
-                // Сбор ящиков снабжения (+30 HP, +20 Броня, лимит 120 патронов)
+                // Сбор ящиков снабжения (+30 HP, +20 Броня, макс 120 патронов)
                 for (let i = supplyCrates.length - 1; i >= 0; i--) {
                     let crate = supplyCrates[i];
                     let dist = Math.sqrt(Math.pow(camera.position.x - crate.position.x, 2) + Math.pow(camera.position.z - crate.position.z, 2));
@@ -606,4 +614,4 @@
         animate();
     </script>
 </body>
-</html>щ
+</html>
