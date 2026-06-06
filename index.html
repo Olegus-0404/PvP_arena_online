@@ -2,135 +2,118 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>3D Кибер Арена</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
-        #canvas-container { width: 100%; height: 100%; position: absolute; z-index: 1; }
-        
-        #crosshair {
-            position: absolute; top: 50%; left: 50%; width: 18px; height: 18px;
-            transform: translate(-50%, -50%); z-index: 10; pointer-events: none;
-        }
-        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #00ffcc; box-shadow: 0 0 4px #00ffcc; }
-        #crosshair::before { top: 8px; left: 0; width: 18px; height: 2px; }
-        #crosshair::after { top: 0; left: 8px; width: 2px; height: 18px; }
-
-        #hud-scalable-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; transform-origin: top left; }
-        .hud-element { position: absolute; display: flex; align-items: center; gap: 8px; font-weight: bold; pointer-events: auto; }
-        .edit-mode .hud-element { box-shadow: 0 0 0 2px #ef4444 !important; background: rgba(239, 68, 68, 0.2) !important; }
-        
-        #hud-hp { left: 20px; top: 20px; background: rgba(15, 23, 42, 0.65); color: #ef4444; padding: 10px 15px; border-radius: 8px; border-left: 4px solid #ef4444; }
-        #hud-armor { left: 160px; top: 20px; background: rgba(15, 23, 42, 0.65); color: #3b82f6; padding: 10px 15px; border-radius: 8px; border-left: 4px solid #3b82f6; }
-        #game-timer { left: 50%; top: 20px; transform: translateX(-50%); background: rgba(15, 23, 42, 0.65); color: #00ffff; padding: 10px 20px; border-radius: 8px; text-align: center; }
-        #kills-counter { right: 220px; top: 20px; background: rgba(15, 23, 42, 0.65); color: #e2e8f0; padding: 10px 15px; border-radius: 8px; }
-        #btn-menu-trigger { right: 20px; top: 20px; background: rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b; padding: 10px 15px; border-radius: 8px; cursor: pointer; }
-        #hud-ammo { left: 50%; bottom: 20px; transform: translateX(-50%); background: rgba(15, 23, 42, 0.65); color: #10b981; padding: 8px 20px; border-radius: 20px; border: 1px solid #10b981; }
-
-        /* Кнопка пропуска перерыва */
-        #btn-skip-break { display: none; left: 50%; top: 85px; transform: translateX(-50%); background: #f59e0b; color: black; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; box-shadow: 0 0 10px rgba(245,158,11,0.5); }
-
-        #minimap-container { right: 20px; top: 90px; width: 110px; height: 110px; background: rgba(15, 23, 42, 0.75); border: 2px solid #38bdf8; border-radius: 50%; overflow: hidden; position: absolute; }
-        #minimap-radar { width: 100%; height: 100%; position: relative; }
-        .radar-dot { position: absolute; width: 6px; height: 6px; border-radius: 50%; transform: translate(-50%, -50%); transition: opacity 0.3s; }
-        .dot-me { background: #00ffcc; width: 8px; height: 8px; z-index: 3; }
-        .dot-teammate { background: #3b82f6; z-index: 2; }
-        .dot-enemy { background: #ef4444; box-shadow: 0 0 4px #ef4444; z-index: 1; opacity: 0; }
-
-        #joystick-zone { left: 40px; bottom: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.08); border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); }
-        #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: #3b82f6; border-radius: 50%; }
-        
-        .btn-action { width: 65px; height: 65px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; cursor: pointer; }
-        #btn-fire { right: 110px; bottom: 90px; background: rgba(239, 68, 68, 0.35); border: 2px solid #ef4444; width: 80px; height: 80px; font-size: 28px; }
-        #btn-reload { right: 110px; bottom: 15px; background: rgba(71, 85, 105, 0.35); border: 2px solid #64748b; }
-        #btn-jump { right: 25px; bottom: 140px; background: rgba(16, 185, 129, 0.35); border: 2px solid #10b981; }
-        #btn-crouch { right: 25px; bottom: 40px; background: rgba(30, 58, 138, 0.3); border: 2px solid #1d4ed8; }
-
-        .damage-arrow { position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-bottom: 25px solid #ef4444; filter: drop-shadow(0 0 4px #ef4444); transform-origin: 50% 0%; opacity: 1; transition: opacity 0.8s ease-out; }
-
-        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(10, 15, 29, 0.95); color: white; }
-        .input-field { background: #1e293b; border: 1px solid #38bdf8; padding: 12px; color: white; border-radius: 6px; margin-bottom: 12px; width: 260px; text-align: center; font-size: 16px; }
-        
-        /* Выбор режимов */
-        .mode-selection { display: flex; gap: 15px; margin-bottom: 20px; }
-        .mode-btn { background: #1e293b; border: 2px solid #475569; color: #94a3b8; padding: 15px; width: 130px; border-radius: 8px; cursor: pointer; text-align: center; font-weight: bold; font-size: 13px; transition: all 0.2s; }
-        .mode-btn.active { border-color: #ec4899; color: white; background: rgba(236,72,153,0.15); box-shadow: 0 0 10px rgba(236,72,153,0.3); }
-        .btn-ui { background: #ec4899; color: white; border: none; padding: 14px 40px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 260px; }
-        
-        #customizer-menu { display: none; background: rgba(15, 23, 42, 0.95); border: 2px solid #f59e0b; padding: 20px; border-radius: 12px; text-align: center; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 30; width: 290px; color: white; }
-        #damage-flash { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(239,68,68,1); opacity:0; pointer-events:none; z-index:15; }
-        #respawn-screen { display: none; }
-        .setting-row { display: flex; align-items: center; justify-content: space-between; margin: 10px 0; font-size: 14px; color: #cbd5e1; }
+        /* Базовые стили для интерфейса, чтобы всё не ломалось */
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #05070f; font-family: sans-serif; user-select: none; }
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(5, 7, 15, 0.9); color: white; }
+        .btn-ui { padding: 12px 24px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        #customizer-menu { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(15, 23, 42, 0.95); border: 2px solid #38bdf8; padding: 20px; border-radius: 12px; z-index: 100; width: 280px; box-shadow: 0 0 20px rgba(56, 189, 248, 0.4); color: white; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-size: 13px; }
+        /* Стили для стартового экрана */
+        .mode-btn { background: #1e293b; border: 2px solid #475569; padding: 15px; border-radius: 10px; width: 130px; text-align: center; cursor: pointer; color: #94a3b8; }
+        .mode-btn.active { border-color: #ec4899; color: white; background: rgba(236, 72, 153, 0.1); }
     </style>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
     <div id="canvas-container"></div>
-    <div id="crosshair"></div>
-    <div id="damage-flash"></div>
-    <div id="damage-indicators-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 14;"></div>
-
-    <div id="hud-scalable-wrapper">
-        <div id="hud-hp" class="hud-element"><i class="fa-solid fa-heart"></i> <span id="val-hp">100</span></div>
-        <div id="hud-armor" class="hud-element"><i class="fa-solid fa-shield-halved"></i> <span id="val-armor">100</span></div>
-        <div id="game-timer" class="hud-element"><i class="fa-solid fa-hourglass-start"></i> <span id="val-timer">ПОДКЛЮЧЕНИЕ</span></div>
-        <div id="kills-counter" class="hud-element"><i class="fa-solid fa-skull"></i> <span id="val-kills">0</span></div>
-        <button id="btn-menu-trigger" class="hud-element"><i class="fa-solid fa-gear"></i></button>
-        <div id="hud-ammo" class="hud-element"><i class="fa-solid fa-gun"></i> <span id="val-ammo">30 / 120</span></div>
-
-        <button id="btn-skip-break" class="hud-element"><i class="fa-solid fa-forward"></i> ПРОПУСТИТЬ ТАЙМЕР (<span id="skip-votes-count">0</span>)</button>
-
-        <div id="minimap-container" class="hud-element">
-            <div id="minimap-radar">
-                <div class="radar-dot dot-me" style="left:50%; top:50%;"></div>
-            </div>
-        </div>
-
-        <div id="joystick-zone" class="hud-element"><div id="joystick-stick"></div></div>
-        <button id="btn-fire" class="hud-element btn-action"><i class="fa-solid fa-crosshairs"></i></button>
-        <button id="btn-reload" class="hud-element btn-action"><i class="fa-solid fa-rotate"></i></button>
-        <button id="btn-jump" class="hud-element btn-action"><i class="fa-solid fa-arrow-up"></i></button>
-        <button id="btn-crouch" class="hud-element btn-action"><i class="fa-solid fa-arrow-down"></i></button>
-    </div>
 
     <div id="auth-screen" class="overlay">
-        <h2 style="letter-spacing: 2px; color: #38bdf8; font-size: 20px;">ВЫБЕРИТЕ РЕЖИМ ИГРЫ</h2><br>
+        <h2 style="color: #38bdf8; margin-bottom: 20px; letter-spacing: 1px;">ВЫБЕРИТЕ РЕЖИМ ИГРЫ</h2>
         
-        <div class="mode-selection">
-            <div class="mode-btn active" id="mode-coop-select" onclick="selectGameMode('coop')">
-                <i class="fa-solid fa-biohazard" style="font-size:24px; margin-bottom:8px; color:#10b981;"></i><br>ЗАЧИСТКА ВОЛН
+        <div style="display: flex; gap: 20px; margin-bottom: 25px;">
+            <div id="mode-coop-select" class="mode-btn active" onclick="selectGameMode('coop')">
+                <i class="fa-solid fa-biohazard" style="font-size: 24px; color: #10b981; margin-bottom: 8px;"></i>
+                <div>ЗАЧИСТКА ВОЛН</div>
             </div>
-            <div class="mode-btn" id="mode-pvp-select" onclick="selectGameMode('pvp')">
-                <i class="fa-solid fa-gun" style="font-size:24px; margin-bottom:8px; color:#ef4444;"></i><br>КОМАНДНЫЙ БОЙ
+            <div id="mode-pvp-select" class="mode-btn" onclick="selectGameMode('pvp')">
+                <i class="fa-solid fa-gun" style="font-size: 24px; color: #ef4444; margin-bottom: 8px;"></i>
+                <div>КОМАНДНЫЙ БОЙ</div>
             </div>
         </div>
 
-        <input type="text" id="input-nick" class="input-field" placeholder="Никнейм" value="Олег">
-        <input type="password" id="input-pass" class="input-field" placeholder="Пароль" value="1234">
-        <button id="btn-auth" class="btn-ui">ПОДКЛЮЧИТЬСЯ</button>
-        <p id="auth-status" style="margin-top: 15px; color: #64748b; font-size: 14px;">Ожидание сервера...</p>
+        <input type="text" id="input-nick" placeholder="Имя бойца" value="Олег" style="background: #1e293b; border: 1px solid #38bdf8; padding: 12px; color: white; border-radius: 8px; width: 260px; text-align: center; margin-bottom: 10px; font-size: 16px;">
+        <input type="password" id="input-pass" placeholder="Пароль (необязательно)" value="...." style="background: #1e293b; border: 1px solid #38bdf8; padding: 12px; color: white; border-radius: 8px; width: 260px; text-align: center; margin-bottom: 20px; font-size: 16px;">
+        
+        <button id="btn-auth" class="btn-ui" style="background: #ec4899; width: 284px; font-size: 16px; box-shadow: 0 4px 14px rgba(236, 72, 153, 0.4);">ПОДКЛЮЧИТЬСЯ</button>
+        <div id="auth-status" style="margin-top: 15px; font-size: 13px; color: #64748b;">Ожидание сервера...</div>
+    </div>
+
+    <div id="hud-scalable-wrapper" style="position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: 5;">
+        <div id="val-timer" class="hud-element" style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); text-align: center; font-family: monospace; font-size: 18px; font-weight: bold; color: #38bdf8; text-shadow: 0 2px 4px rgba(0,0,0,0.8); line-height: 1.2; pointer-events: auto;">
+            ЗАГРУЗКА...
+        </div>
+
+        <button id="btn-skip-break" class="hud-element btn-ui" style="position: absolute; top: 75px; left: 50%; transform: translateX(-50%); background: #10b981; display: none; font-size: 12px; padding: 6px 14px; pointer-events: auto;">
+            ПРОПУСТИТЬ ПЕРЕРЫВ (<span id="skip-votes-count">0</span>)
+        </button>
+
+        <div id="btn-menu-trigger" class="hud-element" style="position: absolute; top: 20px; right: 20px; width: 42px; height: 42px; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; pointer-events: auto; cursor: pointer;">
+            <i class="fa-solid fa-gear"></i>
+        </div>
+
+        <div id="hud-stats-block" class="hud-element" style="position: absolute; bottom: 20px; left: 20px; background: rgba(15, 23, 42, 0.6); padding: 10px 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); color: white; min-width: 120px;">
+            <div style="margin-bottom: 4px;"><i class="fa-solid fa-heart" style="color: #ef4444; width: 20px;"></i> <span id="val-hp" style="font-weight: bold;">100</span></div>
+            <div><i class="fa-solid fa-shield-halved" style="color: #3b82f6; width: 20px;"></i> <span id="val-armor" style="font-weight: bold;">100</span></div>
+        </div>
+
+        <div id="hud-weapon-block" class="hud-element" style="position: absolute; bottom: 20px; right: 20px; background: rgba(15, 23, 42, 0.6); padding: 10px 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); color: white; text-align: right; min-width: 100px;">
+            <div style="font-weight: bold; font-size: 18px; margin-bottom: 2px;" id="val-ammo">30 / 120</div>
+            <div style="font-size: 12px; color: #94a3b8;"><i class="fa-solid fa-skull" style="font-size: 11px;"></i> Убийств: <span id="val-kills">0</span></div>
+        </div>
+
+        <div id="minimap-radar" class="hud-element" style="position: absolute; top: 20px; left: 20px; width: 110px; height: 110px; background: rgba(15, 23, 42, 0.5); border: 2px solid #1e40af; border-radius: 50%; pointer-events: auto;">
+            <div class="radar-dot dot-me" style="position: absolute; top: 53px; left: 53px; width: 4px; height: 4px; background: #38bdf8; border-radius: 50%; box-shadow: 0 0 6px #38bdf8;"></div>
+        </div>
+
+        <div id="joystick-zone" class="hud-element" style="position: absolute; bottom: 40px; left: 40px; width: 100px; height: 100px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; pointer-events: auto;">
+            <div id="joystick-stick" style="position: absolute; top: 30px; left: 30px; width: 40px; height: 40px; background: #38bdf8; border-radius: 50%; box-shadow: 0 0 10px #38bdf8;"></div>
+        </div>
+
+        <div id="btn-fire" class="hud-element" style="position: absolute; bottom: 50px; right: 140px; width: 70px; height: 70px; background: rgba(239, 68, 68, 0.4); border: 2px solid #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; pointer-events: auto;"><i class="fa-solid fa-crosshairs"></i></div>
+        <div id="btn-reload" class="hud-element" style="position: absolute; bottom: 40px; right: 230px; width: 50px; height: 50px; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; pointer-events: auto;"><i class="fa-solid fa-rotate"></i></div>
+        <div id="btn-jump" class="hud-element" style="position: absolute; bottom: 130px; right: 50px; width: 50px; height: 50px; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; pointer-events: auto;"><i class="fa-solid fa-arrow-up"></i></div>
+        <div id="btn-crouch" class="hud-element" style="position: absolute; bottom: 40px; right: 50px; width: 50px; height: 50px; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; pointer-events: auto;"><i class="fa-solid fa-arrow-down"></i></div>
+    </div>
+
+    <div id="damage-flash" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(239,68,68,1); opacity:0; pointer-events:none; z-index:4; transition: opacity 0.1s ease-out;"></div>
+    <div id="damage-indicators-container" style="position: absolute; top:50%; left:50%; width:0; height:0; pointer-events:none; z-index:4;"></div>
+
+    <div id="respawn-screen" class="overlay" style="display: none; background: rgba(239, 64, 64, 0.3); backdrop-filter: blur(4px);">
+        <h1 style="font-size: 36px; text-shadow: 0 4px 10px black; color: white; margin-bottom: 15px;">ВЫ ПОГИБЛИ</h1>
+        <button id="btn-respawn" class="btn-ui" style="background: #10b981; font-size: 18px; padding: 15px 40px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);">ВЕРНУТЬСЯ В СТРОЙ</button>
     </div>
 
     <div id="customizer-menu">
-        <h3 style="color: #f59e0b; margin-bottom: 10px;"><i class="fa-solid fa-sliders"></i> НАСТРОЙКИ</h3>
+        <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.1);">
+            <div style="font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Ваш профиль</div>
+            <div id="menu-user-nick" style="font-size: 20px; font-weight: bold; color: #38bdf8; margin: 4px 0;">Загрузка...</div>
+            <div id="menu-user-mode" style="font-size: 12px; font-weight: bold; padding: 3px 8px; background: #1e293b; display: inline-block; border-radius: 4px; margin-top: 5px;">-</div>
+        </div>
+
+        <h4 style="color: #f59e0b; margin-bottom: 10px; text-align: left; font-size: 14px;"><i class="fa-solid fa-gamepad"></i> Сменить режим боя:</h4>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+            <button id="btn-menu-switch-coop" class="btn-ui" style="background: #10b981; width: 48%; padding: 8px; font-size: 11px;">ЗАЧИСТКА</button>
+            <button id="btn-menu-switch-pvp" class="btn-ui" style="background: #ef4444; width: 48%; padding: 8px; font-size: 11px;">PVP АРЕНА</button>
+        </div>
+
+        <h4 style="color: #f59e0b; margin-bottom: 10px; text-align: left; font-size: 14px;"><i class="fa-solid fa-sliders"></i> Кастомизация HUD:</h4>
         <div class="setting-row">
             <span>Размер интерфейса:</span>
             <input type="range" id="scale-slider" min="0.5" max="1.5" step="0.05" value="1">
         </div>
-        <button id="btn-save-hud" class="btn-ui" style="background: #10b981; margin-bottom: 10px; width: 100%;">Сохранить</button>
-        <button id="btn-fullscreen-toggle" class="btn-ui" style="background: #3b82f6; margin-bottom: 10px; width: 100%;">Во весь экран</button>
-        <button id="btn-reset-hud" class="btn-ui" style="background: #ef4444; width: 100%;">Сбросить всё</button>
+        
+        <button id="btn-save-hud" class="btn-ui" style="background: #3b82f6; margin-top: 15px; margin-bottom: 8px; width: 100%; font-size: 14px;">ВЕРНУТЬСЯ В БОЙ</button>
+        <button id="btn-fullscreen-toggle" class="btn-ui" style="background: #475569; margin-bottom: 8px; width: 100%; font-size: 12px;"><i class="fa-solid fa-expand"></i> Весь экран</button>
+        <button id="btn-logout" class="btn-ui" style="background: #ef4444; width: 100%; font-size: 12px;"><i class="fa-solid fa-door-open"></i> Главный экран</button>
     </div>
 
-    <div id="respawn-screen" class="overlay">
-        <h2><i class="fa-solid fa-skull-crossbones" style="color:#ef4444;"></i> ТЫ ТРУП</h2>
-        <button id="btn-respawn" class="btn-ui" style="margin-top:20px;">ВОЗРОДИТЬСЯ</button>
-    </div>
-
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.2/dist/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
