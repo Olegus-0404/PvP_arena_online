@@ -2,32 +2,32 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 
-// Настраиваем CORS, чтобы сервер принимал подключения ОТО ВСЮДУ
+// Настраиваем CORS, чтобы сервер принимал подключения от твоего GitHub Pages
 const io = require('socket.io')(http, {
     cors: {
-        origin: "*", // Разрешает подключаться любым сайтам (включая твой GitHub Pages)
+        origin: "*", 
         methods: ["GET", "POST"]
     }
 });
 
 let players = {};
 let passwords = {}; 
-let matchTimer = 180; // 3 минуты (180 секунд)
+let matchTimer = 180; // 3 минуты раунда
 
-// Запуск таймера раунда
+// Таймер матча
 setInterval(() => {
     if (matchTimer > 0) {
         matchTimer--;
         io.emit('timerUpdate', { timeLeft: matchTimer });
     } else {
-        matchTimer = 180; // Перезапуск раунда
+        matchTimer = 180; // Перезапуск
         let leaderboard = Object.values(players)
             .sort((a, b) => b.kills - a.kills)
             .slice(0, 5);
             
         io.emit('matchEnd', { leaderboard: leaderboard });
         
-        // Респавн всех живых и мертвых для нового раунда
+        // Сброс позиций и хп для нового раунда
         for (let id in players) {
             players[id].hp = 100;
             players[id].kills = 0;
@@ -36,7 +36,6 @@ setInterval(() => {
         }
         
         setTimeout(() => {
-            io.emit('mapChange', "arena_1");
             for (let id in players) {
                 io.to(id).emit('init', { x: players[id].x, z: players[id].z });
             }
@@ -87,12 +86,12 @@ io.on('connection', (socket) => {
         let zone = data.zone;
 
         if (players[targetId] && players[targetId].hp > 0 && players[socket.id] && players[socket.id].hp > 0) {
-            let damage = zone === 'head' ? 100 : 35; // Хедшот — мгновенная смерть
+            let damage = zone === 'head' ? 100 : 35; 
             players[targetId].hp -= damage;
 
             if (players[targetId].hp <= 0) {
                 players[targetId].hp = 0;
-                players[socket.id].kills += 1; // Засчитываем килл без лимитов
+                players[socket.id].kills += 1;
             }
 
             io.emit('updatePlayers', players);
@@ -110,7 +109,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log(`Игрок отключился: ${socket.id}`);
         delete players[socket.id];
         io.emit('updatePlayers', players);
     });
@@ -118,5 +116,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 10000;
 http.listen(PORT, () => {
-    console.log(`Сервер запущен на порту ${PORT}`);
+    console.log(`Сервер на порту ${PORT}`);
 });
