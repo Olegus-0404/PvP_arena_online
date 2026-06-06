@@ -1,5 +1,5 @@
 // ВСТАВЬ СЮДА СВОЙ URL ИЗ ПАНЕЛИ RENDER (ОБЯЗАТЕЛЬНО БЕЗ СЛЭША НА КОНЦЕ!)
-const SERVER_URL = "https://pvp-arena-online.onrender.com"; 
+onst SERVER_URL = "https://pvp-arena-online.onrender.com"; 
 let socket = null;
 
 let myId = null, myNick = "", myPass = "", currentGameMode = "coop";
