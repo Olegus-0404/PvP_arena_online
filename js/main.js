@@ -466,4 +466,45 @@ function setupControls() {
         el.addEventListener('touchstart', (e) => {
             if (!isCustomizing || el.id === "btn-menu-trigger") return; 
             dragElement = el; let touch = e.touches[0]; let rect = el.getBoundingClientRect();
-            dragOffsetX = touch.clientX - rect.left; dragOffsetY = touch.clientY - rect
+            dragOffsetX = touch.clientX - rect.left; dragOffsetY = touch.clientY - rect.top; el.style.transform = "none";
+        });
+    });
+    window.addEventListener('touchmove', (e) => {
+        if (!isCustomizing || !dragElement) return;
+        let touch = e.touches[0]; let x = (touch.clientX - dragOffsetX) / window.gameSettings.hudScale; let y = (touch.clientY - dragOffsetY) / window.gameSettings.hudScale;
+        dragElement.style.left = x + 'px'; dragElement.style.top = y + 'px'; dragElement.style.bottom = 'auto'; dragElement.style.right = 'auto';
+    });
+    window.addEventListener('touchend', () => { dragElement = null; });
+}
+
+function saveHUDPositions() { let layout = {}; document.querySelectorAll('.hud-element').forEach(el => { layout[el.id] = { left: el.style.left, top: el.style.top }; }); localStorage.setItem('hud_layout_universal', JSON.stringify(layout)); }
+function loadHUDPositions() {
+    let saved = localStorage.getItem('hud_layout_universal'); if (!saved) return;
+    let layout = JSON.parse(saved);
+    for (let id in layout) { let el = document.getElementById(id); if (el && layout[id].left) { el.style.left = layout[id].left; el.style.top = layout[id].top; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.transform = 'none'; } }
+}
+
+let clock = new THREE.Clock();
+function animate() {
+    requestAnimationFrame(animate); if (!renderer || !scene || !camera) return;
+    let delta = clock.getDelta(); if (delta > 0.1) delta = 0.1;
+
+    if (myId && hp > 0 && !isCustomizing) {
+        playerVelocity.y -= GRAVITY * delta;
+        let forwardVector = new THREE.Vector3(0, 0, -1).applyQuaternion(yawObject.quaternion);
+        let sideVector = new THREE.Vector3(1, 0, 0).applyQuaternion(yawObject.quaternion);
+        let moveX = (forwardVector.x * moveDirection.forward + sideVector.x * moveDirection.right) * moveSpeed * delta;
+        let moveZ = (forwardVector.z * moveDirection.forward + sideVector.z * moveDirection.right) * moveSpeed * delta;
+
+        let targetPos = yawObject.position.clone(); targetPos.x += moveX; if (!checkWallCollisions(targetPos)) yawObject.position.x = targetPos.x;
+        targetPos = yawObject.position.clone(); targetPos.z += moveZ; if (!checkWallCollisions(targetPos)) yawObject.position.z = targetPos.z;
+
+        yawObject.position.y += playerVelocity.y * delta;
+        let targetHeight = isCrouching ? 0.9 : 1.7;
+        if (yawObject.position.y <= targetHeight) { playerVelocity.y = 0; yawObject.position.y = targetHeight; isGrounded = true; } else { isGrounded = false; }
+
+        if(socket && socket.connected) socket.emit('playerMove', { x: yawObject.position.x, z: yawObject.position.z, rotY: yawObject.rotation.y });
+    }
+    renderer.render(scene, camera);
+}
+window.addEventListener('resize', () => { if(camera && renderer) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } });
