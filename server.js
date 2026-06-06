@@ -1,203 +1,161 @@
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-
 const app = express();
-app.use(cors());
+const http = require('http').createServer(app);
 
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] }
+// Подключаем Socket.io версии 4.7.2 с полной свободой для CORS
+const io = require('socket.io')(http, {
+  cors: {
+    origin: "*", 
+    methods: ["GET", "POST"],
+    credentials: true
+  }
 });
-
-let currentMap = "arena"; 
-let mapVotes = { arena: 0, maze: 0 };
-let isVotingMode = false;
-let votingTimeout = null;
-
-class Player {
-    constructor(id, nick) {
-        this.id = id;
-        this.nick = nick;
-        this.hp = 100;
-        this.armor = 100; 
-        this.kills = 0;
-        this.x = (Math.random() * 30) - 15;
-        this.z = (Math.random() * 30) - 15;
-        this.rotY = 0;
-    }
-    updatePosition(x, z, rotY) {
-        if (this.hp > 0 && !isVotingMode) {
-            this.x = x;
-            this.z = z;
-            this.rotY = rotY;
-        }
-    }
-    takeDamage(zone) {
-        if (this.hp <= 0 || isVotingMode) return false;
-        
-        let baseDamage = 20;
-        let damage = (zone === 'head') ? Math.floor(baseDamage * 1.7) : baseDamage;
-        
-        if (this.armor > 0) {
-            if (this.armor >= damage) {
-                this.armor -= damage;
-            } else {
-                let remainingDamage = damage - this.armor;
-                this.armor = 0;
-                this.hp -= remainingDamage;
-            }
-        } else {
-            this.hp -= damage;
-        }
-
-        if (this.hp < 0) this.hp = 0;
-        return this.hp === 0; 
-    }
-    respawn() {
-        this.hp = 100;
-        this.armor = 100; 
-        this.x = (Math.random() * 30) - 15;
-        this.z = (Math.random() * 30) - 15;
-        this.rotY = 0;
-    }
-}
 
 let players = {};
-let accounts = {}; 
-const MATCH_DURATION = 180; 
-let timeLeft = MATCH_DURATION;
+let currentMap = "arena"; // Начальная карта
+let gameTimeLeft = 180;   // 3 минуты на раунд
+let isVotingMode = false;
+let mapVotes = { arena: 0, maze: 0 };
+let votedPlayers = new Set();
 
+// Спавн-точки для карт
+const spawnPoints = {
+  arena: [
+    { x: 0, z: 15 }, { x: 15, z: -15 }, { x: -15, z: -15 }, { x: 0, z: -20 }
+  ],
+  maze: [
+    { x: -35, z: -35 }, { x: 35, z: 35 }, { x: -35, z: 35 }, { x: 35, z: -35 }
+  ]
+};
+
+function getRandomSpawn() {
+  const points = spawnPoints[currentMap] || spawnPoints.arena;
+  const p = points[Math.floor(Math.random() * points.length)];
+  return { x: p.x + (Math.random() * 2 - 1), z: p.z + (Math.random() * 2 - 1), map: currentMap };
+}
+
+// Таймер матча
 setInterval(() => {
-    if (isVotingMode) return;
-    if (timeLeft > 0) {
-        timeLeft--;
-        io.emit('timerUpdate', { timeLeft, isVoting: false });
+  if (gameTimeLeft > 0) {
+    gameTimeLeft--;
+    io.emit('timerUpdate', { timeLeft: gameTimeLeft, isVoting: isVotingMode });
+  } else {
+    if (!isVotingMode) {
+      // Время вышло — запускаем голосование за карту
+      isVotingMode = true;
+      gameTimeLeft = 15; // 15 секунд на голосование
+      mapVotes = { arena: 0, maze: 0 };
+      votedPlayers.clear();
+      io.emit('startVoting');
     } else {
-        startMapVoting();
+      // Голосование завершено — считаем результаты
+      isVotingMode = false;
+      gameTimeLeft = 180; // Сброс на 3 минуты
+      
+      currentMap = mapVotes.maze > mapVotes.arena ? "maze" : "arena";
+      io.emit('endVoting');
+
+      // Респавним всех на новой карте
+      for (let id in players) {
+        players[id].hp = 100;
+        players[id].armor = 100;
+        let s = getRandomSpawn();
+        players[id].x = s.x;
+        players[id].z = s.z;
+        io.to(id).emit('init', s);
+      }
     }
+  }
 }, 1000);
 
-function startMapVoting() {
-    isVotingMode = true;
-    mapVotes = { arena: 0, maze: 0 };
-    io.emit('startVoting', { maps: ['arena', 'maze'] });
-
-    let voteTimeLeft = 10;
-    let voteInterval = setInterval(() => {
-        voteTimeLeft--;
-        io.emit('timerUpdate', { timeLeft: voteTimeLeft, isVoting: true });
-        if (voteTimeLeft <= 0) {
-            clearInterval(voteInterval);
-            endMapVoting();
-        }
-    }, 1000);
-}
-
-function endMapVoting() {
-    isVotingMode = false;
-    timeLeft = MATCH_DURATION;
-    
-    currentMap = (mapVotes.maze > mapVotes.arena) ? "maze" : "arena";
-    
-    for (let id in players) {
-        if (players[id]) {
-            players[id].kills = 0;
-            players[id].respawn();
-            io.to(id).emit('init', { x: players[id].x, z: players[id].z, map: currentMap });
-        }
-    }
-    io.emit('endVoting', { winner: currentMap });
-    io.emit('updatePlayers', players);
-}
-
 io.on('connection', (socket) => {
-    socket.emit('timerUpdate', { timeLeft, isVoting: isVotingMode });
-    if (isVotingMode) socket.emit('startVoting', { maps: ['arena', 'maze'] });
 
-    socket.on('playerAuth', (data) => {
-        try {
-            if (!data) return;
-            const nick = data.nick ? String(data.nick).trim() : "";
-            const pass = data.pass ? String(data.pass).trim() : "";
+  socket.on('playerAuth', (data) => {
+    let nickname = (data.nick || "Игрок").substring(0, 14);
+    
+    players[socket.id] = {
+      id: socket.id,
+      nick: nickname,
+      x: 0, z: 0, rotY: 0,
+      hp: 100, armor: 100,
+      kills: 0
+    };
 
-            if (nick.length < 2 || pass.length < 3) {
-                socket.emit('authFailed', "Слишком короткие данные!");
-                return;
-            }
+    socket.emit('authSuccess', { nick: nickname, pass: data.pass || "1234" });
+    
+    let spawn = getRandomSpawn();
+    players[socket.id].x = spawn.x;
+    players[socket.id].z = spawn.z;
+    
+    socket.emit('init', spawn);
+  });
 
-            if (accounts[nick]) {
-                if (accounts[nick] !== pass) {
-                    socket.emit('authFailed', "Неверный пароль!");
-                    return;
-                }
-            } else {
-                accounts[nick] = pass;
-            }
+  socket.on('playerMove', (data) => {
+    if (players[socket.id] && players[socket.id].hp > 0) {
+      players[socket.id].x = data.x;
+      players[socket.id].z = data.z;
+      players[socket.id].rotY = data.rotY;
+    }
+  });
 
-            for (let id in players) {
-                if (players[id] && players[id].nick === nick) {
-                    socket.emit('authFailed', "Ник уже в игре!");
-                    return;
-                }
-            }
+  // Фикс регистрации попаданий и урона
+  socket.on('playerHit', (data) => {
+    let shooter = players[socket.id];
+    let target = players[data.targetId];
 
-            players[socket.id] = new Player(socket.id, nick);
-            
-            socket.emit('authSuccess', { nick, pass });
-            socket.emit('init', { x: players[socket.id].x, z: players[socket.id].z, map: currentMap });
-            io.emit('updatePlayers', players);
-        } catch (error) {
-            socket.emit('authFailed', "Ошибка сервера.");
-        }
-    });
+    if (!shooter || shooter.hp <= 0 || !target || target.hp <= 0) return;
 
-    socket.on('playerMove', (data) => {
-        if (players[socket.id] && !isVotingMode) {
-            players[socket.id].updatePosition(data.x, data.z, data.rotY);
-            socket.broadcast.emit('updatePlayers', players);
-        }
-    });
+    // Считаем урон: в голову 55, в тело 20
+    let damage = data.zone === 'head' ? 55 : 20;
 
-    socket.on('submitVote', (mapName) => {
-        if (isVotingMode && mapVotes[mapName] !== undefined) {
-            mapVotes[mapName]++;
-            io.emit('votesUpdated', mapVotes);
-        }
-    });
+    // Просчет брони
+    if (target.armor > 0) {
+      let absorbed = Math.floor(damage * 0.4);
+      target.armor = Math.max(0, target.armor - absorbed);
+      target.hp -= (damage - absorbed);
+    } else {
+      target.hp -= damage;
+    }
 
-    socket.on('playerHit', (data) => {
-        const shooter = players[socket.id];
-        const target = players[data.targetId];
-        if (!shooter || shooter.hp <= 0 || !target || target.hp <= 0 || isVotingMode) return;
+    // Отправляем таргету вспышку урона
+    io.to(data.targetId).emit('damagedBy');
 
-        let isDead = target.takeDamage(data.zone);
-        
-        // Отправляем цели инфу о том, КТО в неё выстрелил, чтобы посчитать направление
-        io.to(data.targetId).emit('damagedBy', { shooterX: shooter.x, shooterZ: shooter.z });
+    if (target.hp <= 0) {
+      target.hp = 0;
+      shooter.kills++;
+    }
+  });
 
-        if (isDead) {
-            shooter.kills++;
-        }
-        io.emit('updatePlayers', players);
-    });
+  socket.on('requestRespawn', () => {
+    if (players[socket.id] && players[socket.id].hp <= 0) {
+      players[socket.id].hp = 100;
+      players[socket.id].armor = 100;
+      socket.emit('init', getRandomSpawn());
+    }
+  });
 
-    socket.on('requestRespawn', () => {
-        if (players[socket.id] && players[socket.id].hp <= 0 && !isVotingMode) {
-            players[socket.id].respawn();
-            socket.emit('init', { x: players[socket.id].x, z: players[socket.id].z, map: currentMap });
-            io.emit('updatePlayers', players);
-        }
-    });
+  socket.on('submitVote', (mapName) => {
+    if (isVotingMode && !votedPlayers.has(socket.id)) {
+      if (mapVotes[mapName] !== undefined) {
+        mapVotes[mapName]++;
+        votedPlayers.add(socket.id);
+        io.emit('votesUpdated', mapVotes);
+      }
+    }
+  });
 
-    socket.on('disconnect', () => {
-        if (players[socket.id]) {
-            delete players[socket.id];
-            io.emit('updatePlayers', players);
-        }
-    });
+  socket.on('disconnect', () => {
+    delete players[socket.id];
+    votedPlayers.delete(socket.id);
+  });
 });
 
+// Отправка позиций игроков 30 раз в секунду (тикрэйт)
+setInterval(() => {
+  io.emit('updatePlayers', players);
+}, 1000 / 30);
+
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
+http.listen(PORT, () => {
+  console.log(`Сервер пашет на порту ${PORT}`);
+});
