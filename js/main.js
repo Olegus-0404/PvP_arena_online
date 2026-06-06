@@ -365,15 +365,44 @@ function setupControls() {
 
     document.getElementById('btn-save-hud').addEventListener('click', () => { isCustomizing = false; document.body.classList.remove('edit-mode'); customMenu.style.display = 'none'; saveHUDPositions(); });
 
-    // Логика переключения на весь экран внутри меню
-    document.getElementById('btn-fullscreen-toggle').addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(() => {});
+    // ПОЛНОСТЬЮ АДАПТИРОВАННАЯ КНОПКА ПОЛНОГО ЭКРАНА С МОБИЛЬНЫМИ ПРЕФИКСАМИ
+    document.getElementById('btn-fullscreen-toggle').addEventListener('click', (e) => {
+        e.preventDefault();
+        const docEl = document.documentElement;
+        const isFullscreen = document.fullscreenElement || 
+                             document.webkitFullscreenElement || 
+                             document.mozFullScreenElement || 
+                             document.msFullscreenElement;
+
+        if (!isFullscreen) {
+            if (docEl.requestFullscreen) {
+                docEl.requestFullscreen().catch(err => console.log(err));
+            } else if (docEl.webkitRequestFullscreen) {
+                docEl.webkitRequestFullscreen();
+            } else if (docEl.mozRequestFullScreen) {
+                docEl.mozRequestFullScreen();
+            } else if (docEl.msRequestFullscreen) {
+                docEl.msRequestFullscreen();
+            }
         } else {
             if (document.exitFullscreen) {
                 document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
             }
         }
+        
+        setTimeout(() => {
+            if (camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        }, 300);
     });
 
     document.getElementById('btn-menu-switch-coop').addEventListener('click', () => {
