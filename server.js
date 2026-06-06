@@ -1,4 +1,4 @@
-эconst express = require('express');
+const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, { cors: { origin: "*" } });
@@ -6,35 +6,37 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-const USERS_FILE = path.join(__dirname, 'users.json');
+
+// Будем сохранять файл в системную папку /tmp, куда у Node.js на Render есть полный доступ
+const USERS_FILE = path.join('/tmp', 'users_backup.json');
+
+let registeredUsers = {
+    "admin": "1234" // Аккаунт по умолчанию
+};
 
 let players = {};
-let registeredUsers = {};
 let mapVotes = { arena: 0, factory: 0, city: 0 };
 let votedPlayers = new Set();
 let currentMap = 'arena';
 let matchKillsLimit = 15;
 let isMatchEnded = false;
 
-// Загрузка зарегистрированных аккаунтов из файла users.json
+// Пытаемся прочитать сохраненных игроков при запуске сервера
 if (fs.existsSync(USERS_FILE)) {
     try {
         registeredUsers = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-        console.log('База данных пользователей успешно загружена из JSON.');
+        console.log('База данных игроков успешно загружена из сохранения.');
     } catch (e) {
-        console.error('Ошибка чтения базы данных пользователей, создаём чистую:', e);
-        registeredUsers = {};
+        console.log('Не удалось прочитать сохранение, используем память.');
     }
-} else {
-    console.log('Файл users.json не найден, он будет создан автоматически при первой регистрации.');
 }
 
-// Функция для сохранения аккаунтов в файл
-function saveUsers() {
+// Функция для записи новых игроков на «диск»
+function saveUsersToFile() {
     try {
         fs.writeFileSync(USERS_FILE, JSON.stringify(registeredUsers, null, 2), 'utf8');
     } catch (e) {
-        console.error('Не удалось сохранить пользователей в файл:', e);
+        console.error('Ошибка сохранения файла:', e);
     }
 }
 
@@ -53,9 +55,9 @@ io.on('connection', (socket) => {
                 socket.emit('authFailed', 'Этот ник занят. Неверный пароль!');
             }
         } else {
-            // Создание нового аккаунта, если ника нет в базе
+            // Если игрока нет, сохраняем его в память и дублируем в файл
             registeredUsers[nick] = pass;
-            saveUsers();
+            saveUsersToFile();
             loginPlayer(socket, nick, pass);
         }
     });
@@ -88,17 +90,17 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- ОБРАБОТКА ХЕДШОТОВ И УРОНА ---
+    // --- ОБРАБОТКА УРОНА ---
     socket.on('playerHit', (data) => {
         const targetId = data.targetId;
         const zone = data.zone;
 
         if (players[targetId] && players[targetId].hp > 0 && !isMatchEnded) {
             if (zone === 'head') {
-                players[targetId].hp = 0; // Мгновенная смерть при хедшоте
-                console.log(`Игрок ${players[socket.id]?.nick} поставил хедшот ${players[targetId].nick}!`);
+                players[targetId].hp = 0;
+                console.log(`Игрок ${players[socket.id]?.nick} попал в голову ${players[targetId].nick}!`);
             } else {
-                let damage = 25; // Обычное попадание в тело
+                let damage = 25;
                 if (players[targetId].armor > 0) {
                     players[targetId].armor -= damage * 0.5;
                     players[targetId].hp -= damage * 0.5;
@@ -115,7 +117,6 @@ io.on('connection', (socket) => {
                 players[targetId].hp = 0;
                 if (players[socket.id]) {
                     players[socket.id].kills++;
-                    // Проверка на победу в раунде
                     if (players[socket.id].kills >= matchKillsLimit && !isMatchEnded) {
                         endMatch();
                     }
@@ -125,7 +126,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Респавн игрока
+    // Респавн
     socket.on('requestRespawn', () => {
         if (players[socket.id] && players[socket.id].hp <= 0) {
             players[socket.id].hp = 100;
@@ -137,7 +138,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Голосование за следующую локацию
     socket.on('voteMap', (mapName) => {
         if (!votedPlayers.has(socket.id) && mapVotes[mapName] !== undefined) {
             mapVotes[mapName]++;
@@ -147,7 +147,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log(`Отключился клиент: ${socket.id}`);
         delete players[socket.id];
         votedPlayers.delete(socket.id);
         io.emit('updatePlayers', players);
@@ -162,7 +161,6 @@ function endMatch() {
 
     io.emit('matchEnd', { leaderboard });
 
-    // Смена карты через 10 секунд
     setTimeout(() => {
         let winnerMap = 'arena';
         if (mapVotes.factory > mapVotes.arena && mapVotes.factory > mapVotes.city) winnerMap = 'factory';
@@ -173,7 +171,6 @@ function endMatch() {
         mapVotes = { arena: 0, factory: 0, city: 0 };
         votedPlayers.clear();
 
-        // Полный сброс параметров перед новым раундом
         Object.keys(players).forEach(id => {
             players[id].kills = 0;
             players[id].hp = 100;
