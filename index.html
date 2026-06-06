@@ -48,6 +48,14 @@
 <body>
 
     <div id="game-container">
+        <div id="auth-screen" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(10,15,30,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; color: white; display: none;">
+            <h2 style="margin-bottom: 20px; color: #00aaff; text-shadow: 0 0 10px #00aaff;">ВХОД В КИБЕР-АРЕНУ</h2>
+            <input type="text" id="auth-nick" placeholder="Ваш Никнейм" style="padding: 10px; margin: 10px; width: 250px; border-radius: 5px; border: 1px solid #00aaff; background: #1a233d; color: white; text-align: center;">
+            <input type="password" id="auth-pass" placeholder="Пароль" style="padding: 10px; margin: 10px; width: 250px; border-radius: 5px; border: 1px solid #00aaff; background: #1a233d; color: white; text-align: center;">
+            <button id="btn-auth-submit" style="background: #ff0055; color: white; border: none; padding: 12px 40px; font-size: 16px; border-radius: 5px; cursor: pointer; margin-top: 15px; font-weight: bold; box-shadow: 0 0 15px #ff0055;">ВОЙТИ / СОЗДАТЬ</button>
+            <p id="auth-error" style="color: #ff3333; margin-top: 15px; font-size: 14px;"></p>
+        </div>
+
         <div id="reticle"></div>
         
         <div id="hud">
@@ -91,12 +99,16 @@
     </div>
 
     <script>
-        // --- РЕЗЕРВНЫЕ ФУНКЦИИ ЗАЩИТЫ ---
+        // --- РЕЗЕРВНЫЕ ФУНКЦИИ ЗАЩИТЫ МОДЕЛЕЙ ---
         if (typeof createCharacterModel !== 'function') {
             window.createCharacterModel = function() {
                 const g = new THREE.Group();
                 const m = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({color: 0xff0033}));
-                m.position.y = 1; g.add(m); return g;
+                m.position.y = 1; g.add(m); 
+                const h = new THREE.Mesh(new THREE.SphereGeometry(0.35), new THREE.MeshStandardMaterial({color: 0xffaa00}));
+                h.name = "head"; h.position.y = 2.2; g.add(h);
+                g.userData = { legL: new THREE.Group(), legR: new THREE.Group() };
+                return g;
             };
         }
         if (typeof createSupplyBoxModel !== 'function') {
@@ -107,8 +119,46 @@
             };
         }
 
+        // Подключение к серверу (Замени на IP своего Realme, если тестируешь локально)
         const socket = io('https://pvp-arena-online.onrender.com'); 
 
+        // --- СИСТЕМА АВТО-АВТОРИЗАЦИИ (LOCALSTORAGE) ---
+        const authScreen = document.getElementById('auth-screen');
+        const authError = document.getElementById('auth-error');
+
+        const savedNick = localStorage.getItem('game_nick');
+        const savedPass = localStorage.getItem('game_pass');
+
+        if (savedNick && savedPass) {
+            socket.emit('playerAuth', { nick: savedNick, pass: savedPass });
+        } else {
+            authScreen.style.display = 'flex';
+        }
+
+        document.getElementById('btn-auth-submit').addEventListener('click', () => {
+            const nick = document.getElementById('auth-nick').value.trim();
+            const pass = document.getElementById('auth-pass').value.trim();
+            if (nick.length < 3 || pass.length < 4) {
+                authError.innerText = "Ник от 3 символов, пароль от 4!";
+                return;
+            }
+            socket.emit('playerAuth', { nick, pass });
+        });
+
+        socket.on('authSuccess', (data) => {
+            localStorage.setItem('game_nick', data.nick);
+            localStorage.setItem('game_pass', data.pass);
+            authScreen.style.display = 'none';
+        });
+
+        socket.on('authFailed', (message) => {
+            authScreen.style.display = 'flex';
+            authError.innerText = message;
+            localStorage.removeItem('game_nick');
+            localStorage.removeItem('game_pass');
+        });
+
+        // --- ИНИЦИАЛИЗАЦИЯ THREE.JS СЦЕНЫ ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x0a0f1d); 
         scene.fog = new THREE.FogExp2(0x0a0f1d, 0.02); 
@@ -144,37 +194,32 @@
         let lastNetUpdate = 0;
         const netTickRate = 1000 / 30; 
 
-        // Оружие в руках игрока (HUD оружие)
+        // --- ОРУЖИЕ В РУКАХ (HUD) ---
         const weaponGroup = new THREE.Group();
         camera.add(weaponGroup);
-        scene.add(camera); // Добавляем камеру на сцену, чтобы видеть вложенное оружие
+        scene.add(camera);
 
         function buildWeapon() {
-            // Удаляем старое, если было
             while(weaponGroup.children.length > 0) weaponGroup.remove(weaponGroup.children[0]);
-
             const ironMat = new THREE.MeshStandardMaterial({ color: 0x22252c, roughness: 0.4, metalness: 0.8 });
             const neonMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
 
-            // Ствол
             const mainBody = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.4), ironMat);
             mainBody.position.set(0.25, -0.25, -0.45);
             weaponGroup.add(mainBody);
 
-            // Рукоятка
             const grip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.15, 0.06), ironMat);
             grip.position.set(0.25, -0.34, -0.35);
             grip.rotation.x = -0.3;
             weaponGroup.add(grip);
 
-            // Лазерная линия подсветки
             const laserLine = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 0.38), neonMat);
             laserLine.position.set(0.25, -0.21, -0.45);
             weaponGroup.add(laserLine);
         }
         buildWeapon();
 
-        // Полноценная кибер-карта вместо кубиков
+        // --- СТРОИТЕЛЬСТВО КИБЕР-КАРТЫ ---
         const floorGeo = new THREE.PlaneGeometry(100, 100);
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x121622, roughness: 0.5 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -197,14 +242,12 @@
             const wallMat = new THREE.MeshStandardMaterial({ color: 0x1b2234, roughness: 0.3 });
             const glowMat = new THREE.MeshBasicMaterial({ color: themeColor });
 
-            // Функция постройки цельного блока стены с неоновой полосой
             function createStructure(w, h, d, x, z) {
                 const group = new THREE.Group();
                 const base = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
                 base.castShadow = true; base.receiveShadow = true;
                 group.add(base);
 
-                // Светящаяся полоса
                 const neon = new THREE.Mesh(new THREE.BoxGeometry(w + 0.04, 0.1, d + 0.04), glowMat);
                 neon.position.y = h / 2 - 0.2;
                 group.add(neon);
@@ -212,30 +255,21 @@
                 group.position.set(x, h/2, z);
                 scene.add(group);
 
-                // Сохраняем физическую коробку для коллизий
                 const collisionMesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
                 collisionMesh.position.set(x, h/2, z);
                 wallMeshes.push(collisionMesh);
             }
 
-            // РЕАЛЬНАЯ АРХИТЕКТУРА КАРТЫ
-            // Центральный постамент
-            createStructure(6, 0.5, 6, 0, 0);
-            
-            // 4 Защитные угловые башни
-            createStructure(3, 7, 3, -15, -15);
+            createStructure(6, 0.5, 6, 0, 0); // Центр
+            createStructure(3, 7, 3, -15, -15); // Башни
             createStructure(3, 7, 3, 15, -15);
             createStructure(3, 7, 3, -15, 15);
             createStructure(3, 7, 3, 15, 15);
-
-            // Внутренние стены-укрытия
-            createStructure(8, 3, 1.5, 0, -12);
+            createStructure(8, 3, 1.5, 0, -12); // Укрытия
             createStructure(8, 3, 1.5, 0, 12);
             createStructure(1.5, 3, 8, -12, 0);
             createStructure(1.5, 3, 8, 12, 0);
-
-            // Внешние границы карты
-            createStructure(100, 5, 2, 0, -49);
+            createStructure(100, 5, 2, 0, -49); // Границы карты
             createStructure(100, 5, 2, 0, 49);
             createStructure(2, 5, 100, -49, 0);
             createStructure(2, 5, 100, 49, 0);
@@ -278,6 +312,7 @@
             return { group: barGroup, hpMesh: hpMesh, canvas: canvas, texture: texture, ctx: ctx };
         }
 
+        // --- УПРАВЛЕНИЕ ---
         setupJoystick('move-pad', (dx, dy) => { moveInput.x = dx; moveInput.y = dy; });
         setupLookPad('look-pad');
 
@@ -339,26 +374,23 @@
             document.getElementById('kills-counter').innerText = `💀 Убийства: ${kills} / 15`;
         }
 
-        // --- ЖЕЛЕЗНЫЕ ХЕДШОТЫ И ПОПАДАНИЯ ---
+        // --- ЛОГИКА СТРЕЛЬБЫ И ХЕДШОТОВ ---
         function fireBullet() {
             if(ammo <= 0 || isDead || isReloading) { isShootingPressed = false; clearInterval(shootInterval); return; }
             ammo--;
             updateHUD();
 
-            // Анимация отдачи оружия назад
-            weaponGroup.position.z = 0.08;
+            weaponGroup.position.z = 0.08; // Отдача
 
             if (ammo === 0) { isShootingPressed = false; clearInterval(shootInterval); startAutoReload(); }
 
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
 
-            // Собираем все внутренние Mesh-объекты врагов для точной проверки частей тела
             const targetMeshes = [];
             Object.values(opponents).forEach(op => {
                 op.mesh.traverse(child => {
                     if (child.isMesh) {
-                        // Привязываем ID врага к каждой отдельной детали его тела
                         child.userData.enemyId = op.mesh.name; 
                         targetMeshes.push(child);
                     }
@@ -370,12 +402,11 @@
                 const hitPart = intersects[0].object;
                 const enemyId = hitPart.userData.enemyId;
                 
-                // Проверяем имя детали на содержание слова 'head' (зависит от разметки в player.js)
                 let hitZone = 'body';
                 if (hitPart.name && hitPart.name.toLowerCase().includes('head')) {
                     hitZone = 'head';
                 } else if (hitPart.geometry && hitPart.geometry.type === 'SphereGeometry') {
-                    hitZone = 'head'; // Резервная проверка по сфере
+                    hitZone = 'head';
                 }
 
                 socket.emit('playerHit', { targetId: enemyId, zone: hitZone });
@@ -424,7 +455,6 @@
                     };
                 }
 
-                // Вычисляем двигается ли враг для активации анимации ног
                 let dx = serverPlayers[id].x - opponents[id].lastX;
                 let dz = serverPlayers[id].z - opponents[id].lastZ;
                 opponents[id].isMoving = (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01);
@@ -442,8 +472,9 @@
 
                 opponents[id].ctx.clearRect(0, 0, 128, 32);
                 opponents[id].ctx.fillStyle = '#ffffff';
-                opponents[id].ctx.font = 'Bold 20px Arial';
-                opponents[id].ctx.fillText(`${currentHp} / 100`, 64, 22);
+                opponents[id].ctx.font = 'Bold 16px Arial';
+                // Отображаем ник и здоровье над врагом
+                opponents[id].ctx.fillText(`${serverPlayers[id].nick || 'Игрок'}: ${currentHp}`, 64, 22);
                 opponents[id].texture.needsUpdate = true;
             });
 
@@ -459,7 +490,7 @@
         socket.on('matchEnd', (data) => {
             document.getElementById('leaderboard-screen').style.display = 'flex';
             let list = document.getElementById('leaderboard-list');
-            list.innerHTML = data.leaderboard.map((p, i) => `${i+1}. Игрок [${p.id.substring(0,4)}] — ${p.kills} фрагов`).join('<br>');
+            list.innerHTML = data.leaderboard.map((p, i) => `${i+1}. ${p.nick || 'Игрок'} — ${p.kills} фрагов`).join('<br>');
             setTimeout(() => { document.getElementById('voting-screen').style.display = 'flex'; }, 4000);
         });
 
@@ -469,19 +500,17 @@
             document.getElementById('v-city').innerText = votes.city || 0;
         });
 
-        // --- ИГРОВОЙ ЦИКЛ ОБНОВЛЕНИЯ (ANIMATE) ---
+        // --- ИГРОВОЙ ЦИКЛ (ANIMATE) ---
         function animate() {
             requestAnimationFrame(animate);
 
             const time = performance.now() * 0.002;
             
-            // Левитация ящиков
             supplyCrates.forEach(crate => { crate.rotation.y += 0.015; crate.position.y = 0.5 + Math.sin(time) * 0.08; });
 
-            // Возврат оружия назад после отдачи (интерполяция)
-            weaponGroup.position.z += (0 - weaponGroup.position.z) * 0.2;
+            weaponGroup.position.z += (0 - weaponGroup.position.z) * 0.2; // Плавный возврат ствола
 
-            // Эффект покачивания оружия в руках при ходьбе игрока
+            // Покачивание оружия при ходьбе
             if (!isDead && (Math.abs(moveInput.x) > 0.1 || Math.abs(moveInput.y) > 0.1)) {
                 weaponGroup.position.y = Math.sin(performance.now() * 0.01) * 0.015;
                 weaponGroup.position.x = Math.cos(performance.now() * 0.005) * 0.01;
@@ -490,25 +519,23 @@
                 weaponGroup.position.x += (0 - weaponGroup.position.x) * 0.1;
             }
 
-            // --- ИСПРАВЛЕННАЯ АНИМАЦИЯ НОГ ВРАГОВ ---
+            // Анимация ног оппонентов
             const legWave = Math.sin(performance.now() * 0.012);
             Object.values(opponents).forEach(op => {
                 if(op.hbGroup) op.hbGroup.quaternion.copy(camera.quaternion);
 
                 if (op.mesh.userData && op.mesh.userData.legL && op.mesh.userData.legR) {
                     if (op.isMoving) {
-                        // Если враг бежит — раскачиваем ноги по синусоиде
                         op.mesh.userData.legL.rotation.x = legWave * 0.6;
                         op.mesh.userData.legR.rotation.x = -legWave * 0.6;
                     } else {
-                        // Если враг остановился — плавно возвращаем ноги ровно в ноль
                         op.mesh.userData.legL.rotation.x += (0 - op.mesh.userData.legL.rotation.x) * 0.2;
                         op.mesh.userData.legR.rotation.x += (0 - op.mesh.userData.legR.rotation.x) * 0.2;
                     }
                 }
             });
 
-            if(!isDead) {
+            if(!isDead && authScreen.style.display === 'none') {
                 camera.rotation.order = "YXZ";
                 camera.rotation.y = rotY; camera.rotation.x = rotX;
 
@@ -523,10 +550,8 @@
                 let playerSize = 0.6; 
                 let allowMoveX = true; let allowMoveZ = true;
 
-                // Столкновения со структурами
                 for (let wall of wallMeshes) {
                     let wX = wall.position.x; let wZ = wall.position.z;
-                    // Извлекаем параметры геометрии структуры для точной коллизии
                     let halfW = wall.geometry.parameters.width / 2;
                     let halfD = wall.geometry.parameters.depth / 2;
 
@@ -550,12 +575,13 @@
                 camera.position.x = Math.max(-48, Math.min(48, camera.position.x));
                 camera.position.z = Math.max(-48, Math.min(48, camera.position.z));
 
-                // Подбор ящиков (макс патронов 120)
+                // Сбор ящиков снабжения (+30 HP, +20 Броня, лимит 120 патронов)
                 for (let i = supplyCrates.length - 1; i >= 0; i--) {
                     let crate = supplyCrates[i];
                     let dist = Math.sqrt(Math.pow(camera.position.x - crate.position.x, 2) + Math.pow(camera.position.z - crate.position.z, 2));
                     if (dist < 1.6) {
                         hp = Math.min(100, hp + 30);
+                        armor = Math.min(100, armor + 20); 
                         reserveAmmo = Math.min(MAX_RESERVE_AMMO, reserveAmmo + 60); 
                         updateHUD();
                         scene.remove(crate);
@@ -580,4 +606,4 @@
         animate();
     </script>
 </body>
-</html>
+</html>щ
