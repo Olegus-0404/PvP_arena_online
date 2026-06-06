@@ -7,105 +7,105 @@ const io = require('socket.io')(http, {
 
 let players = {};
 let bots = {};
-let gameState = {
+let pvpMap = "arena";
+
+// Состояние кооперативного режима
+let coopState = {
   wave: 1,
   botsLeft: 0,
   waveActive: false,
-  timerBeforeWave: 10, // Время на передышку между волнами (сек)
+  timerBeforeWave: 15, // Изменено на 15 секунд перерыва!
   isBreak: true
 };
 
+let skipVotes = new Set(); // ID игроков, проголосовавших за пропуск перерыва
 let botIdCounter = 0;
 
-// Точки спавна для ботов
 const botSpawnPoints = [
   {x: -20, z: -20}, {x: 20, z: -20}, {x: -20, z: 20}, {x: 20, z: 20},
-  {x: 0, z: -30}, {x: 0, z: 30}, {x: -30, z: 0}, {x: 30, z: 0}
+  {x: 0, z: -30}, {x: 0, z: 30}
 ];
 
 function startWave() {
-  gameState.isBreak = false;
-  gameState.waveActive = true;
-  // Количество ботов зависит от номера волны и числа игроков
-  let playerCount = Object.keys(players).length || 1;
-  gameState.botsLeft = gameState.wave * 4 + playerCount * 2;
+  coopState.isBreak = false;
+  coopState.waveActive = true;
+  skipVotes.clear();
+
+  let coopPlayersCount = Object.values(players).filter(p => p.mode === 'coop' && p.hp > 0).length || 1;
+  coopState.botsLeft = coopState.wave * 4 + coopPlayersCount * 2;
   
   bots = {};
-  for (let i = 0; i < gameState.botsLeft; i++) {
+  for (let i = 0; i < coopState.botsLeft; i++) {
     botIdCounter++;
     let spawn = botSpawnPoints[Math.floor(Math.random() * botSpawnPoints.length)];
     bots["bot_" + botIdCounter] = {
       id: "bot_" + botIdCounter,
       x: spawn.x + (Math.random() * 4 - 2),
       z: spawn.z + (Math.random() * 4 - 2),
-      hp: 50 + gameState.wave * 10, // С каждой волной боты жирнее
-      speed: 4 + Math.min(4, gameState.wave * 0.3) // И чуть быстрее
+      hp: 40 + coopState.wave * 12,
+      speed: 4 + Math.min(4, coopState.wave * 0.3)
     };
   }
-  io.emit('waveStarted', { wave: gameState.wave, bots: bots });
+  // Отправляем инфу только игрокам в режиме coop
+  io.to('mode_coop').emit('waveStarted', { wave: coopState.wave, bots: bots });
 }
 
 function nextWaveCountdown() {
-  gameState.isBreak = true;
-  gameState.waveActive = false;
-  gameState.timerBeforeWave = 10;
+  coopState.isBreak = true;
+  coopState.waveActive = false;
+  coopState.timerBeforeWave = 15; // 15 секунд перерыва
+  skipVotes.clear();
   
-  // Хилим и восполняем припасы всем выжившим игрокам в конце волны!
+  // Лечим всех живых кооп-игроков
   for (let id in players) {
-    if (players[id].hp > 0) {
+    if (players[id].mode === 'coop' && players[id].hp > 0) {
       players[id].hp = 100;
       players[id].armor = 100;
     }
   }
-  io.emit('waveCleared', { nextWaveIn: gameState.timerBeforeWave });
+  io.to('mode_coop').emit('waveCleared');
 }
 
-// Главный игровой цикл сервера (ИИ ботов и таймеры)
+// Игровой тик сервера (30 раз в секунду)
 setInterval(() => {
-  // Если передышка между волнами
-  if (gameState.isBreak) {
-    if (gameState.timerBeforeWave > 0) {
-      gameState.timerBeforeWave--;
-      io.emit('timerUpdate', { timeLeft: gameState.timerBeforeWave, isBreak: true, wave: gameState.wave });
-    } else {
-      startWave();
+  // Логика Co-op режима
+  if (coopState.isBreak) {
+    // Если все кооп-игроки проголосовали за скип — сбрасываем таймер в 0
+    let totalCoopPlayers = Object.values(players).filter(p => p.mode === 'coop').length;
+    if (totalCoopPlayers > 0 && skipVotes.size >= totalCoopPlayers) {
+      coopState.timerBeforeWave = 0;
     }
   }
 
-  // Если идет волна — двигаем ботов к ближайшему игроку
-  if (gameState.waveActive) {
-    let pIds = Object.keys(players).filter(id => players[id].hp > 0);
+  // Обновление физики ботов
+  if (coopState.waveActive) {
+    let aliveCoopPlayers = Object.values(players).filter(p => p.mode === 'coop' && p.hp > 0);
     
-    if (pIds.length > 0) {
+    if (aliveCoopPlayers.length > 0) {
       for (let bId in bots) {
         let bot = bots[bId];
-        // Находим ближайшего живого игрока
         let closestPlayer = null;
         let minDist = 9999;
         
-        pIds.forEach(pId => {
-          let p = players[pId];
+        aliveCoopPlayers.forEach(p => {
           let dist = Math.sqrt((p.x - bot.x)**2 + (p.z - bot.z)**2);
           if (dist < minDist) { minDist = dist; closestPlayer = p; }
         });
 
         if (closestPlayer) {
-          // Вычисляем вектор движения к игроку (упрощенно за 1 тик)
           let dx = closestPlayer.x - bot.x;
           let dz = closestPlayer.z - bot.z;
           let angle = Math.atan2(dx, dz);
           
-          // Движение (учитываем тикрейт 30 раз в сек)
           bot.x += Math.sin(angle) * (bot.speed / 30);
           bot.z += Math.cos(angle) * (bot.speed / 30);
           bot.rotY = angle;
 
-          // Если бот подошел вплотную — наносит урон игроку
           if (minDist < 1.2) {
             let targetPlayer = players[closestPlayer.id];
             if (targetPlayer && targetPlayer.hp > 0 && (!bot.lastAttack || Date.now() - bot.lastAttack > 1000)) {
               bot.lastAttack = Date.now();
-              let dmg = 10 + gameState.wave * 2;
+              let dmg = 12 + coopState.wave * 2;
               if (targetPlayer.armor > 0) {
                 targetPlayer.armor = Math.max(0, targetPlayer.armor - Math.floor(dmg * 0.4));
                 targetPlayer.hp -= Math.floor(dmg * 0.6);
@@ -118,24 +118,63 @@ setInterval(() => {
         }
       }
     }
-    io.emit('updateBots', bots);
-    io.emit('timerUpdate', { timeLeft: Object.keys(bots).length, isBreak: false, wave: gameState.wave });
+    io.to('mode_coop').emit('updateBots', bots);
   }
 }, 1000 / 30);
+
+// Ежесекундный таймер
+setInterval(() => {
+  if (coopState.isBreak) {
+    if (coopState.timerBeforeWave > 0) {
+      coopState.timerBeforeWave--;
+    } else {
+      startWave();
+    }
+  }
+  // Рассылаем тики таймера в соответствующие комнаты
+  let totalCoopVotes = skipVotes.size;
+  io.to('mode_coop').emit('timerUpdate', { 
+    timeLeft: coopState.isBreak ? coopState.timerBeforeWave : Object.keys(bots).length, 
+    isBreak: coopState.isBreak, 
+    wave: coopState.wave,
+    votes: totalCoopVotes
+  });
+}, 1000);
 
 io.on('connection', (socket) => {
   socket.on('playerAuth', (data) => {
     let nickname = (data.nick || "Боец").substring(0, 14);
-    players[socket.id] = { id: socket.id, nick: nickname, x: 0, z: 0, rotY: 0, hp: 100, armor: 100, kills: 0 };
-    socket.emit('authSuccess', { nick: nickname, pass: data.pass || "1234" });
-    socket.emit('init', { x: 0, z: 0, map: "arena" });
-    // Синхронизируем текущее состояние волны для зашедшего
-    socket.emit('syncWave', { wave: gameState.wave, isBreak: gameState.isBreak });
+    let chosenMode = data.mode === 'pvp' ? 'pvp' : 'coop';
+
+    players[socket.id] = {
+      id: socket.id,
+      nick: nickname,
+      mode: chosenMode,
+      x: 0, z: 0, rotY: 0,
+      hp: 100, armor: 100, kills: 0
+    };
+
+    // Закидываем сокет в комнату выбранного режима
+    socket.join('mode_' + chosenMode);
+
+    socket.emit('authSuccess', { nick: nickname, pass: data.pass || "1234", mode: chosenMode });
+    
+    // Спавн
+    let spawn = chosenMode === 'pvp' ? { x: Math.random()*20-10, z: Math.random()*20-10, map: pvpMap } : { x: 0, z: 0, map: "arena" };
+    socket.emit('init', spawn);
   });
 
   socket.on('playerMove', (data) => {
     if (players[socket.id] && players[socket.id].hp > 0) {
-      players[socket.id].x = data.x; players[socket.id].z = data.z; players[socket.id].rotY = data.rotY;
+      players[socket.id].x = data.x;
+      players[socket.id].z = data.z;
+      players[socket.id].rotY = data.rotY;
+    }
+  });
+
+  socket.on('skipBreakVote', () => {
+    if (players[socket.id] && players[socket.id].mode === 'coop' && coopState.isBreak) {
+      skipVotes.add(socket.id);
     }
   });
 
@@ -143,36 +182,64 @@ io.on('connection', (socket) => {
     let shooter = players[socket.id];
     if (!shooter || shooter.hp <= 0) return;
 
-    // Проверяем попадание по БОТУ
-    if (bots[data.targetId]) {
-      let bot = bots[data.targetId];
-      let damage = data.zone === 'head' ? 60 : 25;
-      bot.hp -= damage;
-
-      if (bot.hp <= 0) {
-        delete bots[data.targetId];
-        shooter.kills++;
-        
-        // Если ботов больше не осталось — запускаем отсчет следующей волны
-        if (Object.keys(bots).length === 0) {
-          gameState.wave++;
-          nextWaveCountdown();
+    if (shooter.mode === 'coop') {
+      // Стрельба по ботам в коопе
+      if (bots[data.targetId]) {
+        let bot = bots[data.targetId];
+        bot.hp -= (data.zone === 'head' ? 60 : 25);
+        if (bot.hp <= 0) {
+          delete bots[data.targetId];
+          shooter.kills++;
+          if (Object.keys(bots).length === 0) {
+            coopState.wave++;
+            nextWaveCountdown();
+          }
         }
+      }
+    } else {
+      // Стрельба по игрокам в PvP режиме
+      let target = players[data.targetId];
+      if (target && target.hp > 0 && target.mode === 'pvp') {
+        let damage = data.zone === 'head' ? 55 : 20;
+        if (target.armor > 0) {
+          let abs = Math.floor(damage * 0.4);
+          target.armor = Math.max(0, target.armor - abs);
+          target.hp -= (damage - abs);
+        } else {
+          target.hp -= damage;
+        }
+        io.to(data.targetId).emit('damagedBy', { shooterX: shooter.x, shooterZ: shooter.z });
+        if (target.hp <= 0) { target.hp = 0; shooter.kills++; }
       }
     }
   });
 
   socket.on('requestRespawn', () => {
     if (players[socket.id] && players[socket.id].hp <= 0) {
-      players[socket.id].hp = 100; players[socket.id].armor = 100;
-      socket.emit('init', { x: 0, z: 0 });
+      players[socket.id].hp = 100;
+      players[socket.id].armor = 100;
+      let spawn = players[socket.id].mode === 'pvp' ? { x: Math.random()*20-10, z: Math.random()*20-10 } : { x: 0, z: 0 };
+      socket.emit('init', spawn);
     }
   });
 
-  socket.on('disconnect', () => { delete players[socket.id]; });
+  socket.on('disconnect', () => {
+    delete players[socket.id];
+    skipVotes.delete(socket.id);
+  });
 });
 
-setInterval(() => { io.emit('updatePlayers', players); }, 1000 / 30);
+// Отдельная рассылка позиций игроков для каждой комнаты (чтобы режимы не видели друг друга)
+setInterval(() => {
+  let pvpPlayers = {};
+  let coopPlayers = {};
+  for(let id in players){
+    if(players[id].mode === 'pvp') pvpPlayers[id] = players[id];
+    else coopPlayers[id] = players[id];
+  }
+  io.to('mode_pvp').emit('updatePlayers', pvpPlayers);
+  io.to('mode_coop').emit('updatePlayers', coopPlayers);
+}, 1000 / 30);
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => { console.log(`Coop сервер пашет на порту ${PORT}`); });
+http.listen(PORT, () => { console.log(`Игровой сервер запущен на порту ${PORT}`); });
