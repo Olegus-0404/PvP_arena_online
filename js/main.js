@@ -19,17 +19,23 @@ let lookTouchId = null;
 let lastLookX = 0, lastLookY = 0;
 let fireIntervalId = null;
 
-// Функция инициализации сетевых событий
+// Инициализация сетевых событий (Запускается сразу при старте страницы)
 function initSocket() {
     try { 
         socket = io(SERVER_URL); 
     } catch(e) { 
-        console.error(e); 
+        console.error("Ошибка инициализации сокетов:", e); 
+        document.getElementById('auth-status').innerText = "Ошибка сети";
         return;
     }
 
-    socket.on('connect', () => { document.getElementById('auth-status').innerText = "Сервер онлайн! Введите данные."; });
-    socket.on('connect_error', () => { document.getElementById('auth-status').innerText = "Ошибка подключения к серверу..."; });
+    socket.on('connect', () => { 
+        document.getElementById('auth-status').innerText = "Сервер онлайн! Введите данные."; 
+    });
+    
+    socket.on('connect_error', () => { 
+        document.getElementById('auth-status').innerText = "Ошибка подключения к серверу..."; 
+    });
     
     socket.on('authSuccess', (data) => { 
         localStorage.setItem('n', data.nick); 
@@ -87,28 +93,30 @@ function initSocket() {
     });
 }
 
-// ФУНКЦИЯ ВЫХОДА В МЕНЮ (Вызывается из settings.js)
+// ФУНКЦИЯ ВЫХОДА В МЕНЮ
 window.leaveMatch = function() {
     if (socket) {
-        socket.disconnect(); // Отключаемся от сервера
+        socket.disconnect(); 
     }
     myId = null;
     stopAutofire();
     
-    // Удаляем всех видимых врагов со сцены
     for (let id in remotePlayers) {
         scene.remove(remotePlayers[id]);
     }
     remotePlayers = {};
 
-    // Сбрасываем интерфейс и показываем окно входа
     document.getElementById('auth-screen').style.display = 'flex';
     document.getElementById('btn-auth').innerText = "Войти / Создать";
     document.getElementById('auth-status').innerText = "Вы покинули матч.";
+    
+    // Сразу подключаем сокет обратно, чтобы меню ждало нового ввода данных
+    initSocket();
 };
 
 window.addEventListener('DOMContentLoaded', () => {
     initEngine(); 
+    initSocket(); // <--- Важно! Сокет стартует сразу
     initGameSettings(); 
     setupControls();
     
@@ -181,7 +189,10 @@ function checkWallCollisions(newPos) {
     return false;
 }
 
+// Исправленная кнопка авторизации: отправляет данные без задержек
 document.getElementById('btn-auth').addEventListener('click', () => {
+    if (window.isEditMode) return;
+    
     let nickname = document.getElementById('input-nick').value.trim(); 
     let password = document.getElementById('input-pass').value.trim();
     if(nickname.length < 2 || password.length < 3) return;
@@ -190,15 +201,12 @@ document.getElementById('btn-auth').addEventListener('click', () => {
     myNick = nickname; 
     myPass = password;
     
-    // Инициализируем сокеты при клике на вход
-    initSocket();
-    
-    // Даем небольшую задержку, чтобы сокет успел соединиться
-    setTimeout(() => {
-        if (socket && socket.connected) {
-            socket.emit('playerAuth', { nick: nickname, pass: password });
-        }
-    }, 500);
+    if (socket && socket.connected) {
+        socket.emit('playerAuth', { nick: nickname, pass: password });
+    } else {
+        document.getElementById('btn-auth').innerText = "Войти / Создать";
+        document.getElementById('auth-status').innerText = "Нет связи с сервером. Попробуйте позже.";
+    }
 });
 
 function performShot() {
