@@ -33,7 +33,6 @@
         #hud-hp { border-left-color: #ef4444; color: #fca5a5; }
         #hud-ammo { border-left-color: #eab308; color: #fef08a; }
 
-        /* ТАЙМЕР ПО ЦЕНТРУ СВЕРХУ */
         #game-timer { 
             position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 10;
             background: rgba(10, 16, 30, 0.85); border: 2px solid #00ffff; color: #00ffff; 
@@ -41,7 +40,6 @@
             text-shadow: 0 0 5px rgba(0, 255, 255, 0.5); font-variant-numeric: tabular-nums;
         }
 
-        /* ПАНЕЛЬ СПРАВА СВЕРХУ */
         #top-right-controls { position: absolute; top: 12px; right: 12px; z-index: 10; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
         #kills-counter { background: rgba(15, 23, 42, 0.75); color: #38bdf8; padding: 8px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; border: 1px solid #38bdf8; }
         
@@ -54,13 +52,11 @@
         #crosshair::before { top: 4px; left: -5px; width: 20px; height: 2px; }
         #crosshair::after { top: -5px; left: 4px; width: 2px; height: 20px; }
 
-        /* ОБЩАЯ СЕНСОРНАЯ СУПЕР-ЗОНА ДЛЯ КАМЕРЫ (НА ВЕСЬ ЭКРАН) */
         #camera-touch-zone { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 4; }
 
-        /* ЭЛЕМЕНТЫ УПРАВЛЕНИЯ С ПОДДЕРЖКОЙ КАСТОМИЗАЦИИ */
+        /* ЭЛЕМЕНТЫ УПРАВЛЕНИЯ */
         .draggable { position: absolute; z-index: 20; touch-action: none; user-select: none; }
         
-        /* Изменён z-index до 25, чтобы джойстик перехватывал нажатия раньше зоны камеры */
         #joystick-zone { width: 120px; height: 120px; background: rgba(255, 255, 255, 0.08); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 50%; left: 40px; bottom: 40px; z-index: 25; pointer-events: auto; }
         #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: radial-gradient(circle, #38bdf8 0%, #0284c7 100%); border-radius: 50%; pointer-events: none; }
         
@@ -71,7 +67,7 @@
         #btn-crouch { width: 65px; height: 65px; background: #1e3a8a; border: 1px solid #3b82f6; font-size: 10px; right: 35px; bottom: 35px; }
         #btn-reload { width: 65px; height: 65px; background: #475569; border: 1px solid #64748b; font-size: 10px; right: 120px; bottom: 35px; }
 
-        /* ОКНО НАСТРОЕК РАСКЛАДКИ */
+        /* ОКНО НАСТРОЕК */
         #settings-panel {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: rgba(15, 23, 42, 0.95); border: 2px solid #eab308; padding: 20px; border-radius: 12px;
@@ -129,7 +125,6 @@
     </div>
 
     <div id="crosshair"></div>
-    
     <div id="camera-touch-zone"></div>
     
     <div id="joystick-zone" class="draggable"><div id="joystick-stick"></div></div>
@@ -141,8 +136,16 @@
     <div id="canvas-container"></div>
 
     <script>
+        // ВНИМАНИЕ: Замени эту ссылку на СВОЙ реальный адрес Render, если он отличается!
         const SERVER_URL = "https://pvp-arena-online.onrender.com"; 
-        const socket = io(SERVER_URL);
+        
+        let socket;
+        try {
+            socket = io(SERVER_URL);
+        } catch(e) {
+            console.error("Socket.io не загрузился!", e);
+            document.getElementById('auth-status').innerText = "Ошибка загрузки сетей браузером.";
+        }
 
         let myId = null, myNick = "", myPass = "";
         let hp = 100, ammo = 30, reserveAmmo = 90, kills = 0, isReloading = false, isCrouching = false;
@@ -161,10 +164,57 @@
         let joystickTouchId = null;
         let lookTouchId = null;
         let lastLookX = 0, lastLookY = 0;
-        let fireIntervalId = null; // ID таймера для стрельбы зажимом
+        let fireIntervalId = null;
 
-        socket.on('connect', () => { document.getElementById('auth-status').innerText = "Сервер онлайн! Введите данные."; });
-        socket.on('connect_error', () => { document.getElementById('auth-status').innerText = "Ошибка подключения к Render..."; });
+        if (socket) {
+            socket.on('connect', () => { document.getElementById('auth-status').innerText = "Сервер онлайн! Введите данные."; });
+            socket.on('connect_error', () => { document.getElementById('auth-status').innerText = "Ошибка подключения к Render..."; });
+            
+            socket.on('authSuccess', (data) => {
+                localStorage.setItem('n', data.nick); localStorage.setItem('p', data.pass);
+                document.getElementById('auth-screen').style.display = 'none'; myId = socket.id;
+            });
+
+            socket.on('authFailed', (msg) => { document.getElementById('btn-auth').innerText = "Войти / Создать"; document.getElementById('auth-status').innerText = msg; });
+            socket.on('init', (spawnPos) => { yawObject.position.set(spawnPos.x, 1.7, spawnPos.z); hp = 100; ammo = 30; updateHUD(); document.getElementById('respawn-screen').style.display = 'none'; });
+            
+            socket.on('timerUpdate', (data) => { 
+                const m = Math.floor(data.timeLeft / 60); 
+                const s = data.timeLeft % 60; 
+                document.getElementById('game-timer').innerText = `${m < 10 ? '0' + m : m}:${s < 10 ? '0' + s : s}`; 
+            });
+
+            socket.on('updatePlayers', (serverPlayers) => {
+                // 1. Проверяем смерть локального игрока
+                if (myId && serverPlayers[myId]) {
+                    let myServerData = serverPlayers[myId];
+                    kills = myServerData.kills;
+                    if (myServerData.hp <= 0 && hp > 0) {
+                        hp = 0; stopAutofire(); updateHUD(); document.getElementById('respawn-screen').style.display = 'flex';
+                    }
+                    updateHUD();
+                }
+
+                // 2. Обновляем модельки врагов
+                for (let id in serverPlayers) {
+                    if (id === socket.id) continue;
+                    let pData = serverPlayers[id];
+                    if (!remotePlayers[id] && pData.hp > 0) {
+                        let group = new THREE.Group();
+                        let b = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.4, 12), new THREE.MeshStandardMaterial({ color: 0xff0055 }));
+                        b.position.y = 0.7; b.userData = { targetId: id, zone: 'body' }; group.add(b);
+                        let h = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 12), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+                        h.position.y = 1.6; h.userData = { targetId: id, zone: 'head' }; group.add(h);
+                        scene.add(group); remotePlayers[id] = group;
+                    }
+                    if (remotePlayers[id]) {
+                        if (pData.hp <= 0) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; } 
+                        else { remotePlayers[id].position.set(pData.x, 0, pData.z); remotePlayers[id].rotation.y = pData.rotY; }
+                    }
+                }
+                for (let id in remotePlayers) { if (!serverPlayers[id]) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; } }
+            });
+        }
 
         window.addEventListener('DOMContentLoaded', () => {
             initEngine(); 
@@ -188,44 +238,33 @@
             scene.add(new THREE.AmbientLight(0xffffff, 0.4));
             let dirLight = new THREE.DirectionalLight(0x38bdf8, 0.8); dirLight.position.set(20, 40, 20); scene.add(dirLight);
 
-            buildMap();
-            createWeapon();
-            animate();
+            buildMap(); createWeapon(); animate();
         }
 
         function createWeapon() {
             let weaponGroup = new THREE.Group();
             let barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.6, 8), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.2 }));
             barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0, -0.3); weaponGroup.add(barrel);
-
             let bodyGen = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.4), new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.5 }));
             bodyGen.position.set(0, -0.02, -0.1); weaponGroup.add(bodyGen);
-
             let sight = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.03, 0.05), new THREE.MeshBasicMaterial({ color: 0x00ffcc }));
             sight.position.set(0, 0.04, -0.2); weaponGroup.add(sight);
-
-            weaponGroup.position.set(0.25, -0.22, -0.45);
-            camera.add(weaponGroup); weaponMesh = weaponGroup;
+            weaponGroup.position.set(0.25, -0.22, -0.45); camera.add(weaponGroup); weaponMesh = weaponGroup;
         }
 
         function buildMap() {
             mapObjects.forEach(obj => scene.remove(obj)); mapObjects = []; colliders = [];
             let floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8 }));
             floor.rotation.x = -Math.PI / 2; scene.add(floor); mapObjects.push(floor);
-
             let grid = new THREE.GridHelper(100, 50, 0x38bdf8, 0x1f2937); grid.position.y = 0.01; scene.add(grid); mapObjects.push(grid);
-
             createObstacle(0, 3, 0, 12, 6, 2, 0x334155);
-            createObstacle(-20, 4, 20, 6, 8, 6, 0x0284c7);
-            createObstacle(20, 4, -20, 6, 8, 6, 0x0284c7);
-            createObstacle(25, 2, 15, 8, 4, 2, 0x475569);
-            createObstacle(-25, 2, -15, 8, 4, 2, 0x475569);
+            createObstacle(-20, 4, 20, 6, 8, 6, 0x0284c7); createObstacle(20, 4, -20, 6, 8, 6, 0x0284c7);
+            createObstacle(25, 2, 15, 8, 4, 2, 0x475569); createObstacle(-25, 2, -15, 8, 4, 2, 0x475569);
         }
 
         function createObstacle(x, y, z, w, h, d, color) {
             let mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: color }));
-            mesh.position.set(x, y, z); scene.add(mesh); mapObjects.push(mesh);
-            colliders.push(new THREE.Box3().setFromObject(mesh));
+            mesh.position.set(x, y, z); scene.add(mesh); mapObjects.push(mesh); colliders.push(new THREE.Box3().setFromObject(mesh));
         }
 
         function checkWallCollisions(newPos) {
@@ -234,71 +273,25 @@
                 new THREE.Vector3(newPos.x - pr, newPos.y - (isCrouching ? 0.9 : 1.7), newPos.z - pr),
                 new THREE.Vector3(newPos.x + pr, newPos.y + 0.3, newPos.z + pr)
             );
-            for (let i = 0; i < colliders.length; i++) {
-                if (playerBox.intersectsBox(colliders[i])) return true;
-            }
+            for (let i = 0; i < colliders.length; i++) { if (playerBox.intersectsBox(colliders[i])) return true; }
             return false;
         }
 
         document.getElementById('btn-auth').addEventListener('click', () => {
             let nickname = document.getElementById('input-nick').value.trim();
             let password = document.getElementById('input-pass').value.trim();
-            if(nickname.length < 2 || password.length < 3) return;
+            if(nickname.length < 2 || password.length < 3 || !socket) return;
             document.getElementById('btn-auth').innerText = "Вход...";
             myNick = nickname; myPass = password;
             socket.emit('playerAuth', { nick: nickname, pass: password });
         });
 
-        socket.on('authSuccess', (data) => {
-            localStorage.setItem('n', data.nick); localStorage.setItem('p', data.pass);
-            document.getElementById('auth-screen').style.display = 'none'; myId = socket.id;
-        });
-
-        socket.on('authFailed', (msg) => { document.getElementById('btn-auth').innerText = "Войти / Создать"; document.getElementById('auth-status').innerText = msg; });
-        socket.on('init', (spawnPos) => { yawObject.position.set(spawnPos.x, 1.7, spawnPos.z); hp = 100; ammo = 30; updateHUD(); document.getElementById('respawn-screen').style.display = 'none'; });
-        
-        socket.on('timerUpdate', (data) => { 
-            const m = Math.floor(data.timeLeft / 60); 
-            const s = data.timeLeft % 60; 
-            document.getElementById('game-timer').innerText = `${m < 10 ? '0' + m : m}:${s < 10 ? '0' + s : s}`; 
-        });
-
-        socket.on('updatePlayers', (serverPlayers) => {
-            for (let id in serverPlayers) {
-                if (id === socket.id) { kills = serverPlayers[id].kills; updateHUD(); continue; }
-                let pData = serverPlayers[id];
-                if (!remotePlayers[id] && pData.hp > 0) {
-                    let group = new THREE.Group();
-                    let b = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.4, 12), new THREE.MeshStandardMaterial({ color: 0xff0055 }));
-                    b.position.y = 0.7; b.userData = { targetId: id, zone: 'body' }; group.add(b);
-                    let h = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 12), new THREE.MeshStandardMaterial({ color: 0xffffff }));
-                    h.position.y = 1.6; h.userData = { targetId: id, zone: 'head' }; group.add(h);
-                    scene.add(group); remotePlayers[id] = group;
-                }
-                if (remotePlayers[id]) {
-                    if (pData.hp <= 0) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; } 
-                    else { remotePlayers[id].position.set(pData.x, 0, pData.z); remotePlayers[id].rotation.y = pData.rotY; }
-                }
-            }
-            for (let id in remotePlayers) { if (!serverPlayers[id]) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; } }
-        });
-
         function performShot() {
-            if (isReloading || hp <= 0 || isEditMode) return;
-            
-            // Автоматическая перезарядка, если закончились патроны
-            if (ammo <= 0) {
-                stopAutofire();
-                startReload();
-                return;
-            }
+            if (isReloading || hp <= 0 || isEditMode || !socket) return;
+            if (ammo <= 0) { stopAutofire(); startReload(); return; }
 
             ammo--; updateHUD();
-
-            if(weaponMesh) {
-                weaponMesh.position.z = -0.38;
-                setTimeout(() => weaponMesh.position.z = -0.45, 60);
-            }
+            if(weaponMesh) { weaponMesh.position.z = -0.38; setTimeout(() => weaponMesh.position.z = -0.45, 60); }
 
             let raycaster = new THREE.Raycaster(); raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             let targets = []; for (let id in remotePlayers) { targets.push(...remotePlayers[id].children); }
@@ -306,27 +299,11 @@
             if (intersects.length > 0) {
                 let obj = intersects[0].object.userData; socket.emit('playerHit', { targetId: obj.targetId, zone: obj.zone });
             }
-
-            // Ещё одна проверка на случай, если этот выстрел был последним в обойме
-            if (ammo <= 0) {
-                stopAutofire();
-                startReload();
-            }
+            if (ammo <= 0) { stopAutofire(); startReload(); }
         }
 
-        // Логика зажима кнопки огня
-        function startAutofire() {
-            if (fireIntervalId !== null) return;
-            performShot(); // Первый выстрел сразу
-            fireIntervalId = setInterval(performShot, 500); // Повторение каждые 0.5 секунды
-        }
-
-        function stopAutofire() {
-            if (fireIntervalId !== null) {
-                clearInterval(fireIntervalId);
-                fireIntervalId = null;
-            }
-        }
+        function startAutofire() { if (fireIntervalId !== null) return; performShot(); fireIntervalId = setInterval(performShot, 500); }
+        function stopAutofire() { if (fireIntervalId !== null) { clearInterval(fireIntervalId); fireIntervalId = null; } }
 
         function startReload() {
             if (isReloading || ammo === 30 || reserveAmmo <= 0 || isEditMode) return;
@@ -343,20 +320,13 @@
             document.getElementById('kills-counter').innerText = `💀 Убийства: ${kills}`;
         }
 
-        socket.on('updatePlayers', (serverPlayers) => {
-            if (myId && serverPlayers[myId] && serverPlayers[myId].hp <= 0 && hp > 0) {
-                hp = 0; stopAutofire(); updateHUD(); document.getElementById('respawn-screen').style.display = 'flex';
-            }
-        });
-
-        document.getElementById('btn-respawn').addEventListener('click', () => socket.emit('requestRespawn'));
+        document.getElementById('btn-respawn').addEventListener('click', () => { if(socket) socket.emit('requestRespawn'); });
 
         function setupControls() {
             const cameraZone = document.getElementById('camera-touch-zone');
             const jZone = document.getElementById('joystick-zone');
             const stick = document.getElementById('joystick-stick');
 
-            // ОБРАБОТКА СТРЕЛЬБЫ ПО ЗАЖАТИЮ КНОПКИ ОГНЯ
             const fireBtn = document.getElementById('btn-fire');
             fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if(!isEditMode) startAutofire(); });
             fireBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopAutofire(); });
@@ -366,85 +336,47 @@
             document.getElementById('btn-jump').addEventListener('touchstart', (e) => { e.preventDefault(); if(isGrounded && !isEditMode) playerVelocity.y = JUMP_FORCE; });
             
             document.getElementById('btn-crouch').addEventListener('touchstart', (e) => { 
-                e.preventDefault(); 
-                if (isEditMode) return;
+                e.preventDefault(); if (isEditMode) return;
                 isCrouching = !isCrouching;
-                if(isCrouching) {
-                    moveSpeed = 6;
-                    document.getElementById('btn-crouch').style.background = "#3b82f6";
-                } else {
-                    moveSpeed = 14;
-                    document.getElementById('btn-crouch').style.background = "#1e3a8a";
-                }
+                if(isCrouching) { moveSpeed = 6; document.getElementById('btn-crouch').style.background = "#3b82f6"; } 
+                else { moveSpeed = 14; document.getElementById('btn-crouch').style.background = "#1e3a8a"; }
             });
 
             document.getElementById('btn-fullscreen').addEventListener('click', () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); });
 
-            // СТРОГАЯ ЗОНА ХОДЬБЫ: Только клики по самому кругу джойстика активируют бег
             jZone.addEventListener('touchstart', (e) => {
-                if (isEditMode) return;
-                e.stopPropagation(); // Не даем событию уйти на зону камеры под ним
-                let t = e.targetTouches[0];
-                joystickTouchId = t.identifier;
-                updateJoystick(t);
+                if (isEditMode) return; e.stopPropagation();
+                let t = e.targetTouches[0]; joystickTouchId = t.identifier; updateJoystick(t);
             });
-
             jZone.addEventListener('touchmove', (e) => {
-                if (isEditMode) return;
-                e.stopPropagation();
-                for(let t of e.touches) {
-                    if(t.identifier === joystickTouchId) updateJoystick(t);
-                }
+                if (isEditMode) return; e.stopPropagation();
+                for(let t of e.touches) { if(t.identifier === joystickTouchId) updateJoystick(t); }
             });
-
-            jZone.addEventListener('touchend', (e) => {
-                joystickTouchId = null;
-                stick.style.transform = `translate(0px, 0px)`;
-                moveDirection.forward = 0; moveDirection.right = 0;
-            });
+            jZone.addEventListener('touchend', () => { joystickTouchId = null; stick.style.transform = `translate(0px, 0px)`; moveDirection.forward = 0; moveDirection.right = 0; });
 
             function updateJoystick(touch) {
                 let rect = jZone.getBoundingClientRect();
-                let dx = touch.clientX - (rect.left + rect.width / 2);
-                let dy = touch.clientY - (rect.top + rect.height / 2);
-                let dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist > 40) { dx = (dx / dist) * 40; dy = (dy / dist) * 40; }
-                stick.style.transform = `translate(${dx}px, ${dy}px)`;
-                moveDirection.forward = -(dy / 40); moveDirection.right = (dx / 40);
+                let dx = touch.clientX - (rect.left + rect.width / 2); let dy = touch.clientY - (rect.top + rect.height / 2);
+                let dist = Math.sqrt(dx*dx + dy*dy); if (dist > 40) { dx = (dx / dist) * 40; dy = (dy / dist) * 40; }
+                stick.style.transform = `translate(${dx}px, ${dy}px)`; moveDirection.forward = -(dy / 40); moveDirection.right = (dx / 40);
             }
 
-            // ВСЕ ОСТАЛЬНОЕ ПРОСТРАНСТВО ЭКРАНА ОТВЕЧАЕТ ЗА КАМЕРУ
             cameraZone.addEventListener('touchstart', (e) => {
-                if (isEditMode) return;
-                e.preventDefault();
-                for(let t of e.changedTouches) {
-                    if(lookTouchId === null) {
-                        lookTouchId = t.identifier;
-                        lastLookX = t.clientX; lastLookY = t.clientY;
-                    }
-                }
+                if (isEditMode) return; e.preventDefault();
+                for(let t of e.changedTouches) { if(lookTouchId === null) { lookTouchId = t.identifier; lastLookX = t.clientX; lastLookY = t.clientY; } }
             });
-
             cameraZone.addEventListener('touchmove', (e) => {
-                if (isEditMode) return;
-                e.preventDefault();
+                if (isEditMode) return; e.preventDefault();
                 for(let t of e.changedTouches) {
                     if(t.identifier === lookTouchId) {
-                        let dx = t.clientX - lastLookX;
-                        let dy = t.clientY - lastLookY;
-                        yawObject.rotation.y -= dx * lookSpeed;
-                        pitchObject.rotation.x -= dy * lookSpeed;
+                        let dx = t.clientX - lastLookX; let dy = t.clientY - lastLookY;
+                        yawObject.rotation.y -= dx * lookSpeed; pitchObject.rotation.x -= dy * lookSpeed;
                         pitchObject.rotation.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitchObject.rotation.x));
                         lastLookX = t.clientX; lastLookY = t.clientY;
                     }
                 }
             });
-
-            cameraZone.addEventListener('touchend', (e) => {
-                for(let t of e.changedTouches) {
-                    if(t.identifier === lookTouchId) lookTouchId = null;
-                }
-            });
+            cameraZone.addEventListener('touchend', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouchId = null; } });
         }
 
         function setupLayoutEditor() {
@@ -452,39 +384,62 @@
             const panel = document.getElementById('settings-panel');
             const draggables = document.querySelectorAll('.draggable');
 
-            btnSettings.addEventListener('click', () => {
-                isEditMode = true;
-                panel.style.display = 'block';
-                draggables.forEach(el => el.classList.add('edit-mode'));
-            });
-
+            btnSettings.addEventListener('click', () => { isEditMode = true; panel.style.display = 'block'; draggables.forEach(el => el.classList.add('edit-mode')); });
             document.getElementById('btn-save-layout').addEventListener('click', () => {
-                isEditMode = false;
-                panel.style.display = 'none';
-                draggables.forEach(el => el.classList.remove('edit-mode'));
-                
+                isEditMode = false; panel.style.display = 'none'; draggables.forEach(el => el.classList.remove('edit-mode'));
                 let layout = {};
-                draggables.forEach(el => {
-                    layout[el.id] = { left: el.style.left, top: el.style.top, right: el.style.right, bottom: el.style.bottom };
-                });
+                draggables.forEach(el => { layout[el.id] = { left: el.style.left, top: el.style.top, right: el.style.right, bottom: el.style.bottom }; });
                 localStorage.setItem('cyber_arena_layout', JSON.stringify(layout));
             });
-
-            document.getElementById('btn-reset-layout').addEventListener('click', () => {
-                localStorage.removeItem('cyber_arena_layout');
-                location.reload();
-            });
+            document.getElementById('btn-reset-layout').addEventListener('click', () => { localStorage.removeItem('cyber_arena_layout'); location.reload(); });
 
             draggables.forEach(el => {
                 let activeDrag = false;
-                el.addEventListener('touchstart', (e) => {
-                    if (!isEditMode) return;
-                    activeDrag = true;
-                });
-
+                el.addEventListener('touchstart', () => { if (isEditMode) activeDrag = true; });
                 window.addEventListener('touchmove', (e) => {
                     if (!isEditMode || !activeDrag) return;
-                    let touch = e.touches[0];
-                    el.style.right = 'auto';
-                    el.style.bottom = 'auto';
-                    el.style.left = (touch.clientX - el.offsetWidth / 2) + '
+                    let touch = e.touches[0]; el.style.right = 'auto'; el.style.bottom = 'auto';
+                    el.style.left = (touch.clientX - el.offsetWidth / 2) + 'px'; el.style.top = (touch.clientY - el.offsetHeight / 2) + 'px';
+                });
+                window.addEventListener('touchend', () => { activeDrag = false; });
+            });
+        }
+
+        function loadSavedLayout() {
+            let saved = localStorage.getItem('cyber_arena_layout');
+            if (saved) {
+                let layout = JSON.parse(saved);
+                for (let id in layout) {
+                    let el = document.getElementById(id);
+                    if (el) { el.style.left = layout[id].left; el.style.top = layout[id].top; el.style.right = layout[id].right; el.style.bottom = layout[id].bottom; }
+                }
+            }
+        }
+
+        let clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            let delta = clock.getDelta(); if (delta > 0.1) delta = 0.1;
+
+            if (myId && hp > 0 && socket) {
+                playerVelocity.y -= GRAVITY * delta;
+                let forwardVector = new THREE.Vector3(0, 0, -1).applyQuaternion(yawObject.quaternion);
+                let sideVector = new THREE.Vector3(1, 0, 0).applyQuaternion(yawObject.quaternion);
+                let moveX = (forwardVector.x * moveDirection.forward + sideVector.x * moveDirection.right) * moveSpeed * delta;
+                let moveZ = (forwardVector.z * moveDirection.forward + sideVector.z * moveDirection.right) * moveSpeed * delta;
+
+                let targetPos = yawObject.position.clone(); targetPos.x += moveX; if (!checkWallCollisions(targetPos)) yawObject.position.x = targetPos.x;
+                targetPos = yawObject.position.clone(); targetPos.z += moveZ; if (!checkWallCollisions(targetPos)) yawObject.position.z = targetPos.z;
+
+                yawObject.position.y += playerVelocity.y * delta;
+                let targetHeight = isCrouching ? 0.9 : 1.7;
+                if (yawObject.position.y <= targetHeight) { playerVelocity.y = 0; yawObject.position.y = targetHeight; isGrounded = true; } else { isGrounded = false; }
+
+                socket.emit('playerMove', { x: yawObject.position.x, z: yawObject.position.z, rotY: yawObject.rotation.y });
+            }
+            renderer.render(scene, camera);
+        }
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    </script>
+</body>
+</html>
