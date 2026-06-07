@@ -12,10 +12,11 @@ let moveDirection = { forward: 0, right: 0 };
 let playerVelocity = new THREE.Vector3();
 let isGrounded = true;
 
-// НАСТРОЙКИ СКОРОСТИ КАК В CS
-const GRAVITY = 28; const JUMP_FORCE = 10; 
-let moveSpeed = 6.5; // Базовая скорость бега (как в CS)
-let crouchSpeed = 3.0; // Скорость в приседе
+// НАСТРОЙКИ ФИЗИКИ В СТИЛЕ CS (Counter-Strike)
+const GRAVITY = 38;      // Сильная гравитация, чтобы не было "лунных" прыжков
+const JUMP_FORCE = 8.5;  // Невысокий, плотный прыжок
+let moveSpeed = 5.5;     // Скорость бега (стандарт CS)
+let crouchSpeed = 1.8;   // В приседе игрок еле ползет, как в CS
 
 let colliders = [];
 let lootItems = []; // Массив для хранения ящиков с лутом на карте
@@ -99,13 +100,13 @@ function initSocket() {
         if(statusText) statusText.innerText = "Сервер онлайн! Входите в бой."; 
         if(authBtn) { authBtn.disabled = false; authBtn.style.background = '#ec4899'; authBtn.innerText = "ПОДКЛЮЧИТЬСЯ"; }
         
-        // Убираем зависшую надпись «Загрузка» через 3 секунды после коннекта, если сервер не прислал таймер
+        // Убираем зависшую надпись «Загрузка» автоматически через 1.5 секунды после коннекта
         setTimeout(() => {
             const timerText = document.getElementById('hud-timer');
             if (timerText && timerText.innerText === "ЗАГРУЗКА...") {
                 timerText.style.display = "none";
             }
-        }, 3000);
+        }, 1500);
     });
 
     socket.on('connect_error', (error) => {
@@ -119,7 +120,7 @@ function initSocket() {
         document.getElementById('auth-screen').style.display = 'none'; 
         myId = socket.id; 
         
-        // Пересобираем карту под выбранный режим
+        // Пересобираем карту
         buildMap();
     });
     
@@ -134,7 +135,7 @@ function initSocket() {
         const timerText = document.getElementById('hud-timer');
         const skipBtn = document.getElementById('btn-skip-break');
         if (!timerText) return;
-        timerText.style.display = "block"; // Показываем плашку, если пришли данные
+        timerText.style.display = "block";
 
         if (currentGameMode === 'coop') {
             if (data.isBreak) {
@@ -281,16 +282,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
 function applyHUDScale(scale) { document.getElementById('hud-scalable-wrapper').style.transform = `scale(${scale})`; }
 
-// Принудительно возвращаем джойстик на базу вниз-влево
 function fixJoystickPosition() {
     const jZone = document.getElementById('joystick-zone');
     if (jZone) {
-        jZone.style.position = 'absolute';
-        jZone.style.bottom = '40px';
-        jZone.style.left = '40px';
-        jZone.style.top = 'auto';
-        jZone.style.right = 'auto';
-        jZone.style.transform = 'none';
+        jZone.style.position = 'absolute'; jZone.style.bottom = '40px'; jZone.style.left = '40px';
+        jZone.style.top = 'auto'; jZone.style.right = 'auto'; jZone.style.transform = 'none';
     }
 }
 
@@ -324,26 +320,21 @@ function buildMap() {
     createObstacle(-40, 3, 0, 2, 6, 80, 0x1e293b); createObstacle(40, 3, 0, 2, 6, 80, 0x1e293b);
     createObstacle(-10, 2, -10, 4, 4, 4, 0x334155); createObstacle(10, 2, 10, 4, 4, 4, 0x334155);
 
-    // СПАВН ЯЩИКОВ С ЛУТОМ ТОЛЬКО ДЛЯ PVP РЕЖИМА
-    if (currentGameMode === 'pvp') {
-        spawnLoot(0, 0.4, 15, 'medkit', 0x10b981);    // Хил (Зеленый)
-        spawnLoot(-15, 0.4, -5, 'armor', 0x3b82f6);   // Армор (Синий)
-        spawnLoot(15, 0.4, -5, 'ammo', 0xf59e0b);     // Патроны (Желтый)
-    }
+    // ГАРАНТИРОВАННЫЙ СПАВН ЯЩИКОВ (Они всегда будут на карте!)
+    spawnLoot(0, 0.4, 15, 'medkit', 0x10b981);    // Хил (Зеленый)
+    spawnLoot(-15, 0.4, -5, 'armor', 0x3b82f6);   // Армор (Синий)
+    spawnLoot(15, 0.4, -5, 'ammo', 0xf59e0b);     // Патроны (Желтый)
 }
 
 function createObstacle(x, y, z, w, h, d, color) {
     let mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: color })); mesh.position.set(x, y, z); scene.add(mesh); mapObjects.push(mesh); colliders.push(new THREE.Box3().setFromObject(mesh));
 }
 
-// Создание 3D ящика лута на поле
 function spawnLoot(x, y, z, type, colorHex) {
     let geo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
     let mat = new THREE.MeshStandardMaterial({ color: colorHex, emissive: colorHex, emissiveIntensity: 0.3, metalness: 0.2, roughness: 0.5 });
-    let mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, y, z);
-    scene.add(mesh);
-    lootItems.push({ mesh: mesh, type: type, baseHeight: y, seed: Math.random() * 100 });
+    let mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y, z); scene.add(mesh);
+    lootItems.push({ mesh: mesh, type: type, x: x, y: y, z: z, baseHeight: y, seed: Math.random() * 100 });
 }
 
 function checkWallCollisions(newPos) {
@@ -353,7 +344,6 @@ function checkWallCollisions(newPos) {
     return false;
 }
 
-// Проверка сбора ящиков игроком
 function checkLootPickups() {
     if (!yawObject || hp <= 0) return;
     let pPos = yawObject.position;
@@ -362,23 +352,20 @@ function checkLootPickups() {
         let item = lootItems[i];
         let dist = pPos.distanceTo(item.mesh.position);
         
-        if (dist < 1.3) { // Радиус подбора
+        if (dist < 1.3) { 
             let pickedUp = false;
-            
             if (item.type === 'medkit' && hp < 100) { hp = 100; pickedUp = true; } 
             else if (item.type === 'armor' && armor < 100) { armor = 100; pickedUp = true; } 
             else if (item.type === 'ammo' && reserveAmmo < 120) { reserveAmmo = 120; pickedUp = true; }
             
             if (pickedUp) {
                 updateHUD();
-                // Временно прячем ящик (убираем из сцены)
-                let pickedMesh = item.mesh;
-                scene.remove(pickedMesh);
+                let pickedMesh = item.mesh; scene.remove(pickedMesh);
                 lootItems.splice(i, 1);
                 
-                // Переспавн ящика на том же месте через 15 секунд
+                // Авто-респавн ровно через 15 секунд на том же месте
                 setTimeout(() => {
-                    if (currentGameMode === 'pvp' && scene) {
+                    if (scene) {
                         scene.add(pickedMesh);
                         lootItems.push(item);
                     }
@@ -431,6 +418,7 @@ function updateHUD() {
 document.getElementById('btn-respawn').addEventListener('click', () => { if(socket) socket.emit('requestRespawn'); });
 document.getElementById('btn-skip-break').addEventListener('click', () => { if(socket && socket.connected) socket.emit('skipBreakVote'); });
 
+// ИСПРАВЛЕННЫЙ ЗАГРУЗЧИК НАСТРОЕК ЦЕНТРАЛЬНОГО ПРИЦЕЛА
 function loadCrosshairSettings() {
     const crosshair = document.getElementById('game-crosshair'); if(!crosshair) return;
     let color = localStorage.getItem('ch_color') || '#00ff00';
@@ -478,8 +466,7 @@ function setupControls() {
 
     document.getElementById('btn-save-hud').addEventListener('click', () => { 
         isCustomizing = false; document.body.classList.remove('edit-mode'); customMenu.style.display = 'none'; 
-        saveHUDPositions();
-        fixJoystickPosition(); // Принудительно сажаем джойстик на место после сохранения
+        saveHUDPositions(); fixJoystickPosition();
         if(document.getElementById('crosshair-color')) localStorage.setItem('ch_color', document.getElementById('crosshair-color').value);
         if(document.getElementById('crosshair-size')) localStorage.setItem('ch_size', document.getElementById('crosshair-size').value);
         if(document.getElementById('crosshair-shape')) localStorage.setItem('ch_shape', document.getElementById('crosshair-shape').value);
@@ -526,92 +513,4 @@ function setupControls() {
         if(!isCustomizing){ e.preventDefault(); isCrouching = !isCrouching; document.getElementById('btn-crouch').style.backgroundColor = isCrouching ? "rgba(59, 130, 246, 0.6)" : "rgba(30, 58, 138, 0.3)"; }
     });
 
-    jZone.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.stopPropagation(); let t = e.targetTouches[0]; joystickTouchId = t.identifier; updateJoystick(t); } });
-    jZone.addEventListener('touchmove', (e) => { if(!isCustomizing){ e.stopPropagation(); for(let t of e.touches) { if(t.identifier === joystickTouchId) updateJoystick(t); } } });
-    jZone.addEventListener('touchend', () => { if(!isCustomizing){ joystickTouchId = null; stick.style.transform = `translate(0px, 0px)`; moveDirection.forward = 0; moveDirection.right = 0; } });
-
-    function updateJoystick(touch) {
-        let rect = jZone.getBoundingClientRect(); let dx = touch.clientX - (rect.left + rect.width / 2), dy = touch.clientY - (rect.top + rect.height / 2);
-        let dist = Math.sqrt(dx*dx + dy*dy); if (dist > 40) { dx = (dx / dist) * 40; dy = (dy / dist) * 40; }
-        stick.style.transform = `translate(${dx}px, ${dy}px)`; moveDirection.forward = -(dy / 40); moveDirection.right = (dx / 40);
-    }
-
-    window.addEventListener('touchstart', (e) => {
-        if (isCustomizing || e.target.closest('#customizer-menu') || e.target.closest('.overlay')) return;
-        for(let t of e.changedTouches) { if(lookTouchId === null) { lookTouchId = t.identifier; lastLookX = t.clientX; lastLookY = t.clientY; } }
-    });
-    window.addEventListener('touchmove', (e) => {
-        if (isCustomizing) return;
-        for(let t of e.changedTouches) {
-            if(t.identifier === lookTouchId) {
-                let dx = t.clientX - lastLookX, dy = t.clientY - lastLookY; let sens = window.gameSettings.sensitivity;
-                yawObject.rotation.y -= dx * sens; pitchObject.rotation.x -= dy * sens;
-                pitchObject.rotation.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitchObject.rotation.x));
-                lastLookX = t.clientX; lastLookY = t.clientY;
-            }
-        }
-    });
-    window.addEventListener('touchend', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouchId = null; } });
-
-    let dragElement = null, dragOffsetX = 0, dragOffsetY = 0;
-    document.querySelectorAll('.hud-element').forEach(el => {
-        if (el.id === "game-crosshair" || el.id === "joystick-zone") return; // Прицел и джойстик защищены от случайного перетаскивания
-        el.addEventListener('touchstart', (e) => {
-            if (!isCustomizing || el.id === "btn-menu-trigger") return; 
-            dragElement = el; let touch = e.touches[0]; let rect = el.getBoundingClientRect();
-            dragOffsetX = touch.clientX - rect.left; dragOffsetY = touch.clientY - rect.top; el.style.transform = "none";
-        });
-    });
-    window.addEventListener('touchmove', (e) => {
-        if (!isCustomizing || !dragElement) return;
-        let touch = e.touches[0]; let x = (touch.clientX - dragOffsetX) / window.gameSettings.hudScale; let y = (touch.clientY - dragOffsetY) / window.gameSettings.hudScale;
-        dragElement.style.left = x + 'px'; dragElement.style.top = y + 'px'; dragElement.style.bottom = 'auto'; dragElement.style.right = 'auto';
-    });
-    window.addEventListener('touchend', () => { dragElement = null; });
-}
-
-function saveHUDPositions() { let layout = {}; document.querySelectorAll('.hud-element').forEach(el => { if(el.id!=="game-crosshair" && el.id!=="joystick-zone") layout[el.id] = { left: el.style.left, top: el.style.top }; }); localStorage.setItem('hud_layout_universal', JSON.stringify(layout)); }
-function loadHUDPositions() {
-    let saved = localStorage.getItem('hud_layout_universal'); if (!saved) return;
-    let layout = JSON.parse(saved);
-    for (let id in layout) { let el = document.getElementById(id); if (el && layout[id].left) { el.style.left = layout[id].left; el.style.top = layout[id].top; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.transform = 'none'; } }
-}
-
-let clock = new THREE.Clock();
-function animate() {
-    requestAnimationFrame(animate); if (!renderer || !scene || !camera) return;
-    let delta = clock.getDelta(); if (delta > 0.1) delta = 0.1;
-
-    // Анимация вращения и покачивания ящиков лута
-    lootItems.forEach(item => {
-        item.mesh.rotation.y += 1.2 * delta;
-        item.mesh.rotation.x += 0.4 * delta;
-        item.mesh.position.y = item.baseHeight + Math.sin(Date.now() * 0.003 + item.seed) * 0.12;
-    });
-
-    if (myId && hp > 0 && !isCustomizing) {
-        playerVelocity.y -= GRAVITY * delta;
-        
-        // Переключение скорости CS-style (обычный бег или присед)
-        let currentSpeed = isCrouching ? crouchSpeed : moveSpeed;
-
-        let forwardVector = new THREE.Vector3(0, 0, -1).applyQuaternion(yawObject.quaternion);
-        let sideVector = new THREE.Vector3(1, 0, 0).applyQuaternion(yawObject.quaternion);
-        let moveX = (forwardVector.x * moveDirection.forward + sideVector.x * moveDirection.right) * currentSpeed * delta;
-        let moveZ = (forwardVector.z * moveDirection.forward + sideVector.z * moveDirection.right) * currentSpeed * delta;
-
-        let targetPos = yawObject.position.clone(); targetPos.x += moveX; if (!checkWallCollisions(targetPos)) yawObject.position.x = targetPos.x;
-        targetPos = yawObject.position.clone(); targetPos.z += moveZ; if (!checkWallCollisions(targetPos)) yawObject.position.z = targetPos.z;
-
-        yawObject.position.y += playerVelocity.y * delta;
-        let targetHeight = isCrouching ? 0.9 : 1.7;
-        if (yawObject.position.y <= targetHeight) { playerVelocity.y = 0; yawObject.position.y = targetHeight; isGrounded = true; } else { isGrounded = false; }
-
-        // Проверяем, не наступил ли игрок на лут
-        checkLootPickups();
-
-        if(socket && socket.connected) socket.emit('playerMove', { x: yawObject.position.x, z: yawObject.position.z, rotY: yawObject.rotation.y });
-    }
-    renderer.render(scene, camera);
-}
-window.addEventListener('resize', () => { if(camera && renderer) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } });
+    jZone.addEventListener('touchstart', (e) => { if(!isCustomizing){ e
