@@ -81,7 +81,6 @@ function initSocket() {
     if(statusText) statusText.innerText = "Устанавливаем соединение с сервером...";
     if(authBtn) { authBtn.disabled = true; authBtn.style.background = '#475569'; authBtn.innerText = "ПИНГУЕМ СЕРВЕР..."; }
 
-    // Универсальные настройки подключения для стабильной связи с Render
     socket = io(SERVER_URL, {
         transports: ['polling', 'websocket'],
         forceNew: true,
@@ -255,7 +254,7 @@ function createDamageArrow(shooterX, shooterZ) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    initEngine(); initSocket(); setupControls(); loadHUDPositions();
+    initEngine(); initSocket(); setupControls(); loadHUDPositions(); loadCrosshairSettings();
     let savedScale = localStorage.getItem('game_hud_scale');
     if (savedScale) { window.gameSettings.hudScale = parseFloat(savedScale); document.getElementById('scale-slider').value = savedScale; applyHUDScale(savedScale); }
     if(localStorage.getItem('n') && localStorage.getItem('p')) {
@@ -347,6 +346,22 @@ function updateHUD() {
 document.getElementById('btn-respawn').addEventListener('click', () => { if(socket) socket.emit('requestRespawn'); });
 document.getElementById('btn-skip-break').addEventListener('click', () => { if(socket && socket.connected) socket.emit('skipBreakVote'); });
 
+function loadCrosshairSettings() {
+    const crosshair = document.getElementById('game-crosshair'); if(!crosshair) return;
+    let color = localStorage.getItem('ch_color') || '#00ff00';
+    let size = localStorage.getItem('ch_size') || '6';
+    let shape = localStorage.getItem('ch_shape') || '50%';
+
+    crosshair.style.background = color;
+    crosshair.style.width = size + 'px'; crosshair.style.height = size + 'px';
+    crosshair.style.borderRadius = shape;
+
+    if(document.getElementById('crosshair-color')) document.getElementById('crosshair-color').value = color;
+    if(document.getElementById('crosshair-size')) document.getElementById('crosshair-size').value = size;
+    if(document.getElementById('crosshair-size-val')) document.getElementById('crosshair-size-val').innerText = size + 'px';
+    if(document.getElementById('crosshair-shape')) document.getElementById('crosshair-shape').value = shape;
+}
+
 function setupControls() {
     const jZone = document.getElementById('joystick-zone'), stick = document.getElementById('joystick-stick');
     const menuTrigger = document.getElementById('btn-menu-trigger'), customMenu = document.getElementById('customizer-menu');
@@ -354,6 +369,18 @@ function setupControls() {
     document.getElementById('scale-slider').addEventListener('input', (e) => {
         let val = e.target.value; window.gameSettings.hudScale = parseFloat(val); applyHUDScale(val); localStorage.setItem('game_hud_scale', val);
     });
+
+    // Обработчики кастомизации прицела
+    const crosshair = document.getElementById('game-crosshair');
+    if(document.getElementById('crosshair-color')) {
+        document.getElementById('crosshair-color').addEventListener('input', (e) => { if(crosshair) crosshair.style.background = e.target.value; });
+    }
+    if(document.getElementById('crosshair-size')) {
+        document.getElementById('crosshair-size').addEventListener('input', (e) => { if(crosshair) { crosshair.style.width = e.target.value+'px'; crosshair.style.height = e.target.value+'px'; document.getElementById('crosshair-size-val').innerText = e.target.value+'px'; } });
+    }
+    if(document.getElementById('crosshair-shape')) {
+        document.getElementById('crosshair-shape').addEventListener('change', (e) => { if(crosshair) crosshair.style.borderRadius = e.target.value; });
+    }
 
     menuTrigger.addEventListener('touchstart', (e) => {
         e.preventDefault(); e.stopPropagation(); if (isCustomizing) return; 
@@ -365,47 +392,26 @@ function setupControls() {
         document.body.classList.add('edit-mode'); customMenu.style.display = 'block';
     });
 
-    document.getElementById('btn-save-hud').addEventListener('click', () => { isCustomizing = false; document.body.classList.remove('edit-mode'); customMenu.style.display = 'none'; saveHUDPositions(); });
+    document.getElementById('btn-save-hud').addEventListener('click', () => { 
+        isCustomizing = false; document.body.classList.remove('edit-mode'); customMenu.style.display = 'none'; 
+        saveHUDPositions();
+        // Сохраняем настройки прицела
+        if(document.getElementById('crosshair-color')) localStorage.setItem('ch_color', document.getElementById('crosshair-color').value);
+        if(document.getElementById('crosshair-size')) localStorage.setItem('ch_size', document.getElementById('crosshair-size').value);
+        if(document.getElementById('crosshair-shape')) localStorage.setItem('ch_shape', document.getElementById('crosshair-shape').value);
+    });
 
-    // Бронебойный полноэкранный режим на быстрое касание
     document.getElementById('btn-fullscreen-toggle').addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         const docEl = document.documentElement;
-        const isFullscreen = document.fullscreenElement || 
-                             document.webkitFullscreenElement || 
-                             document.mozFullScreenElement || 
-                             document.msFullscreenElement;
-
+        const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
         if (!isFullscreen) {
-            if (docEl.requestFullscreen) {
-                docEl.requestFullscreen().catch(err => console.log(err));
-            } else if (docEl.webkitRequestFullscreen) {
-                docEl.webkitRequestFullscreen();
-            } else if (docEl.mozRequestFullScreen) {
-                docEl.mozRequestFullScreen();
-            } else if (docEl.msRequestFullscreen) {
-                docEl.msRequestFullscreen();
-            }
+            if (docEl.requestFullscreen) docEl.requestFullscreen().catch(err => console.log(err));
+            else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
         } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            } else if (document.mozCancelFullScreen) {
-                document.mozCancelFullScreen();
-            } else if (document.msExitFullscreen) {
-                document.msExitFullscreen();
-            }
+            if (document.exitFullscreen) document.exitFullscreen();
         }
-        
-        setTimeout(() => {
-            if (camera && renderer) {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            }
-        }, 300);
+        setTimeout(() => { if (camera && renderer) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } }, 300);
     }, { passive: false });
 
     document.getElementById('btn-menu-switch-coop').addEventListener('click', () => {
@@ -463,6 +469,7 @@ function setupControls() {
 
     let dragElement = null, dragOffsetX = 0, dragOffsetY = 0;
     document.querySelectorAll('.hud-element').forEach(el => {
+        if (el.id === "game-crosshair") return; // Прицел нельзя перетаскивать пальцем
         el.addEventListener('touchstart', (e) => {
             if (!isCustomizing || el.id === "btn-menu-trigger") return; 
             dragElement = el; let touch = e.touches[0]; let rect = el.getBoundingClientRect();
@@ -477,7 +484,7 @@ function setupControls() {
     window.addEventListener('touchend', () => { dragElement = null; });
 }
 
-function saveHUDPositions() { let layout = {}; document.querySelectorAll('.hud-element').forEach(el => { layout[el.id] = { left: el.style.left, top: el.style.top }; }); localStorage.setItem('hud_layout_universal', JSON.stringify(layout)); }
+function saveHUDPositions() { let layout = {}; document.querySelectorAll('.hud-element').forEach(el => { if(el.id!=="game-crosshair") layout[el.id] = { left: el.style.left, top: el.style.top }; }); localStorage.setItem('hud_layout_universal', JSON.stringify(layout)); }
 function loadHUDPositions() {
     let saved = localStorage.getItem('hud_layout_universal'); if (!saved) return;
     let layout = JSON.parse(saved);
