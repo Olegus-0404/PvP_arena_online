@@ -1,12 +1,11 @@
 // ============================================================================
-// GAME CLIENT CORE: WebGL Mobile FPS (Zone Survival & PvP Arena)
-// Карта ЧАЭС из графа + Режим "Выживание без зомби"
+// GAME CLIENT CORE: S.T.A.L.K.E.R. Zone Atmosphere Edition
 // ============================================================================
 
 const SERVER_URL = "https://pvp-arena-online.onrender.com"; 
 let socket = null;
 
-let myId = null, myNick = "", myPass = "", currentGameMode = "survival"; // Режим по умолчанию: Выживание
+let myId = null, myNick = "", myPass = "", currentGameMode = "survival";
 let hp = 100, armor = 100, ammo = 30, reserveAmmo = 120, kills = 0, isReloading = false;
 
 let scene, camera, renderer, weaponMesh;
@@ -34,7 +33,6 @@ const RADAR_PING_INTERVAL = 2500;
 
 window.gameSettings = { sensitivity: 0.0035, hudScale: 1.0 };
 
-// Выбор режимов (Добавлен 'survival')
 window.selectGameMode = function(mode) {
     currentGameMode = mode;
     const btnCoop = document.getElementById('mode-coop-select');
@@ -53,7 +51,7 @@ function createCharacterLabel(text, hp, armor, isEnemy) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (!isEnemy) {
-        ctx.fillStyle = '#38bdf8'; 
+        ctx.fillStyle = '#4dabf7'; 
         ctx.beginPath(); ctx.moveTo(128, 5); ctx.lineTo(118, 20); ctx.lineTo(138, 20); ctx.closePath(); ctx.fill();
     }
 
@@ -61,28 +59,23 @@ function createCharacterLabel(text, hp, armor, isEnemy) {
     const barY = isEnemy ? 34 : 55;
     const armorY = isEnemy ? 56 : 77;
 
-    ctx.font = 'Bold 22px sans-serif';
-    ctx.fillStyle = isEnemy ? '#ef4444' : '#ffffff';
+    ctx.font = 'Bold 20px monospace';
+    ctx.fillStyle = isEnemy ? '#ff6b6b' : '#e6dfcc';
     ctx.textAlign = 'center'; ctx.fillText(text, 128, textY);
 
     const barX = 28; const barW = 200;
 
-    ctx.fillStyle = '#1e293b'; ctx.fillRect(barX, barY, barW, 18);
-    ctx.fillStyle = '#10b981'; let hpPercent = Math.max(0, Math.min(100, hp)) / 100; ctx.fillRect(barX, barY, barW * hpPercent, 18);
+    ctx.fillStyle = '#1a1c1a'; ctx.fillRect(barX, barY, barW, 18);
+    ctx.fillStyle = '#51cf66'; let hpPercent = Math.max(0, Math.min(100, hp)) / 100; ctx.fillRect(barX, barY, barW * hpPercent, 18);
 
-    ctx.font = 'Bold 13px sans-serif'; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+    ctx.font = 'Bold 13px monospace'; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
     ctx.fillText(`${Math.max(0, hp)} HP`, 128, barY + 14);
 
-    ctx.fillStyle = '#1e293b'; ctx.fillRect(barX, armorY, barW, 8);
-    ctx.fillStyle = '#3b82f6'; let armorPercent = Math.max(0, Math.min(100, armor)) / 100; ctx.fillRect(barX, armorY, barW * armorPercent, 8);
+    ctx.fillStyle = '#1a1c1a'; ctx.fillRect(barX, armorY, barW, 8);
+    ctx.fillStyle = '#4dabf7'; let armorPercent = Math.max(0, Math.min(100, armor)) / 100; ctx.fillRect(barX, armorY, barW * armorPercent, 8);
 
     const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.SpriteMaterial({ 
-        map: texture,
-        depthTest: false,
-        depthWrite: false,
-        transparent: true
-    });
+    const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, depthWrite: false, transparent: true });
     
     const sprite = new THREE.Sprite(material);
     sprite.scale.set(1.5, 0.644, 1); 
@@ -93,8 +86,8 @@ function initSocket() {
     const statusText = document.getElementById('auth-status');
     const authBtn = document.getElementById('btn-auth');
 
-    if(statusText) statusText.innerText = "Устанавливаем соединение с сервером...";
-    if(authBtn) { authBtn.disabled = true; authBtn.style.background = '#475569'; authBtn.innerText = "ПОДКЛЮЧЕНИЕ..."; }
+    if(statusText) statusText.innerText = "Подключение к КПК Зоны...";
+    if(authBtn) { authBtn.disabled = true; authBtn.innerText = "СВЯЗЬ..."; }
 
     socket = io(SERVER_URL, {
         transports: ['polling', 'websocket'],
@@ -106,8 +99,8 @@ function initSocket() {
     });
 
     socket.on('connect', () => { 
-        if(statusText) statusText.innerText = "Сервер онлайн! Входите в ЧЗО."; 
-        if(authBtn) { authBtn.disabled = false; authBtn.style.background = '#ec4899'; authBtn.innerText = "ВОЙТИ В ИГРУ"; }
+        if(statusText) statusText.innerText = "Сигнал получен. Входите в ЧЗО."; 
+        if(authBtn) { authBtn.disabled = false; authBtn.innerText = "ВОЙТИ В ИГРУ"; }
         
         setTimeout(() => {
             const timerText = document.getElementById('hud-timer');
@@ -118,7 +111,7 @@ function initSocket() {
     });
 
     socket.on('connect_error', (error) => {
-        if(statusText) statusText.innerText = `Ошибка связи: ${error.message}.`;
+        if(statusText) statusText.innerText = `Ошибка КПК: ${error.message}`;
     });
     
     socket.on('authSuccess', (data) => { 
@@ -139,7 +132,7 @@ function initSocket() {
     socket.on('chatMessage', (data) => {
         const log = document.getElementById('chat-log');
         if (log) {
-            log.innerHTML += `<div><span style="color: #38bdf8; font-weight:bold;">${data.nick}:</span> ${data.msg}</div>`;
+            log.innerHTML += `<div><span style="color: #d4a359; font-weight:bold;">${data.nick}:</span> ${data.msg}</div>`;
             log.scrollTop = log.scrollHeight; 
         }
     });
@@ -155,14 +148,14 @@ function initSocket() {
                 timerText.innerHTML = `ПЕРЕРЫВ<br>${data.timeLeft}с`;
                 if(skipBtn) { skipBtn.style.display = 'block'; document.getElementById('skip-votes-count').innerText = data.votes || 0; }
             } else {
-                timerText.innerHTML = `ВОЛНА ${data.wave}<br>БОТОВ: ${data.timeLeft}`;
+                timerText.innerHTML = `ВОЛНА ${data.wave}<br>МУТАНТОВ: ${data.timeLeft}`;
                 if(skipBtn) skipBtn.style.display = 'none';
             }
         } else if (currentGameMode === 'survival') {
             timerText.innerHTML = `ВЫЖИВАНИЕ<br>ИССЛЕДОВАНИЕ`;
             if(skipBtn) skipBtn.style.display = 'none';
         } else {
-            timerText.innerHTML = `МАТЧ (PvP)<br>ИГРА ИДЕТ`;
+            timerText.innerHTML = `БОЙ В ЗОНЕ<br>МАТЧ`;
             if(skipBtn) skipBtn.style.display = 'none';
         }
     });
@@ -186,10 +179,10 @@ function initSocket() {
             
             if (!remotePlayers[id] && pData.hp > 0) {
                 let group = new THREE.Group();
-                let color = isEnemyPlayer ? 0xff0055 : 0x3b82f6;
-                let torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), new THREE.MeshStandardMaterial({ color: color }));
+                let color = isEnemyPlayer ? 0x8c2b2b : 0x3d5a80; // Сталкерские защитные цвета
+                let torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), new THREE.MeshStandardMaterial({ color: color, roughness: 0.9 }));
                 torso.position.y = 0.9; torso.userData = { targetId: id, zone: 'body' }; group.add(torso);
-                let head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), new THREE.MeshStandardMaterial({ color: 0xe2e8f0 }));
+                let head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), new THREE.MeshStandardMaterial({ color: 0x6c757d, roughness: 0.8 }));
                 head.position.y = 1.5; head.userData = { targetId: id, zone: 'head' }; group.add(head);
 
                 let label = createCharacterLabel(pData.nick, pData.hp, pData.armor, isEnemyPlayer);
@@ -209,16 +202,10 @@ function initSocket() {
         updateMinimap(serverPlayers, remoteBots);
     });
 
-    // Обработка ботов: В режиме ВЫЖИВАНИЯ (survival) боты полностью очищаются!
     socket.on('updateBots', (serverBots) => {
         if (!scene) return;
-
-        // Если режим "Выживание без зомби" — удаляем всех имеющихся ботов и выходим
         if (currentGameMode === 'survival') {
-            for (let id in remoteBots) {
-                scene.remove(remoteBots[id]);
-                delete remoteBots[id];
-            }
+            for (let id in remoteBots) { scene.remove(remoteBots[id]); delete remoteBots[id]; }
             return;
         }
 
@@ -228,13 +215,13 @@ function initSocket() {
 
             if (!remoteBots[id]) {
                 let group = new THREE.Group();
-                let torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.8), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+                let torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.8), new THREE.MeshStandardMaterial({ color: 0x3a2e2b, roughness: 1.0 }));
                 torso.position.y = 1.0; torso.userData = { targetId: id, zone: 'body' }; group.add(torso);
                 
-                let head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 16), new THREE.MeshBasicMaterial({ color: 0x00ff00 }));
+                let head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 16), new THREE.MeshStandardMaterial({ color: 0x212529, roughness: 1.0 }));
                 head.position.y = 2.0; head.userData = { targetId: id, zone: 'head' }; group.add(head);
 
-                let label = createCharacterLabel("ЗОМБИ", bData.hp || 100, 0, true);
+                let label = createCharacterLabel("МУТАНТ", bData.hp || 100, 0, true);
                 label.position.y = 2.8; label.name = "bot_label"; group.add(label);
                 
                 scene.add(group); remoteBots[id] = group;
@@ -247,7 +234,7 @@ function initSocket() {
                 let oldLabel = remoteBots[id].getObjectByName("bot_label"); 
                 if (oldLabel) remoteBots[id].remove(oldLabel);
                 
-                let newLabel = createCharacterLabel("ЗОМБИ", bData.hp || 100, 0, true);
+                let newLabel = createCharacterLabel("МУТАНТ", bData.hp || 100, 0, true);
                 newLabel.position.y = 2.8; newLabel.name = "bot_label"; remoteBots[id].add(newLabel);
             }
         }
@@ -288,7 +275,7 @@ function createRadarDot(objX, objZ, myX, myZ, myRot, radarRadius, mapScale, clas
     if (dist < radarRadius - 4) {
         let dot = document.createElement('div'); dot.className = `radar-dot ${className}`;
         dot.style.position = 'absolute'; dot.style.width = '4px'; dot.style.height = '4px'; dot.style.borderRadius = '50%';
-        if(className==='dot-teammate') dot.style.background = '#3b82f6'; else dot.style.background = '#ef4444';
+        if(className==='dot-teammate') dot.style.background = '#4dabf7'; else dot.style.background = '#ff6b6b';
         dot.style.left = pixelX + 'px'; dot.style.top = pixelY + 'px';
         radarContainer.appendChild(dot); return dot;
     }
@@ -299,7 +286,7 @@ function triggerDamageFlash() { let flash = document.getElementById('damage-flas
 
 function createDamageArrow(shooterX, shooterZ) {
     const container = document.getElementById('damage-indicators-container'); if (!container || !yawObject) return;
-    const arrow = document.createElement('div'); arrow.className = 'damage-arrow'; arrow.style.position = 'absolute'; arrow.style.width = '0'; arrow.style.height = '0'; arrow.style.borderLeft = '8px solid transparent'; arrow.style.borderRight = '8px solid transparent'; arrow.style.borderBottom = '20px solid #ef4444'; container.appendChild(arrow);
+    const arrow = document.createElement('div'); arrow.className = 'damage-arrow'; arrow.style.position = 'absolute'; arrow.style.width = '0'; arrow.style.height = '0'; arrow.style.borderLeft = '8px solid transparent'; arrow.style.borderRight = '8px solid transparent'; arrow.style.borderBottom = '20px solid #c92a2a'; container.appendChild(arrow);
     function updateArrow() {
         if (!arrow.parentNode) return;
         let angle = Math.atan2(shooterX - yawObject.position.x, shooterZ - yawObject.position.z);
@@ -337,91 +324,99 @@ function fixJoystickPosition() {
     }
 }
 
+// ============================================================================
+// 3D-АТМОСФЕРА ЧЕРНОБЫЛЯ (S.T.A.L.K.E.R. STAGE)
+// ============================================================================
 function initEngine() {
     const container = document.getElementById('canvas-container'); if (!container) return;
-    scene = new THREE.Scene(); scene.background = new THREE.Color(0x05070f); scene.fog = new THREE.FogExp2(0x05070f, 0.015);
+    scene = new THREE.Scene(); 
+    
+    // Пасмурное небо и туман Зоны
+    scene.background = new THREE.Color(0x1a1d1a); 
+    scene.fog = new THREE.FogExp2(0x1a1d1a, 0.018);
+
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     pitchObject.add(camera); yawObject.add(pitchObject); scene.add(yawObject);
     renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight);
     container.appendChild(renderer.domElement);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-    let dirLight = new THREE.DirectionalLight(0xff9500, 0.8); dirLight.position.set(20, 50, 20); scene.add(dirLight);
+    
+    // Тусклое освещение
+    scene.add(new THREE.AmbientLight(0x73796e, 0.6));
+    let dirLight = new THREE.DirectionalLight(0xc2ba9b, 0.5); dirLight.position.set(20, 50, 20); scene.add(dirLight);
+    
     buildMap(); createWeapon(); animate();
 }
 
 function createWeapon() {
     if (!camera) return;
     let weaponGroup = new THREE.Group();
-    let barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness:0.7 })); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0, -0.25); weaponGroup.add(barrel);
+    // Вороненая сталь автомата
+    let barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5), new THREE.MeshStandardMaterial({ color: 0x111311, roughness:0.8, metalness:0.6 })); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0, -0.25); weaponGroup.add(barrel);
     weaponGroup.position.set(0.2, -0.18, -0.4); camera.add(weaponGroup); weaponMesh = weaponGroup;
 }
 
-// ============================================================================
-// ПОЛНОЦЕННАЯ 3D-КАРТА ЧАЭС ПО ВАШЕМУ MERMAID-ГРАФУ
-// ============================================================================
 function buildMap() {
     mapObjects.forEach(obj => scene.remove(obj)); mapObjects = []; colliders = [];
     lootItems.forEach(item => scene.remove(item.mesh)); lootItems = [];
 
-    // Земля Зоны
-    let floor = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.MeshStandardMaterial({ color: 0x0f172a })); 
+    // Почва ЧЗО (Земля/Жухлая трава без киберпанк-сетки)
+    let floor = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.MeshStandardMaterial({ color: 0x222620, roughness: 1.0 })); 
     floor.rotation.x = -Math.PI / 2; scene.add(floor); mapObjects.push(floor);
-    let grid = new THREE.GridHelper(240, 60, 0xff9500, 0x1e293b); grid.position.y = 0.01; scene.add(grid); mapObjects.push(grid);
     
-    // Внешний периметр (Граница Зоны)
-    createObstacle(0, 4, -120, 240, 8, 2, 0x2b0a0a); createObstacle(0, 4, 120, 240, 8, 2, 0x2b0a0a);
-    createObstacle(-120, 4, 0, 2, 8, 240, 0x2b0a0a); createObstacle(120, 4, 0, 2, 8, 240, 0x2b0a0a);
+    // Периметр ЧЗО
+    createObstacle(0, 4, -120, 240, 8, 2, 0x1f1d18); createObstacle(0, 4, 120, 240, 8, 2, 0x1f1d18);
+    createObstacle(-120, 4, 0, 2, 8, 240, 0x1f1d18); createObstacle(120, 4, 0, 2, 8, 240, 0x1f1d18);
 
-    // 1. CNPP (ЧАЭС — 4-й Энергоблок в центре)
-    createObstacle(0, 8, 0, 24, 16, 24, 0x3d1f00); 
-    let sarco = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshBasicMaterial({ color: 0xff9500, wireframe: true }));
+    // 1. ЧАЭС (Грязный бетон Саркофага)
+    createObstacle(0, 8, 0, 24, 16, 24, 0x3d3e3b); 
+    let sarco = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshStandardMaterial({ color: 0x4a3b2c, roughness: 0.9 }));
     sarco.position.set(0, 19, 0); scene.add(sarco); mapObjects.push(sarco);
 
-    // 2. PRIPYAT (Припять — Город-призрак на севере)
-    createObstacle(0, 6, -50, 12, 12, 12, 0x0d1b2a);
-    createObstacle(-16, 5, -55, 10, 10, 10, 0x0d1b2a);
-    createObstacle(16, 7, -55, 10, 14, 10, 0x0d1b2a);
+    // 2. ПРИПЯТЬ (Панельные заброшенные дома)
+    createObstacle(0, 6, -50, 12, 12, 12, 0x2f312d);
+    createObstacle(-16, 5, -55, 10, 10, 10, 0x2f312d);
+    createObstacle(16, 7, -55, 10, 14, 10, 0x2f312d);
 
-    // 3. REDFOREST (Красный Лес на западе)
+    // 3. КРАСНЫЙ ЛЕС (Ржаво-бурые Мертвые деревья)
     for(let i = 0; i < 8; i++) {
         let rx = -45 + (i % 3) * 8; let rz = -10 + Math.floor(i / 3) * 10;
-        createObstacle(rx, 3, rz, 3, 6, 3, 0x6b0a0a);
+        createObstacle(rx, 3, rz, 3, 6, 3, 0x4a2718);
     }
 
-    // 4. DUGA (Радар "Русановка" / Дуга РЛС на юго-западе)
-    createObstacle(-50, 15, 45, 40, 30, 3, 0x1a0d2e);
+    // 4. ДУГА РЛС (Ржавый металлический каркас)
+    createObstacle(-50, 15, 45, 40, 30, 3, 0x2b231d);
 
-    // 5. LABX (Лаборатория X-18 на юго-востоке)
-    createObstacle(40, 3, 40, 16, 6, 16, 0x1a0d1a);
+    // 5. ЛАБОРАТОРИЯ X-18 (Бункер)
+    createObstacle(40, 3, 40, 16, 6, 16, 0x1a1b18);
 
-    // 6. SWAMP (Болота) & CHISTOGAL (Чистогаловка)
-    createObstacle(45, 0.2, -10, 30, 0.4, 30, 0x0d1f0d); // Болотная зона
-    createObstacle(45, 2, -10, 6, 4, 6, 0x1a1a1a);       // Чистогаловка
+    // 6. БОЛОТА & ЧИСТОГАЛОВКА
+    createObstacle(45, 0.2, -10, 30, 0.4, 30, 0x1a2118); // Болотная жижа
+    createObstacle(45, 2, -10, 6, 4, 6, 0x383025);       // Деревянные хаты
 
-    // 7. Деревни KOPACHI & ZALESYE
-    createObstacle(-35, 1.5, -45, 5, 3, 5, 0x1a1a1a); // Залесье
-    createObstacle(25, 1.5, -45, 5, 3, 5, 0x1a1a1a);  // Копачи
+    // 7. ДЕРЕВНИ КОПАЧИ И ЗАЛЕСЬЕ
+    createObstacle(-35, 1.5, -45, 5, 3, 5, 0x383025); 
+    createObstacle(25, 1.5, -45, 5, 3, 5, 0x383025);  
 
-    // 8. ХОЛМЫ (HILLS1, HILLS2, HILLS3)
-    createObstacle(20, 2.5, 15, 12, 5, 12, 0x0d1f0d);
-    createObstacle(-20, 2.5, 20, 12, 5, 12, 0x0d1f0d);
+    // 8. ХОЛМЫ (Земляные курганы)
+    createObstacle(20, 2.5, 15, 12, 5, 12, 0x282b23);
+    createObstacle(-20, 2.5, 20, 12, 5, 12, 0x282b23);
 
-    // СПАВН ЛУТА ПО КАРТЕ ЧЗО
-    spawnLoot(0, 0.4, -25, 'medkit', 0x10b981);    // Дорога в Припять
-    spawnLoot(-45, 0.4, 40, 'ammo', 0xf59e0b);     // Около Радара Дуга
-    spawnLoot(40, 0.4, 30, 'armor', 0x3b82f6);     // Бункер X-18
-    spawnLoot(-40, 0.4, -10, 'medkit', 0x10b981);  // Красный Лес
-    spawnLoot(45, 0.4, -10, 'ammo', 0xf59e0b);     // Болота
+    // СПАВН СТАЛКЕРСКОГО ЛУТА (Аптечки, Патроны, Броня)
+    spawnLoot(0, 0.4, -25, 'medkit', 0x51cf66);    
+    spawnLoot(-45, 0.4, 40, 'ammo', 0xd4a359);     
+    spawnLoot(40, 0.4, 30, 'armor', 0x4dabf7);     
+    spawnLoot(-40, 0.4, -10, 'medkit', 0x51cf66);  
+    spawnLoot(45, 0.4, -10, 'ammo', 0xd4a359);     
 }
 
 function createObstacle(x, y, z, w, h, d, color) {
-    let mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: color })); 
+    let mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: color, roughness: 0.9 })); 
     mesh.position.set(x, y, z); scene.add(mesh); mapObjects.push(mesh); colliders.push(new THREE.Box3().setFromObject(mesh));
 }
 
 function spawnLoot(x, y, z, type, colorHex) {
-    let geo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
-    let mat = new THREE.MeshStandardMaterial({ color: colorHex, emissive: colorHex, emissiveIntensity: 0.4, metalness: 0.2 });
+    let geo = new THREE.BoxGeometry(0.6, 0.4, 0.6);
+    let mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5 });
     let mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y, z); scene.add(mesh);
     lootItems.push({ mesh: mesh, type: type, x: x, y: y, z: z, baseHeight: y, seed: Math.random() * 100 });
 }
@@ -508,7 +503,7 @@ function startReload() {
 function updateHUD() {
     if(document.getElementById('val-hp')) document.getElementById('val-hp').innerText = hp;
     if(document.getElementById('val-armor')) document.getElementById('val-armor').innerText = armor;
-    if(document.getElementById('val-ammo')) document.getElementById('val-ammo').innerText = isReloading ? `RELOAD...` : `${ammo} / ${reserveAmmo}`;
+    if(document.getElementById('val-ammo')) document.getElementById('val-ammo').innerText = isReloading ? `ПЕРЕЗАРЯДКА` : `${ammo} / ${reserveAmmo}`;
     if(document.getElementById('val-kills')) document.getElementById('val-kills').innerText = kills;
 }
 
@@ -517,8 +512,8 @@ if(document.getElementById('btn-skip-break')) document.getElementById('btn-skip-
 
 function loadCrosshairSettings() {
     const crosshair = document.getElementById('game-crosshair'); if(!crosshair) return;
-    let color = localStorage.getItem('ch_color') || '#00ff00';
-    let size = localStorage.getItem('ch_size') || '6';
+    let color = localStorage.getItem('ch_color') || '#ffffff';
+    let size = localStorage.getItem('ch_size') || '5';
     let shape = localStorage.getItem('ch_shape') || '50%';
 
     crosshair.style.background = color;
@@ -560,9 +555,9 @@ function setupControls() {
         if(document.getElementById('menu-user-nick')) document.getElementById('menu-user-nick').innerText = myNick || "Сталкер";
         const modeBadge = document.getElementById('menu-user-mode');
         if (modeBadge) {
-            if (currentGameMode === 'coop') { modeBadge.innerText = "РЕЖИМ: ЗАЧИСТКА ЗОМБИ"; modeBadge.style.color = "#10b981"; } 
-            else if (currentGameMode === 'survival') { modeBadge.innerText = "РЕЖИМ: ВЫЖИВАНИЕ (БЕЗ ЗОМБИ)"; modeBadge.style.color = "#f59e0b"; }
-            else { modeBadge.innerText = "РЕЖИМ: КОМАНДНЫЙ БОЙ"; modeBadge.style.color = "#ef4444"; }
+            if (currentGameMode === 'coop') { modeBadge.innerText = "РЕЖИМ: ОХОТА НА МУТАНТОВ"; modeBadge.style.color = "#51cf66"; } 
+            else if (currentGameMode === 'survival') { modeBadge.innerText = "РЕЖИМ: ВЫЖИВАНИЕ (БЕЗ ЗОМБИ)"; modeBadge.style.color = "#d4a359"; }
+            else { modeBadge.innerText = "РЕЖИМ: БОЙ В ЗОНЕ"; modeBadge.style.color = "#ff6b6b"; }
         }
         document.body.classList.add('edit-mode'); if(customMenu) customMenu.style.display = 'block';
     });
@@ -592,7 +587,6 @@ function setupControls() {
         }, { passive: false });
     }
 
-    // Переключение режимов через меню
     if(document.getElementById('btn-menu-switch-coop')) {
         document.getElementById('btn-menu-switch-coop').addEventListener('click', () => {
             if(currentGameMode === 'coop') return;
@@ -611,7 +605,6 @@ function setupControls() {
         });
     }
 
-    // Переключатель для выживания
     let btnSurvMenu = document.getElementById('btn-menu-switch-survival');
     if(btnSurvMenu) {
         btnSurvMenu.addEventListener('click', () => {
@@ -635,7 +628,7 @@ function setupControls() {
     document.getElementById('btn-reload').addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startReload(); } });
     document.getElementById('btn-jump').addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); if(isGrounded) playerVelocity.y = JUMP_FORCE; } });
     document.getElementById('btn-crouch').addEventListener('touchstart', (e) => { 
-        if(!isCustomizing){ e.preventDefault(); isCrouching = !isCrouching; document.getElementById('btn-crouch').style.backgroundColor = isCrouching ? "rgba(59, 130, 246, 0.6)" : "rgba(30, 58, 138, 0.3)"; }
+        if(!isCustomizing){ e.preventDefault(); isCrouching = !isCrouching; document.getElementById('btn-crouch').style.backgroundColor = isCrouching ? "rgba(180, 140, 80, 0.5)" : "rgba(35, 38, 33, 0.5)"; }
     });
 
     jZone.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.stopPropagation(); let t = e.targetTouches[0]; joystickTouchId = t.identifier; updateJoystick(t); } });
@@ -702,7 +695,7 @@ let clock = new THREE.Clock();
 function animate() {
     requestAnimationFrame(animate); if (!renderer || !scene || !camera) return;
     let delta = clock.getDelta(); if (delta > 0.1) delta = 0.1;
-    lootItems.forEach(item => { item.mesh.rotation.y += 1.2 * delta; item.mesh.rotation.x += 0.4 * delta; item.mesh.position.y = item.baseHeight + Math.sin(Date.now() * 0.003 + item.seed) * 0.12; });
+    lootItems.forEach(item => { item.mesh.rotation.y += 1.0 * delta; item.mesh.position.y = item.baseHeight + Math.sin(Date.now() * 0.002 + item.seed) * 0.08; });
 
     if (myId && hp > 0 && !isCustomizing) {
         playerVelocity.y -= GRAVITY * delta; let currentSpeed = isCrouching ? crouchSpeed : moveSpeed;
