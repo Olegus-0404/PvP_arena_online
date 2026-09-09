@@ -1,9 +1,8 @@
 // ============================================================================
 // GAME CLIENT CORE: WebGL Mobile FPS (PvP Arena Online)
-// Полная рабочая сборка без обрезанных функций
+// Финальная сборка с исправлениями для iOS, PvE ботов и быстрого подбора лута
 // ============================================================================
 
-// ВСТАВЬ СЮДА СВОЙ URL ИЗ ПАНЕЛИ RENDER (ОБЯЗАТЕЛЬНО БЕЗ СЛЭША НА КОНЦЕ!)
 const SERVER_URL = "https://pvp-arena-online.onrender.com"; 
 let socket = null;
 
@@ -17,14 +16,13 @@ let moveDirection = { forward: 0, right: 0 };
 let playerVelocity = new THREE.Vector3();
 let isGrounded = true;
 
-// НАСТРОЙКИ ФИЗИКИ В СТИЛЕ CS (Counter-Strike)
-const GRAVITY = 38;      // Сильная гравитация, чтобы не было "лунных" прыжков
-const JUMP_FORCE = 8.5;  // Невысокий, плотный прыжок
-let moveSpeed = 5.5;     // Скорость бега (стандарт CS)
-let crouchSpeed = 1.8;   // В приседе игрок еле ползет, как в CS
+const GRAVITY = 38;      
+const JUMP_FORCE = 8.5;  
+let moveSpeed = 5.5;     
+let crouchSpeed = 1.8;   
 
 let colliders = [];
-let lootItems = []; // Массив для хранения ящиков с лутом на карте
+let lootItems = []; 
 
 let joystickTouchId = null, lookTouchId = null;
 let lastLookX = 0, lastLookY = 0;
@@ -115,7 +113,6 @@ function initSocket() {
 
     socket.on('connect_error', (error) => {
         if(statusText) statusText.innerText = `Ошибка связи: ${error.message}. Проверьте сервер.`;
-        console.error("Socket Error:", error);
     });
     
     socket.on('authSuccess', (data) => { 
@@ -131,6 +128,14 @@ function initSocket() {
         hp = 100; armor = 100; ammo = 30; reserveAmmo = 120; updateHUD(); 
         document.getElementById('respawn-screen').style.display = 'none'; 
         if(spawnPos.map) buildMap(spawnPos.map);
+    });
+
+    socket.on('chatMessage', (data) => {
+        const log = document.getElementById('chat-log');
+        if (log) {
+            log.innerHTML += `<div><span style="color: #38bdf8; font-weight:bold;">${data.nick}:</span> ${data.msg}</div>`;
+            log.scrollTop = log.scrollHeight; 
+        }
     });
     
     socket.on('timerUpdate', (data) => { 
@@ -195,6 +200,7 @@ function initSocket() {
         updateMinimap(serverPlayers, remoteBots);
     });
 
+    // ИСПРАВЛЕННЫЙ ОБРАБОТЧИК БОТОВ (PvE)
     socket.on('updateBots', (serverBots) => {
         if (!scene || currentGameMode !== 'coop') return;
         for (let id in serverBots) {
@@ -211,13 +217,16 @@ function initSocket() {
                 scene.add(group); remoteBots[id] = group;
             }
             if (remoteBots[id]) {
-                remoteBots[id].position.set(bData.x, 0, bData.z); remoteBots[id].rotation.y = bData.rotY;
+                remoteBots[id].position.set(bData.x, 0, bData.z); 
+                remoteBots[id].rotation.y = bData.rotY;
                 let oldLabel = remoteBots[id].getObjectByName("bot_label"); if (oldLabel) remoteBots[id].remove(oldLabel);
                 let newLabel = createCharacterLabel("ЗОМБИ БОТ", bData.hp, 0, true);
                 newLabel.position.y = 2.0; newLabel.name = "bot_label"; remoteBots[id].add(newLabel);
             }
         }
-        for (let id in remoteBots) { if (!serverBots[id]) { scene.remove(remoteBots[id]); delete remoteBots[id]; } }
+        for (let id in remoteBots) { 
+            if (!serverBots[id]) { scene.remove(remoteBots[id]); delete remoteBots[id]; } 
+        }
     });
 }
 
@@ -274,7 +283,18 @@ function createDamageArrow(shooterX, shooterZ) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    initEngine(); initSocket(); setupControls(); fixJoystickPosition(); loadHUDPositions(); loadCrosshairSettings();
+    initEngine(); 
+    initSocket(); 
+    setupControls(); 
+    fixJoystickPosition(); 
+    loadHUDPositions(); 
+    loadCrosshairSettings();
+    
+    // ИСПРАВЛЕНИЕ: Вынос проверки подбора лута в отдельный интервал (убирает задержку)
+    setInterval(() => {
+        checkLootPickups();
+    }, 100);
+
     let savedScale = localStorage.getItem('game_hud_scale');
     if (savedScale) { window.gameSettings.hudScale = parseFloat(savedScale); document.getElementById('scale-slider').value = savedScale; applyHUDScale(savedScale); }
     if(localStorage.getItem('n') && localStorage.getItem('p')) {
@@ -322,10 +342,9 @@ function buildMap() {
     createObstacle(-40, 3, 0, 2, 6, 80, 0x1e293b); createObstacle(40, 3, 0, 2, 6, 80, 0x1e293b);
     createObstacle(-10, 2, -10, 4, 4, 4, 0x334155); createObstacle(10, 2, 10, 4, 4, 4, 0x334155);
 
-    // ГАРАНТИРОВАННЫЙ СПАВН ЯЩИКОВ
-    spawnLoot(0, 0.4, 15, 'medkit', 0x10b981);    // Хил (Зеленый)
-    spawnLoot(-15, 0.4, -5, 'armor', 0x3b82f6);   // Армор (Синий)
-    spawnLoot(15, 0.4, -5, 'ammo', 0xf59e0b);     // Патроны (Желтый)
+    spawnLoot(0, 0.4, 15, 'medkit', 0x10b981);    
+    spawnLoot(-15, 0.4, -5, 'armor', 0x3b82f6);   
+    spawnLoot(15, 0.4, -5, 'ammo', 0xf59e0b);     
 }
 
 function createObstacle(x, y, z, w, h, d, color) {
@@ -365,7 +384,6 @@ function checkLootPickups() {
                 let pickedMesh = item.mesh; scene.remove(pickedMesh);
                 lootItems.splice(i, 1);
                 
-                // Авто-респавн ровно через 15 секунд на том же месте
                 setTimeout(() => {
                     if (scene) {
                         scene.add(pickedMesh);
@@ -404,6 +422,21 @@ function performShot() {
 function startAutofire() { if (fireIntervalId !== null) return; performShot(); fireIntervalId = setInterval(performShot, 110); }
 function stopAutofire() { if (fireIntervalId !== null) { clearInterval(fireIntervalId); fireIntervalId = null; } }
 
+function setupChatControls() {
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && chatInput.value.trim() !== '') {
+                if (socket && socket.connected) {
+                    socket.emit('sendChatMessage', { msg: chatInput.value.trim() });
+                }
+                chatInput.value = ''; 
+                chatInput.blur(); 
+            }
+        });
+    }
+}
+
 function startReload() {
     if (isReloading || ammo === 30 || reserveAmmo <= 0) return;
     isReloading = true; updateHUD();
@@ -436,10 +469,11 @@ function loadCrosshairSettings() {
     if(document.getElementById('crosshair-shape')) document.getElementById('crosshair-shape').value = shape;
 }
 
-// ПОЛНЫЙ ИСПРАВЛЕННЫЙ ТАЧ-ИНТЕРФЕЙС И КАСТОМАЙЗЕР HUD
 function setupControls() {
     const jZone = document.getElementById('joystick-zone'), stick = document.getElementById('joystick-stick');
     const menuTrigger = document.getElementById('btn-menu-trigger'), customMenu = document.getElementById('customizer-menu');
+
+    setupChatControls();
 
     document.getElementById('scale-slider').addEventListener('input', (e) => {
         let val = e.target.value; window.gameSettings.hudScale = parseFloat(val); applyHUDScale(val); localStorage.setItem('game_hud_scale', val);
@@ -515,7 +549,6 @@ function setupControls() {
         if(!isCustomizing){ e.preventDefault(); isCrouching = !isCrouching; document.getElementById('btn-crouch').style.backgroundColor = isCrouching ? "rgba(59, 130, 246, 0.6)" : "rgba(30, 58, 138, 0.3)"; }
     });
 
-    // ПОЛНАЯ ТАЧ-ЛОГИКА ДЖОЙСТИКА
     jZone.addEventListener('touchstart', (e) => { 
         if(!isCustomizing){ 
             e.stopPropagation(); 
@@ -552,9 +585,9 @@ function setupControls() {
         moveDirection.right = (dx / 40);
     }
 
-    // ЛОГИКА ОБЗОРА ЭКРАНА С ПРИВЯЗКОЙ СЕНСЫ
+    // ИСПРАВЛЕНИЕ ДЛЯ iOS: Корректный перехват движения камеры по всему экрану (с исключением элементов управления и чата)
     window.addEventListener('touchstart', (e) => { 
-        if (isCustomizing || e.target.closest('#customizer-menu') || e.target.closest('.overlay')) return; 
+        if (isCustomizing || e.target.closest('#customizer-menu') || e.target.closest('.overlay') || e.target.closest('#game-chat') || e.target.closest('button') || e.target.closest('input')) return; 
         for(let t of e.changedTouches) { 
             if(lookTouchId === null) { 
                 lookTouchId = t.identifier; 
@@ -562,7 +595,8 @@ function setupControls() {
                 lastLookY = t.clientY; 
             } 
         } 
-    });
+    }, { passive: true });
+
     window.addEventListener('touchmove', (e) => {
         if (isCustomizing) return;
         for(let t of e.changedTouches) { 
@@ -576,10 +610,10 @@ function setupControls() {
                 lastLookY = t.clientY; 
             } 
         }
-    });
+    }, { passive: true });
+
     window.addEventListener('touchend', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouchId = null; } });
 
-    // ПЕРЕТАСКИВАНИЕ HUD-ЭЛЕМЕНТОВ ПРИ КАСТОМИЗАЦИИ
     let dragElement = null, dragOffsetX = 0, dragOffsetY = 0;
     document.querySelectorAll('.hud-element').forEach(el => {
         if (el.id === "game-crosshair" || el.id === "joystick-zone") return; 
@@ -609,7 +643,6 @@ function setupControls() {
 function saveHUDPositions() { let layout = {}; document.querySelectorAll('.hud-element').forEach(el => { if(el.id!=="game-crosshair" && el.id!=="joystick-zone") layout[el.id] = { left: el.style.left, top: el.style.top }; }); localStorage.setItem('hud_layout_universal', JSON.stringify(layout)); }
 function loadHUDPositions() { let saved = localStorage.getItem('hud_layout_universal'); if (!saved) return; let layout = JSON.parse(saved); for (let id in layout) { let el = document.getElementById(id); if (el && layout[id].left) { el.style.left = layout[id].left; el.style.top = layout[id].top; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.transform = 'none'; } } }
 
-// ЦИКЛ АНИМАЦИИ И ФИЗИЧЕСКИЙ ДВИЖОК ТИКА СЕРВЕРА
 let clock = new THREE.Clock();
 function animate() {
     requestAnimationFrame(animate); if (!renderer || !scene || !camera) return;
@@ -630,7 +663,6 @@ function animate() {
         let targetHeight = isCrouching ? 0.9 : 1.7;
         if (yawObject.position.y <= targetHeight) { playerVelocity.y = 0; yawObject.position.y = targetHeight; isGrounded = true; } else { isGrounded = false; }
         
-        checkLootPickups();
         if(socket && socket.connected) socket.emit('playerMove', { x: yawObject.position.x, z: yawObject.position.z, rotY: yawObject.rotation.y });
     }
     renderer.render(scene, camera);
