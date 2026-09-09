@@ -1,6 +1,6 @@
 // ============================================================================
 // GAME CLIENT CORE: WebGL Mobile FPS (PvP Arena Online)
-// Финальная сборка с исправлениями для iOS, PvE ботов и быстрого подбора лута
+// Финальная сборка: отладка ботов, фиксы iOS и мгновенный подбор лута
 // ============================================================================
 
 const SERVER_URL = "https://pvp-arena-online.onrender.com"; 
@@ -73,8 +73,8 @@ function createCharacterLabel(text, hp, armor, isEnemy) {
     const texture = new THREE.CanvasTexture(canvas);
     const material = new THREE.SpriteMaterial({ 
         map: texture,
-        depthTest: isEnemy ? true : false,
-        depthWrite: isEnemy ? true : false,
+        depthTest: false,
+        depthWrite: false,
         transparent: true
     });
     
@@ -200,32 +200,65 @@ function initSocket() {
         updateMinimap(serverPlayers, remoteBots);
     });
 
-    // ИСПРАВЛЕННЫЙ ОБРАБОТЧИК БОТОВ (PvE)
+    // =========================================================================
+    // ОНО САМОЕ: БРОНЕБОЙНАЯ ОТЛАДКА БОТОВ (Они яркие и видны сквозь всё)
+    // =========================================================================
     socket.on('updateBots', (serverBots) => {
-        if (!scene || currentGameMode !== 'coop') return;
+        if (!scene) return;
+
         for (let id in serverBots) {
             let bData = serverBots[id];
+            if (bData.x === undefined || bData.z === undefined) continue;
+
             if (!remoteBots[id]) {
                 let group = new THREE.Group();
-                let torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
-                torso.position.y = 0.9; torso.userData = { targetId: id, zone: 'body' }; group.add(torso);
-                let head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), new THREE.MeshStandardMaterial({ color: 0x10b981 }));
-                head.position.y = 1.5; head.userData = { targetId: id, zone: 'head' }; group.add(head);
+                
+                // Светящийся яркий красный корпус
+                let torso = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.8, 1.2, 0.8), 
+                    new THREE.MeshBasicMaterial({ color: 0xff0000 }) 
+                );
+                torso.position.y = 1.0; 
+                torso.userData = { targetId: id, zone: 'body' }; 
+                group.add(torso);
+                
+                // Ярко-зеленая голова
+                let head = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.4, 16, 16), 
+                    new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+                );
+                head.position.y = 2.0; 
+                head.userData = { targetId: id, zone: 'head' }; 
+                group.add(head);
 
-                let label = createCharacterLabel("ЗОМБИ БОТ", bData.hp, 0, true);
-                label.position.y = 2.0; label.name = "bot_label"; group.add(label);
-                scene.add(group); remoteBots[id] = group;
+                let label = createCharacterLabel("ЗОМБИ БОТ", bData.hp || 100, 0, true);
+                label.position.y = 2.8; 
+                label.name = "bot_label"; 
+                group.add(label);
+                
+                scene.add(group); 
+                remoteBots[id] = group;
             }
+            
             if (remoteBots[id]) {
                 remoteBots[id].position.set(bData.x, 0, bData.z); 
-                remoteBots[id].rotation.y = bData.rotY;
-                let oldLabel = remoteBots[id].getObjectByName("bot_label"); if (oldLabel) remoteBots[id].remove(oldLabel);
-                let newLabel = createCharacterLabel("ЗОМБИ БОТ", bData.hp, 0, true);
-                newLabel.position.y = 2.0; newLabel.name = "bot_label"; remoteBots[id].add(newLabel);
+                if (bData.rotY) remoteBots[id].rotation.y = bData.rotY;
+                
+                let oldLabel = remoteBots[id].getObjectByName("bot_label"); 
+                if (oldLabel) remoteBots[id].remove(oldLabel);
+                
+                let newLabel = createCharacterLabel("ЗОМБИ БОТ", bData.hp || 100, 0, true);
+                newLabel.position.y = 2.8; 
+                newLabel.name = "bot_label"; 
+                remoteBots[id].add(newLabel);
             }
         }
+        
         for (let id in remoteBots) { 
-            if (!serverBots[id]) { scene.remove(remoteBots[id]); delete remoteBots[id]; } 
+            if (!serverBots[id]) { 
+                scene.remove(remoteBots[id]); 
+                delete remoteBots[id]; 
+            } 
         }
     });
 }
@@ -290,7 +323,7 @@ window.addEventListener('DOMContentLoaded', () => {
     loadHUDPositions(); 
     loadCrosshairSettings();
     
-    // ИСПРАВЛЕНИЕ: Вынос проверки подбора лута в отдельный интервал (убирает задержку)
+    // Быстрый подбор лута без лагов
     setInterval(() => {
         checkLootPickups();
     }, 100);
@@ -585,7 +618,7 @@ function setupControls() {
         moveDirection.right = (dx / 40);
     }
 
-    // ИСПРАВЛЕНИЕ ДЛЯ iOS: Корректный перехват движения камеры по всему экрану (с исключением элементов управления и чата)
+    // Движение камеры на iOS без сбоев
     window.addEventListener('touchstart', (e) => { 
         if (isCustomizing || e.target.closest('#customizer-menu') || e.target.closest('.overlay') || e.target.closest('#game-chat') || e.target.closest('button') || e.target.closest('input')) return; 
         for(let t of e.changedTouches) { 
