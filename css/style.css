@@ -1,134 +1,362 @@
-* {
-    margin: 0; padding: 0; box-sizing: border-box;
-    user-select: none; -webkit-user-select: none;
-    touch-action: none; /* ФИКС iOS: отключает браузерные жесты зума и свайпа страниц */
-}
+<style>
+    /* ==========================================================================
+       ПОЛНЫЙ ИНТЕРФЕЙС И АТМОСФЕРА S.T.A.L.K.E.R. (ГОТОВЫЙ ДЛЯ ЗАМЕНЫ)
+       ========================================================================== */
 
-body, html {
-    width: 100vw; width: 100dvw; /* ФИКС iOS: динамическая ширина */
-    height: 100vh; height: 100dvh; /* ФИКС iOS: динамическая высота с учетом нижнего бара Safari */
-    overflow: hidden; 
-    position: fixed; /* ФИКС iOS: жестко фиксируем экран, чтобы свайпы камеры не дергали всю страницу */
-    background-color: #0a0f1d; font-family: sans-serif;
-    padding-top: env(safe-area-inset-top); /* Отступ от челки/Dynamic Island */
-    padding-bottom: env(safe-area-inset-bottom); /* Отступ от нижней полоски */
-}
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: manipulation;
+    }
 
-#canvas-container {
-    width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1;
-}
+    body, html {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #0d0f0d !important;
+        font-family: 'Courier New', Courier, monospace !important;
+        color: #c5c8c1;
+    }
 
-/* Фикс блокировки кликов: вспышка полностью прозрачна для тапов */
-#damage-flash {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(239, 68, 68, 0.45); opacity: 0; pointer-events: none;
-    z-index: 40; transition: opacity 0.05s ease-out;
-}
+    #canvas-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+    }
 
-#damage-indicator {
-    position: absolute; top: 50%; left: 50%; width: 140px; height: 140px;
-    transform: translate(-50%, -50%); opacity: 0; pointer-events: none; z-index: 35;
-    transition: opacity 0.15s ease-out;
-    background: radial-gradient(circle, transparent 55%, rgba(239, 68, 68, 0.7) 70%);
-    clip-path: polygon(35% 0%, 65% 0%, 50% 50%); border-radius: 50%;
-}
+    /* --------------------------------------------------------------------------
+       1. ОКТАВЫ АВТОРИЗАЦИИ И МЕНЮ (МРАЧНЫЙ БУНКЕР / КПК)
+       -------------------------------------------------------------------------- */
+    .overlay-screen, #auth-screen-wrapper, #respawn-screen {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(10, 12, 10, 0.88);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
 
-/* HUD */
-#hud-top {
-    position: absolute; top: 12px; left: 0; width: 100%; display: flex;
-    justify-content: space-between; align-items: center; padding: 0 20px;
-    z-index: 50; pointer-events: none; /* Пропускает клики сквозь контейнер */
-}
-#hud-hp, #hud-armor, #game-timer, #kills-counter {
-    background: rgba(15, 23, 42, 0.75); color: #fff; padding: 8px 14px;
-    border-radius: 8px; font-weight: bold; font-size: 14px;
-    backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1);
-}
+    #auth-screen, #customizer-menu, .hud-card {
+        background: rgba(20, 23, 20, 0.95) !important;
+        border: 2px solid #3d423a !important;
+        box-shadow: 0 0 25px rgba(0, 0, 0, 0.9), inset 0 0 10px rgba(0, 0, 0, 0.5) !important;
+        border-radius: 3px !important;
+        padding: 20px;
+        color: #c5c8c1 !important;
+        max-width: 420px;
+        width: 90%;
+        text-align: center;
+    }
 
-#hud-bottom {
-    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
-    z-index: 50; pointer-events: none;
-}
-#hud-ammo {
-    background: rgba(15, 23, 42, 0.85); color: #34d399; padding: 8px 20px;
-    border-radius: 20px; font-weight: bold; font-size: 15px; border: 1px solid #059669;
-}
+    #auth-screen h1, #customizer-menu h2 {
+        color: #d4a359 !important; /* Янтарный цвет текстовых КПК */
+        font-size: 20px;
+        margin-bottom: 15px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        border-bottom: 1px solid #3d423a;
+        padding-bottom: 8px;
+    }
 
-/* Окна экранов */
-.overlay {
-    position: absolute; 
-    width: 100%; height: 100%; top: 0; left: 0;
-    background: rgba(15, 23, 42, 0.85); display: flex; justify-content: center;
-    align-items: center; z-index: 100; backdrop-filter: blur(6px);
-    pointer-events: auto; /* Разрешаем клики внутри меню */
-}
-.menu-box {
-    background: #1e293b; padding: 25px; border-radius: 16px; text-align: center;
-    width: 320px; border: 2px solid #475569; color: white;
-}
-.border-yellow { border-color: #eab308 !important; }
+    .auth-input-group {
+        margin-bottom: 12px;
+        text-align: left;
+    }
 
-input {
-    width: 100%; padding: 12px; margin-bottom: 15px; background: #0f172a;
-    border: 1px solid #475569; border-radius: 8px; color: white; outline: none;
-}
-.menu-btn {
-    width: 100%; padding: 12px; background: #38bdf8; border: none; border-radius: 8px;
-    color: #0f172a; font-weight: bold; cursor: pointer;
-}
+    .auth-input-group label {
+        font-size: 11px;
+        color: #8a9085;
+        display: block;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+    }
 
-.vote-row { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
-.vote-btn {
-    flex: 1; padding: 12px 5px; border: none; border-radius: 8px; color: white;
-    font-weight: bold; cursor: pointer;
-}
-.btn-blue { background: #0284c7; }
-.btn-pink { background: #ec4899; }
+    input[type="text"], input[type="password"], select {
+        width: 100%;
+        padding: 10px;
+        background: #111311 !important;
+        border: 1px solid #3a3e36 !important;
+        color: #d4a359 !important;
+        font-family: inherit;
+        font-size: 14px;
+        border-radius: 2px !important;
+        outline: none;
+    }
 
-/* Управление тач-скрином */
-#touch-controls {
-    position: absolute; width: 100%; height: 100%; top: 0; left: 0;
-    z-index: 30; pointer-events: none;
-}
-#joystick-zone {
-    position: absolute; left: 40px; bottom: 40px; width: 110px; height: 110px;
-    background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.25);
-    border-radius: 50%; pointer-events: auto;
-}
-#joystick-stick {
-    position: absolute; left: 35px; top: 35px; width: 40px; height: 40px;
-    background: rgba(255,255,255,0.7); border-radius: 50%;
-}
+    input[type="text"]:focus, input[type="password"]:focus {
+        border-color: #8c5a2b !important;
+    }
 
-.btn-action {
-    position: absolute; border: none; color: white; display: flex;
-    align-items: center; justify-content: center; border-radius: 50%; pointer-events: auto;
-    background-size: 55% 55% !important; background-position: center center !important;
-    background-repeat: no-repeat !important; -webkit-appearance: none; outline: none;
-}
-.btn-action:active { transform: scale(0.9); }
+    /* Селектор режимов игры */
+    .mode-selector {
+        display: flex;
+        gap: 8px;
+        margin: 15px 0;
+    }
 
-#btn-fire {
-    width: 95px; height: 95px; background-color: rgba(239, 68, 68, 0.25); border: 3px solid #f87171;
-    right: 120px; bottom: 90px;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f87171' stroke-width='2.5'><circle cx='12' cy='12' r='10'></circle><circle cx='12' cy='12' r='1'></circle><line x1='22' y1='12' x2='18' y2='12'></line><line x1='6' y1='12' x2='2' y2='12'></line><line x1='12' y1='6' x2='12' y2='2'></line><line x1='12' y1='22' x2='12' y2='18'></line></svg>");
-}
-#btn-jump {
-    width: 65px; height: 65px; background-color: rgba(6, 95, 70, 0.35); border: 1px solid #059669; right: 35px; bottom: 150px;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2334d399' stroke-width='2.5'><line x1='12' y1='19' x2='12' y2='5'></line><polyline points='5 12 12 5 19 12'></polyline></svg>");
-}
-#btn-crouch {
-    width: 65px; height: 65px; background-color: rgba(30, 58, 138, 0.35); border: 1px solid #3b82f6; right: 35px; bottom: 35px;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2360a5fa' stroke-width='2.5'><line x1='12' y1='5' x2='12' y2='19'></line><polyline points='19 12 12 19 5 12'></polyline></svg>");
-}
-#btn-reload {
-    width: 65px; height: 65px; background-color: rgba(71, 85, 105, 0.35); border: 1px solid #64748b; right: 120px; bottom: 35px;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'><polyline points='23 4 23 10 17 10'></polyline><polyline points='1 20 1 14 7 14'></polyline><path d='M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15'></path></svg>");
-}
+    .mode-btn {
+        flex: 1;
+        padding: 8px 4px;
+        background: #1c1f1c !important;
+        border: 1px solid #383d35 !important;
+        color: #7a8075 !important;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: bold;
+        cursor: pointer;
+        border-radius: 2px !important;
+        transition: all 0.2s;
+    }
 
-.small-btn { padding: 6px 12px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; color: white; cursor: pointer; pointer-events: auto; font-weight: bold; }
-.text-red { color: #f87171 !important; }
-.text-yellow { color: #eab308 !important; }
-.animate-pulse { animation: pulse 2s infinite; }
+    .mode-btn.active {
+        background: linear-gradient(180deg, #6e4621 0%, #422a13 100%) !important;
+        border: 1px solid #a36833 !important;
+        color: #f0e6d2 !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.15) !important;
+    }
 
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    /* Главные кнопки в стиле армейского снаряжения */
+    #btn-auth, .btn-stalker-main, #btn-respawn {
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(180deg, #8c5a2b 0%, #59391a 100%) !important;
+        border: 1px solid #b3733b !important;
+        color: #f0e6d2 !important;
+        font-family: inherit;
+        font-weight: bold;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        cursor: pointer;
+        border-radius: 2px !important;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+        margin-top: 10px;
+    }
+
+    #btn-auth:active, .btn-stalker-main:active {
+        background: #422a13 !important;
+        transform: translateY(1px);
+    }
+
+    /* --------------------------------------------------------------------------
+       2. ИГРОВОЙ HUD (ЗДОРОВЬЕ, ПАТРОНЫ, РАДАР)
+       -------------------------------------------------------------------------- */
+    #hud-scalable-wrapper {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        z-index: 10;
+        pointer-events: none;
+        transform-origin: top left;
+    }
+
+    .hud-element {
+        position: absolute;
+        pointer-events: auto;
+    }
+
+    /* Панель показателей */
+    #hud-stats {
+        top: 15px;
+        left: 15px;
+        background: rgba(16, 18, 16, 0.85) !important;
+        border: 1px solid #383c34 !important;
+        padding: 10px 14px;
+        border-radius: 2px !important;
+        display: flex;
+        gap: 15px;
+        font-size: 13px;
+        color: #d4a359 !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    }
+
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .stat-value {
+        font-weight: bold;
+        color: #ffffff;
+    }
+
+    /* Плашка таймера/волны */
+    #hud-timer {
+        top: 15px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(16, 18, 16, 0.85) !important;
+        border: 1px solid #383c34 !important;
+        padding: 8px 16px;
+        text-align: center;
+        font-size: 13px;
+        font-weight: bold;
+        color: #d4a359 !important;
+        border-radius: 2px !important;
+    }
+
+    /* Радар КПК */
+    #minimap-radar {
+        top: 15px;
+        right: 15px;
+        width: 110px;
+        height: 110px;
+        background: rgba(15, 20, 15, 0.9) !important;
+        border: 2px solid #3a4237 !important;
+        border-radius: 50% !important;
+        overflow: hidden;
+        box-shadow: 0 0 10px rgba(0,0,0,0.8), inset 0 0 15px rgba(0,25,0,0.4) !important;
+    }
+
+    .radar-dot.dot-me {
+        position: absolute;
+        top: 53px; left: 53px;
+        width: 4px; height: 4px;
+        background: #51cf66 !important;
+        border-radius: 50%;
+        box-shadow: 0 0 6px #51cf66;
+    }
+
+    /* Чат Зоны */
+    #game-chat {
+        bottom: 20px;
+        left: 15px;
+        width: 280px;
+        max-height: 160px;
+        display: flex;
+        flex-direction: column;
+        pointer-events: auto;
+    }
+
+    #chat-log {
+        background: rgba(12, 14, 12, 0.8) !important;
+        border: 1px solid #2e322b !important;
+        padding: 6px;
+        font-size: 11px;
+        height: 100px;
+        overflow-y: auto;
+        color: #b0b5aa !important;
+        margin-bottom: 4px;
+    }
+
+    #chat-input {
+        background: rgba(18, 20, 18, 0.9) !important;
+        border: 1px solid #383c35 !important;
+        color: #d4a359 !important;
+        padding: 6px;
+        font-size: 11px;
+    }
+
+    /* --------------------------------------------------------------------------
+       3. СЕНСОРНЫЙ ДЖОЙСТИК И КНОПКИ УПРАВЛЕНИЯ
+       -------------------------------------------------------------------------- */
+    #joystick-zone {
+        position: absolute;
+        bottom: 40px;
+        left: 40px;
+        width: 120px;
+        height: 120px;
+        background: rgba(0, 0, 0, 0.25) !important;
+        border: 2px solid rgba(100, 105, 95, 0.35) !important;
+        border-radius: 50% !important;
+        touch-action: none;
+    }
+
+    #joystick-stick {
+        position: absolute;
+        top: 35px; left: 35px;
+        width: 50px; height: 50px;
+        background: rgba(160, 130, 80, 0.45) !important;
+        border: 1px solid rgba(212, 163, 89, 0.6) !important;
+        border-radius: 50% !important;
+        pointer-events: none;
+    }
+
+    .touch-btn {
+        width: 55px;
+        height: 55px;
+        background: rgba(28, 30, 26, 0.65) !important;
+        border: 1px solid rgba(90, 95, 85, 0.5) !important;
+        color: #d4a359 !important;
+        border-radius: 50% !important;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 11px;
+        font-weight: bold;
+        text-transform: uppercase;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    }
+
+    .touch-btn:active {
+        background: rgba(80, 60, 30, 0.8) !important;
+    }
+
+    /* Фиксированные позиции кнопок */
+    #btn-fire {
+        bottom: 40px; right: 40px;
+        width: 75px; height: 75px;
+        background: rgba(120, 40, 30, 0.55) !important;
+        border: 2px solid rgba(180, 60, 50, 0.7) !important;
+        color: #ff9999 !important;
+        font-size: 13px;
+    }
+
+    #btn-jump { bottom: 130px; right: 40px; }
+    #btn-crouch { bottom: 40px; right: 135px; }
+    #btn-reload { bottom: 130px; right: 115px; }
+    #btn-menu-trigger { top: 15px; right: 140px; border-radius: 2px !important; width: 40px; height: 35px; font-size: 16px; }
+
+    /* Прицел */
+    #game-crosshair {
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 5px; height: 5px;
+        background: #ffffff !important;
+        border-radius: 50%;
+        pointer-events: none;
+        box-shadow: 0 0 2px #000;
+    }
+
+    /* Кровавая вспышка при получении урона */
+    #damage-flash {
+        position: absolute;
+        top:0; left:0; width:100%; height:100%;
+        background: radial-gradient(circle, transparent 40%, rgba(180, 20, 20, 0.6) 100%);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.15s ease-out;
+        z-index: 5;
+    }
+
+    #damage-indicators-container {
+        position: absolute;
+        top: 50%; left: 50%;
+        width: 0; height: 0;
+        pointer-events: none;
+        z-index: 6;
+    }
+
+    /* Режим настройки HUD */
+    body.edit-mode .hud-element {
+        outline: 1px dashed #d4a359 !important;
+    }
+
+    #customizer-menu {
+        display: none;
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1001;
+    }
+</style>
