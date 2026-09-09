@@ -1,10 +1,17 @@
 * {
     margin: 0; padding: 0; box-sizing: border-box;
     user-select: none; -webkit-user-select: none;
+    touch-action: none; /* ФИКС iOS: отключает браузерные жесты зума и свайпа страниц */
 }
+
 body, html {
-    width: 100%; height: 100%; overflow: hidden;
+    width: 100vw; width: 100dvw; /* ФИКС iOS: динамическая ширина */
+    height: 100vh; height: 100dvh; /* ФИКС iOS: динамическая высота с учетом нижнего бара Safari */
+    overflow: hidden; 
+    position: fixed; /* ФИКС iOS: жестко фиксируем экран, чтобы свайпы камеры не дергали всю страницу */
     background-color: #0a0f1d; font-family: sans-serif;
+    padding-top: env(safe-area-inset-top); /* Отступ от челки/Dynamic Island */
+    padding-bottom: env(safe-area-inset-bottom); /* Отступ от нижней полоски */
 }
 
 #canvas-container {
@@ -13,7 +20,7 @@ body, html {
 
 /* Фикс блокировки кликов: вспышка полностью прозрачна для тапов */
 #damage-flash {
-    position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(239, 68, 68, 0.45); opacity: 0; pointer-events: none;
     z-index: 40; transition: opacity 0.05s ease-out;
 }
@@ -49,7 +56,8 @@ body, html {
 
 /* Окна экранов */
 .overlay {
-    position: absolute; width: 100vw; height: 100vh; top: 0; left: 0;
+    position: absolute; 
+    width: 100%; height: 100%; top: 0; left: 0;
     background: rgba(15, 23, 42, 0.85); display: flex; justify-content: center;
     align-items: center; z-index: 100; backdrop-filter: blur(6px);
     pointer-events: auto; /* Разрешаем клики внутри меню */
