@@ -2,10 +2,12 @@
 // GAME CLIENT CORE: S.T.A.L.K.E.R. Zone Atmosphere Edition (Unified main.js)
 // ============================================================================
 
-const SERVER_URL = "https://pvp-arena-online.onrender.com"; 
+const DEFAULT_SERVER_URL = "https://pvp-arena-online.onrender.com"; 
+let SERVER_URL = DEFAULT_SERVER_URL;
 let socket = null;
 
-let myId = null, myNick = "", myPass = "", currentGameMode = "survival";
+let myId = null, myNick = "", currentGameMode = "survival";
+let currentLobbyId = null;
 let hp = 100, armor = 100, kills = 0, isReloading = false;
 
 // Арсенал и оружие
@@ -148,12 +150,67 @@ function createCharacterLabel(text, hp, armor, isEnemy) {
     return sprite;
 }
 
-function initSocket() {
+// Рендер и логика нового экрана входа (никнейм, сервера, лобби, друзья)
+function initAuthScreen() {
+    const authScreen = document.getElementById('auth-screen');
+    if (!authScreen) return;
+
+    authScreen.innerHTML = `
+        <div class="auth-container" style="background: rgba(20, 22, 20, 0.95); padding: 25px; border-radius: 8px; border: 1px solid #434c3e; width: 340px; text-align: center; color: #e6dfcc; font-family: monospace;">
+            <h2 style="margin-top: 0; color: #d4a359; letter-spacing: 2px;">ВХОД В ЗОНУ</h2>
+            
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="font-size: 12px; color: #8d99ae;">НИКНЕЙМ СТАЛКЕРА</label>
+                <input type="text" id="input-nick" placeholder="Введите позывной..." maxlength="15" style="width: 100%; padding: 10px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 4px; box-sizing: border-box; margin-top: 4px;">
+            </div>
+
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="font-size: 12px; color: #8d99ae;">СЕРВЕР ЧЗО</label>
+                <select id="select-server" style="width: 100%; padding: 10px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 4px; box-sizing: border-box; margin-top: 4px;">
+                    <option value="https://pvp-arena-online.onrender.com">Основной Сервер (Render RU)</option>
+                    <option value="https://pvp-arena-backup.onrender.com">Резервный Сервер</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 16px; text-align: left; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px;">
+                <label style="font-size: 12px; color: #d4a359; font-weight: bold;">УПРАВЛЕНИЕ ЛОББИ</label>
+                <input type="text" id="input-lobby" placeholder="ID Лобби (пусто для нового)" style="width: 100%; padding: 8px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 4px; box-sizing: border-box; margin-top: 6px; margin-bottom: 8px;">
+                <div id="friends-list-container" style="font-size: 11px; color: #a5a5a5;">Друзья в сети: <span style="color: #51cf66;">Поиск...</span></div>
+            </div>
+
+            <button id="btn-auth" style="width: 100%; padding: 12px; background: #386641; color: white; border: none; font-weight: bold; border-radius: 4px; cursor: pointer; letter-spacing: 1px;">ВОЙТИ В ИГРУ</button>
+            <div id="auth-status" style="margin-top: 10px; font-size: 12px; color: #8d99ae;">Готово к подключению к КПК</div>
+        </div>
+    `;
+
+    document.getElementById('btn-auth').addEventListener('click', () => {
+        let nickname = document.getElementById('input-nick').value.trim();
+        let serverUrl = document.getElementById('select-server').value;
+        let lobbyId = document.getElementById('input-lobby').value.trim();
+
+        if (nickname.length < 2) {
+            alert("Позывной должен содержать минимум 2 символа!");
+            return;
+        }
+
+        myNick = nickname;
+        localStorage.setItem('stalker_nick', myNick);
+
+        SERVER_URL = serverUrl;
+        connectToServer(lobbyId);
+    });
+}
+
+function connectToServer(lobbyId) {
     const statusText = document.getElementById('auth-status');
     const authBtn = document.getElementById('btn-auth');
 
     if(statusText) statusText.innerText = "Подключение к КПК Зоны...";
     if(authBtn) { authBtn.disabled = true; authBtn.innerText = "СВЯЗЬ..."; }
+
+    if (socket) {
+        socket.disconnect();
+    }
 
     socket = io(SERVER_URL, {
         transports: ['polling', 'websocket'],
@@ -161,7 +218,8 @@ function initSocket() {
         reconnection: true,
         reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
-        timeout: 20000
+        timeout: 20000,
+        query: { nick: myNick, lobby: lobbyId || '' }
     });
 
     socket.on('connect', () => { 
@@ -178,11 +236,12 @@ function initSocket() {
 
     socket.on('connect_error', (error) => {
         if(statusText) statusText.innerText = `Ошибка КПК: ${error.message}`;
+        if(authBtn) { authBtn.disabled = false; authBtn.innerText = "ВОЙТИ В ИГРУ"; }
     });
     
     socket.on('authSuccess', (data) => { 
-        localStorage.setItem('n', data.nick); localStorage.setItem('p', data.pass);
         currentGameMode = data.mode || currentGameMode;
+        currentLobbyId = data.lobbyId || lobbyId;
         document.getElementById('auth-screen').style.display = 'none'; 
         myId = socket.id; 
         buildMap();
@@ -248,7 +307,6 @@ function initSocket() {
                 let label = createCharacterLabel(pData.nick, pData.hp, pData.armor, isEnemyPlayer);
                 label.position.y = 2.2; label.name = "player_label"; group.add(label);
                 
-                // Привязка ID к дочерним объектам для рейкаста
                 group.traverse(child => { if(child.userData) child.userData.targetId = id; });
 
                 scene.add(group); remotePlayers[id] = group;
@@ -363,20 +421,22 @@ function createDamageArrow(shooterX, shooterZ) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+    initAuthScreen();
     initEngine(); 
-    initSocket(); 
     setupControls(); 
     fixJoystickPosition(); 
     loadHUDPositions(); 
     loadCrosshairSettings();
     
+    let savedNick = localStorage.getItem('stalker_nick');
+    if (savedNick && document.getElementById('input-nick')) {
+        document.getElementById('input-nick').value = savedNick;
+    }
+    
     setInterval(() => { checkLootPickups(); }, 100);
 
     let savedScale = localStorage.getItem('game_hud_scale');
     if (savedScale) { window.gameSettings.hudScale = parseFloat(savedScale); document.getElementById('scale-slider').value = savedScale; applyHUDScale(savedScale); }
-    if(localStorage.getItem('n') && localStorage.getItem('p')) {
-        document.getElementById('input-nick').value = localStorage.getItem('n'); document.getElementById('input-pass').value = localStorage.getItem('p');
-    }
 });
 
 function applyHUDScale(scale) { document.getElementById('hud-scalable-wrapper').style.transform = `scale(${scale})`; }
@@ -518,14 +578,6 @@ function checkLootPickups() {
     }
 }
 
-document.getElementById('btn-auth').addEventListener('click', () => {
-    let nickname = document.getElementById('input-nick').value.trim(); 
-    let password = document.getElementById('input-pass').value.trim();
-    if(nickname.length < 2 || !socket || !socket.connected) return;
-    myNick = nickname; myPass = password;
-    socket.emit('playerAuth', { nick: nickname, pass: password, mode: currentGameMode });
-});
-
 function performShot() {
     if (isReloading || hp <= 0 || !myId || isCustomizing) return;
     let weapon = WEAPONS[currentWeaponKey];
@@ -644,18 +696,20 @@ function setupControls() {
         document.getElementById('crosshair-shape').addEventListener('change', (e) => { if(crosshair) crosshair.style.borderRadius = e.target.value; });
     }
 
-    menuTrigger.addEventListener('touchstart', (e) => {
-        e.preventDefault(); e.stopPropagation(); if (isCustomizing) return; 
-        isCustomizing = true; stopAutofire(); 
-        if(document.getElementById('menu-user-nick')) document.getElementById('menu-user-nick').innerText = myNick || "Сталкер";
-        const modeBadge = document.getElementById('menu-user-mode');
-        if (modeBadge) {
-            if (currentGameMode === 'coop') { modeBadge.innerText = "РЕЖИМ: ОХОТА НА МУТАНТОВ"; modeBadge.style.color = "#51cf66"; } 
-            else if (currentGameMode === 'survival') { modeBadge.innerText = "РЕЖИМ: ВЫЖИВАНИЕ"; modeBadge.style.color = "#d4a359"; }
-            else { modeBadge.innerText = "РЕЖИМ: БОЙ В ЗОНЕ"; modeBadge.style.color = "#ff6b6b"; }
-        }
-        document.body.classList.add('edit-mode'); if(customMenu) customMenu.style.display = 'block';
-    });
+    if (menuTrigger) {
+        menuTrigger.addEventListener('touchstart', (e) => {
+            e.preventDefault(); e.stopPropagation(); if (isCustomizing) return; 
+            isCustomizing = true; stopAutofire(); 
+            if(document.getElementById('menu-user-nick')) document.getElementById('menu-user-nick').innerText = myNick || "Сталкер";
+            const modeBadge = document.getElementById('menu-user-mode');
+            if (modeBadge) {
+                if (currentGameMode === 'coop') { modeBadge.innerText = "РЕЖИМ: ОХОТА НА МУТАНТОВ"; modeBadge.style.color = "#51cf66"; } 
+                else if (currentGameMode === 'survival') { modeBadge.innerText = "РЕЖИМ: ВЫЖИВАНИЕ"; modeBadge.style.color = "#d4a359"; }
+                else { modeBadge.innerText = "РЕЖИМ: БОЙ В ЗОНЕ"; modeBadge.style.color = "#ff6b6b"; }
+            }
+            document.body.classList.add('edit-mode'); if(customMenu) customMenu.style.display = 'block';
+        });
+    }
 
     if(document.getElementById('btn-save-hud')) {
         document.getElementById('btn-save-hud').addEventListener('click', () => { 
@@ -689,9 +743,11 @@ function setupControls() {
         if(!isCustomizing){ e.preventDefault(); isCrouching = !isCrouching; document.getElementById('btn-crouch').style.backgroundColor = isCrouching ? "rgba(180, 140, 80, 0.5)" : "rgba(35, 38, 33, 0.5)"; }
     });
 
-    jZone.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.stopPropagation(); let t = e.targetTouches[0]; joystickTouchId = t.identifier; updateJoystick(t); } });
-    jZone.addEventListener('touchmove', (e) => { if(!isCustomizing){ e.stopPropagation(); for(let t of e.touches) { if(t.identifier === joystickTouchId) updateJoystick(t); } } });
-    jZone.addEventListener('touchend', () => { if(!isCustomizing){ joystickTouchId = null; stick.style.transform = `translate(0px, 0px)`; moveDirection.forward = 0; moveDirection.right = 0; } });
+    if (jZone) {
+        jZone.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.stopPropagation(); let t = e.targetTouches[0]; joystickTouchId = t.identifier; updateJoystick(t); } });
+        jZone.addEventListener('touchmove', (e) => { if(!isCustomizing){ e.stopPropagation(); for(let t of e.touches) { if(t.identifier === joystickTouchId) updateJoystick(t); } } });
+        jZone.addEventListener('touchend', () => { if(!isCustomizing){ joystickTouchId = null; if(stick) stick.style.transform = `translate(0px, 0px)`; moveDirection.forward = 0; moveDirection.right = 0; } });
+    }
 
     function updateJoystick(touch) {
         let rect = jZone.getBoundingClientRect(); 
@@ -699,7 +755,7 @@ function setupControls() {
         let dy = touch.clientY - (rect.top + rect.height / 2);
         let dist = Math.sqrt(dx*dx + dy*dy); 
         if (dist > 40) { dx = (dx / dist) * 40; dy = (dy / dist) * 40; }
-        stick.style.transform = `translate(${dx}px, ${dy}px)`; 
+        if (stick) stick.style.transform = `translate(${dx}px, ${dy}px)`; 
         moveDirection.forward = -(dy / 40); 
         moveDirection.right = (dx / 40);
     }
