@@ -1,5 +1,5 @@
 // ============================================================================
-// GAME CLIENT CORE: S.T.A.L.K.E.R. Zone Atmosphere Edition (Fixed HUD & Weapons)
+// GAME CLIENT CORE: S.T.A.L.K.E.R. Zone Atmosphere Edition (Fixed Collisions & Spawn)
 // ============================================================================
 
 const DEFAULT_SERVER_URL = "https://pvp-arena-online.onrender.com"; 
@@ -45,9 +45,6 @@ let lastLookX = 0, lastLookY = 0;
 let fireIntervalId = null;
 let isCrouching = false, isCustomizing = false;
 
-let lastRadarPingTime = 0;
-const RADAR_PING_INTERVAL = 2500;
-
 window.gameSettings = { sensitivity: 0.0035, hudScale: 1.0 };
 
 window.selectGameMode = function(mode) {
@@ -70,7 +67,6 @@ window.switchWeapon = function(weaponKey) {
     ammo = weaponState[weaponKey].ammo;
     reserveAmmo = weaponState[weaponKey].reserve;
     
-    // Подсветка активного оружия в интерфейсе
     ['knife', 'pistol', 'rifle'].forEach(w => {
         let el = document.getElementById(`slot-${w}`);
         if(el) el.style.border = w === weaponKey ? '2px solid #d4a359' : '1px solid #333931';
@@ -157,7 +153,6 @@ function createCharacterLabel(text, hp, armor, isEnemy) {
     return sprite;
 }
 
-// Полноценное главное меню при входе
 function initAuthScreen() {
     const authScreen = document.getElementById('auth-screen');
     if (!authScreen) return;
@@ -214,7 +209,6 @@ function initAuthScreen() {
         myNick = nickname;
         localStorage.setItem('stalker_nick', myNick);
 
-        // Автоматический полноэкранный режим при входе
         const docEl = document.documentElement;
         if (docEl.requestFullscreen) {
             docEl.requestFullscreen().catch(err => console.log("Fullscreen request blocked:", err));
@@ -261,9 +255,16 @@ function connectToServer(lobbyId) {
         buildMap();
     });
     
+    // ИСПРАВЛЕННЫЙ БЕЗОПАСНЫЙ СПАВН (защита от проваливания и застревания)
     socket.on('init', (spawnPos) => { 
-        if (yawObject) yawObject.position.set(spawnPos.x || 0, 1.7, spawnPos.z || 30);
-        hp = 100; armor = 100; ammo = WEAPONS[currentWeaponKey].ammo; reserveAmmo = WEAPONS[currentWeaponKey].maxReserve; updateHUD(); 
+        if (yawObject) {
+            yawObject.position.set(spawnPos.x || 0, 3.0, spawnPos.z || 30);
+            playerVelocity.set(0, 0, 0);
+        }
+        hp = 100; armor = 100; 
+        ammo = WEAPONS[currentWeaponKey].ammo; 
+        reserveAmmo = WEAPONS[currentWeaponKey].maxReserve; 
+        updateHUD(); 
         document.getElementById('respawn-screen').style.display = 'none'; 
         buildMap();
     });
@@ -390,7 +391,6 @@ function createDamageArrow(shooterX, shooterZ) {
     setTimeout(() => { arrow.style.opacity = '0'; setTimeout(() => { clearInterval(interval); arrow.remove(); }, 800); }, 800);
 }
 
-// Автоматическая инъекция недостающих кнопок интерфейса прямо в DOM при запуске
 window.addEventListener('DOMContentLoaded', () => {
     injectMissingHUDUI();
     initAuthScreen();
@@ -410,7 +410,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (savedScale) { window.gameSettings.hudScale = parseFloat(savedScale); document.getElementById('scale-slider').value = savedScale; applyHUDScale(savedScale); }
 });
 
-// Добавляет панели оружия сверху по центру (как счетчик килов в CS) и кнопку меню настроек
 function injectMissingHUDUI() {
     const wrapper = document.getElementById('hud-scalable-wrapper') || document.body;
     
@@ -525,8 +524,9 @@ function spawnLoot(x, y, z, type, colorHex) {
     lootItems.push({ mesh: mesh, type: type, x: x, y: y, z: z, baseHeight: y, seed: Math.random() * 100 });
 }
 
+// УВЕЛИЧЕННЫЙ РАДИУС КОЛЛИЗИИ (защита от застревания и прострелов)
 function checkWallCollisions(newPos) {
-    let pr = 0.4;
+    let pr = 0.55; 
     let playerBox = new THREE.Box3(
         new THREE.Vector3(newPos.x - pr, newPos.y - 1.6, newPos.z - pr), 
         new THREE.Vector3(newPos.x + pr, newPos.y + 0.2, newPos.z + pr)
@@ -643,7 +643,6 @@ function setupControls() {
     const jZone = document.getElementById('joystick-zone'), stick = document.getElementById('joystick-stick');
     const customMenu = document.getElementById('customizer-menu');
 
-    // Навешиваем клик на кнопку шестеренки для открытия настроек HUD
     document.addEventListener('click', (e) => {
         if (e.target && e.target.id === 'btn-menu-trigger') {
             if (isCustomizing) return; 
