@@ -1,5 +1,5 @@
 // ============================================================================
-// GAME CLIENT CORE: S.T.A.L.K.E.R. Zone Mobile & PC Universal Edition
+// GAME CLIENT CORE: S.T.A.L.K.E.R. Zone (Custom UI Fix)
 // ============================================================================
 
 const DEFAULT_SERVER_URL = "https://pvp-arena-online.onrender.com"; 
@@ -27,7 +27,6 @@ let weaponState = {
 
 let scene, camera, renderer, weaponMesh;
 let yawObject = new THREE.Object3D(), pitchObject = new THREE.Object3D();
-let remotePlayers = {}, remoteBots = [];
 let moveDirection = { forward: 0, right: 0 };
 let playerVelocity = new THREE.Vector3();
 let isGrounded = true;
@@ -37,12 +36,6 @@ const JUMP_FORCE = 8.5;
 let moveSpeed = 6.0;     
 
 let fireIntervalId = null;
-let isCustomizing = false;
-
-// Drag & Drop
-let draggedElement = null;
-let dragOffsetX = 0;
-let dragOffsetY = 0;
 
 window.gameSettings = { sensitivity: isMobile ? 0.005 : 0.0035 };
 
@@ -54,14 +47,8 @@ window.switchWeapon = function(weaponKey) {
     currentWeaponKey = weaponKey;
     ammo = weaponState[weaponKey].ammo;
     reserveAmmo = weaponState[weaponKey].reserve;
-    
-    ['knife', 'pistol', 'rifle'].forEach(w => {
-        let el = document.getElementById(`slot-${w}`);
-        if(el) el.style.border = w === weaponKey ? '2px solid #d4a359' : '1px solid #333931';
-    });
-
-    updateHUD();
     updateWeaponMesh(weaponKey);
+    updateHUD();
 };
 
 function updateWeaponMesh(key) {
@@ -84,35 +71,19 @@ function updateWeaponMesh(key) {
     }
 }
 
-function initAuthScreen() {
-    const authScreen = document.getElementById('auth-screen');
-    if (!authScreen) return;
-
-    authScreen.innerHTML = `
-        <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #111; display: flex; justify-content: center; align-items: center; z-index: 9999; font-family: monospace; color: #e6dfcc;">
-            <div style="background: rgba(18, 20, 18, 0.95); padding: 20px; border-radius: 10px; border: 1px solid #434c3e; width: 90%; max-width: 360px; text-align: center;">
-                <h2 style="color: #d4a359; margin-top: 0;">S.T.A.L.K.E.R: ЧЗО</h2>
-                
-                <input type="text" id="input-nick" placeholder="Ваш позывной..." maxlength="15" style="width: 100%; padding: 12px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 5px; box-sizing: border-box; font-size: 16px; margin-bottom: 15px;">
-
-                <button id="btn-auth" style="width: 100%; padding: 14px; background: #bc6c25; color: white; border: none; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 16px;">ВОЙТИ В ЗОНУ</button>
-            </div>
-        </div>
-    `;
-
-    document.getElementById('btn-auth').addEventListener('click', () => {
-        let nickname = document.getElementById('input-nick').value.trim();
-        if (nickname.length < 2) return alert("Введите позывной!");
-        myNick = nickname;
-        localStorage.setItem('stalker_nick', myNick);
-        document.getElementById('auth-screen').style.display = 'none';
-        connectToServer();
-        
-        if (!isMobile) {
-            document.body.requestPointerLock?.();
-        }
-    });
-}
+// Упрощенный авто-вход для теста
+window.addEventListener('DOMContentLoaded', () => {
+    myNick = localStorage.getItem('stalker_nick') || "Сталкер";
+    connectToServer();
+    initEngine(); 
+    setupControls(); 
+    
+    // Пытаемся сделать фон страницы прозрачным принудительно
+    document.body.style.background = "transparent";
+    document.documentElement.style.background = "transparent";
+    const container = document.getElementById('canvas-container');
+    if (container) container.style.background = "transparent";
+});
 
 function connectToServer() {
     if (typeof io === 'undefined') return;
@@ -132,128 +103,10 @@ function connectToServer() {
     });
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-    injectMissingHUDUI();
-    initAuthScreen();
-    initEngine(); 
-    setupControls(); 
-    loadHUDPositions(); 
-});
-
-function injectMissingHUDUI() {
-    const style = document.createElement('style');
-    style.innerHTML = `
-        .hud-element {
-            user-select: none !important;
-            -webkit-user-select: none !important;
-            touch-action: none !important;
-        }
-        body.edit-mode .hud-element {
-            outline: 2px dashed #d4a359 !important;
-        }
-        .mobile-btn {
-            position: fixed; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.4);
-            color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center;
-            font-family: monospace; font-weight: bold; user-select: none; touch-action: none; z-index: 9000;
-        }
-    `;
-    document.head.appendChild(style);
-
-    // Добавляем мобильные кнопки управления
-    if (isMobile) {
-        // Кнопка стрельбы
-        const fireBtn = document.createElement('div');
-        fireBtn.className = 'mobile-btn';
-        fireBtn.style.cssText += 'bottom: 80px; right: 20px; width: 65px; height: 65px; background: rgba(188, 108, 37, 0.7); font-size: 22px;';
-        fireBtn.innerHTML = '🔥';
-        document.body.appendChild(fireBtn);
-
-        fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startAutofire(); });
-        fireBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopAutofire(); });
-
-        // Кнопка прыжка
-        const jumpBtn = document.createElement('div');
-        jumpBtn.className = 'mobile-btn';
-        jumpBtn.style.cssText += 'bottom: 160px; right: 20px; width: 55px; height: 55px; font-size: 18px;';
-        jumpBtn.innerHTML = '⬆️';
-        document.body.appendChild(jumpBtn);
-
-        jumpBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (isGrounded) { playerVelocity.y = JUMP_FORCE; isGrounded = false; }
-        });
-
-        // Кнопка перезарядки
-        const reloadBtn = document.createElement('div');
-        reloadBtn.className = 'mobile-btn';
-        reloadBtn.style.cssText += 'bottom: 225px; right: 25px; width: 45px; height: 45px; font-size: 14px;';
-        reloadBtn.innerHTML = '🔄';
-        document.body.appendChild(reloadBtn);
-
-        reloadBtn.addEventListener('touchstart', (e) => { e.preventDefault(); reloadWeapon(); });
-    }
-
-    // Кнопка Сохранить и Выйти для HUD
-    if (!document.getElementById('btn-exit-edit')) {
-        const exitEditBtn = document.createElement('div');
-        exitEditBtn.id = 'btn-exit-edit';
-        exitEditBtn.innerHTML = '💾 СОХРАНИТЬ И ВЫЙТИ';
-        exitEditBtn.style.cssText = 'position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #bc6c25; color: white; padding: 14px 24px; border-radius: 6px; font-family: monospace; font-weight: bold; font-size: 15px; cursor: pointer; display: none; z-index: 100000; border: 2px solid #fff; box-shadow: 0 0 15px rgba(0,0,0,0.9);';
-        document.body.appendChild(exitEditBtn);
-
-        const handleExit = (e) => {
-            if (e) e.preventDefault();
-            isCustomizing = false;
-            document.body.classList.remove('edit-mode');
-            exitEditBtn.style.display = 'none';
-            if (!isMobile) document.body.requestPointerLock?.();
-        };
-
-        exitEditBtn.addEventListener('click', handleExit);
-        exitEditBtn.addEventListener('touchstart', handleExit);
-    }
-
-    // Настройки
-    if (!document.getElementById('game-settings-modal')) {
-        const modal = document.createElement('div');
-        modal.id = 'game-settings-modal';
-        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 99999; font-family: monospace; color: #e6dfcc;';
-        modal.innerHTML = `
-            <div style="background: rgba(18,20,18,0.98); border: 1px solid #434c3e; padding: 20px; border-radius: 8px; width: 90%; max-width: 320px; text-align: center;">
-                <h3 style="color: #d4a359; margin-top: 0;">НАСТРОЙКИ HUD</h3>
-                <button id="btn-edit-hud-pos" style="width: 100%; padding: 12px; background: #386641; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-bottom: 10px; font-size: 14px;">Двигать HUD (Перетаскивание)</button>
-                <button id="btn-close-modal" style="width: 100%; padding: 10px; background: #333931; color: white; border: none; border-radius: 4px; cursor: pointer;">Закрыть</button>
-            </div>
-        `;
-        document.body.appendChild(modal);
-
-        const openEdit = () => {
-            document.getElementById('game-settings-modal').style.display = 'none';
-            isCustomizing = true;
-            document.body.classList.add('edit-mode');
-            document.getElementById('btn-exit-edit').style.display = 'block';
-            if (!isMobile && document.pointerLockElement) document.exitPointerLock();
-        };
-
-        document.getElementById('btn-edit-hud-pos').addEventListener('click', openEdit);
-        document.getElementById('btn-close-modal').addEventListener('click', () => {
-            document.getElementById('game-settings-modal').style.display = 'none';
-            if (!isMobile) document.body.requestPointerLock?.();
-        });
-    }
-
-    // Инициализация существующих блоков HUD
-    setTimeout(() => {
-        document.querySelectorAll('#hud-hp-box, #hud-ammo-box, #minimap-container, #cs-top-scoreboard, #weapon-slots-bar, #btn-menu-trigger').forEach(el => {
-            el.classList.add('hud-element');
-        });
-    }, 500);
-}
-
 function initEngine() {
     const container = document.getElementById('canvas-container') || document.body;
     scene = new THREE.Scene(); 
-    scene.background = new THREE.Color(0x3a403b); 
+    scene.background = new THREE.Color(0x3a403b); // Цвет неба/тумана
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     pitchObject.add(camera); 
@@ -262,13 +115,24 @@ function initEngine() {
     yawObject.position.set(0, 3.5, 0);
     scene.add(yawObject);
     
-    renderer = new THREE.WebGLRenderer({ antialias: true }); 
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); // Включаем прозрачность рендера
     renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    // ВАЖНО: Фиксируем 3D слой позади всех твоих кнопок
+    renderer.domElement.style.position = 'fixed';
+    renderer.domElement.style.top = '0';
+    renderer.domElement.style.left = '0';
+    renderer.domElement.style.zIndex = '-999';
+    renderer.domElement.style.pointerEvents = 'none'; // Чтобы холст не блокировал тапы по кнопкам
+    
     container.appendChild(renderer.domElement);
     
     scene.add(new THREE.HemisphereLight(0xddeeff, 0x334422, 0.8));
     
-    buildMap(); 
+    let floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x2b3028 })); 
+    floor.rotation.x = -Math.PI / 2; 
+    scene.add(floor);
+    
     createWeapon(); 
     animate();
 }
@@ -282,13 +146,8 @@ function createWeapon() {
     weaponMesh = weaponGroup;
 }
 
-function buildMap() {
-    let floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x2b3028 })); 
-    floor.rotation.x = -Math.PI / 2; 
-    scene.add(floor);
-}
-
 function updateHUD() {
+    // Если найдет элементы по ID — обновит их
     let hpEl = document.getElementById('val-hp');
     let ammoEl = document.getElementById('val-ammo');
     if (hpEl) hpEl.innerText = Math.max(0, hp);
@@ -296,64 +155,54 @@ function updateHUD() {
 }
 
 function setupControls() {
-    // Клавиатура (для ПК)
-    window.addEventListener('keydown', (e) => {
-        if (isCustomizing) return;
-        if (e.code === 'KeyW') moveDirection.forward = 1;
-        if (e.code === 'KeyS') moveDirection.forward = -1;
-        if (e.code === 'KeyA') moveDirection.right = -1;
-        if (e.code === 'KeyD') moveDirection.right = 1;
-        if (e.code === 'Space' && isGrounded) { playerVelocity.y = JUMP_FORCE; isGrounded = false; }
-        if (e.code === 'KeyR') reloadWeapon();
-    });
+    // АВТО-БИНД ТВОИХ HTML КНОПОК ПО ТЕКСТУ ВНУТРИ
+    const bindBtn = (text, startFn, endFn) => {
+        const elements = Array.from(document.querySelectorAll('*')).filter(el => 
+            el.textContent.trim().toUpperCase() === text && el.children.length === 0
+        );
+        elements.forEach(el => {
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); startFn(); });
+            if (endFn) {
+                el.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); endFn(); });
+            }
+        });
+    };
 
-    window.addEventListener('keyup', (e) => {
-        if (e.code === 'KeyW' || e.code === 'KeyS') moveDirection.forward = 0;
-        if (e.code === 'KeyA' || e.code === 'KeyD') moveDirection.right = 0;
-    });
+    // Привязываем логику к кнопкам, которые видно на твоем скрине
+    bindBtn('FIRE', startAutofire, stopAutofire);
+    bindBtn('JUMP', () => { if (isGrounded) { playerVelocity.y = JUMP_FORCE; isGrounded = false; } });
+    bindBtn('RELOAD', reloadWeapon);
 
-    // Мышь (для ПК)
-    window.addEventListener('mousemove', (e) => {
-        if (!isMobile && document.pointerLockElement === document.body && !isCustomizing) {
-            yawObject.rotation.y -= e.movementX * window.gameSettings.sensitivity;
-            pitchObject.rotation.x -= e.movementY * window.gameSettings.sensitivity;
-            pitchObject.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitchObject.rotation.x));
-        }
-    });
-
-    // Мобильное управление (Тачскрин / Сенсор)
+    // Мобильное управление (Вращение камеры по экрану)
     let touchLookId = null;
     let touchLookLastX = 0, touchLookLastY = 0;
-
+    
+    // Если джойстик не перехватывает касания, это сработает как запасной вариант ходьбы
     let joystickTouchId = null;
     let joystickStartX = 0, joystickStartY = 0;
 
     window.addEventListener('touchstart', (e) => {
-        if (isCustomizing) return;
         for (let i = 0; i < e.changedTouches.length; i++) {
             let t = e.changedTouches[i];
-            
-            // Если касание в левой половине экрана — Джойстик ходьбы
+            // Игнорируем тапы по кнопкам
+            if (t.target.tagName === 'BUTTON' || t.target.closest('.button')) continue;
+
             if (t.clientX < window.innerWidth / 2 && joystickTouchId === null) {
                 joystickTouchId = t.identifier;
                 joystickStartX = t.clientX;
                 joystickStartY = t.clientY;
-            } 
-            // Если в правой половине — Вращение камеры
-            else if (t.clientX >= window.innerWidth / 2 && touchLookId === null) {
+            } else if (t.clientX >= window.innerWidth / 2 && touchLookId === null) {
                 touchLookId = t.identifier;
                 touchLookLastX = t.clientX;
                 touchLookLastY = t.clientY;
             }
         }
-    });
+    }, { passive: false });
 
     window.addEventListener('touchmove', (e) => {
-        if (isCustomizing) return;
         for (let i = 0; i < e.changedTouches.length; i++) {
             let t = e.changedTouches[i];
 
-            // Джойстик
             if (t.identifier === joystickTouchId) {
                 let dx = t.clientX - joystickStartX;
                 let dy = t.clientY - joystickStartY;
@@ -361,7 +210,6 @@ function setupControls() {
                 moveDirection.forward = Math.max(-1, Math.min(1, -dy / 40));
             }
 
-            // Камера
             if (t.identifier === touchLookId) {
                 let dx = t.clientX - touchLookLastX;
                 let dy = t.clientY - touchLookLastY;
@@ -374,7 +222,7 @@ function setupControls() {
                 touchLookLastY = t.clientY;
             }
         }
-    });
+    }, { passive: false });
 
     const resetTouches = (e) => {
         for (let i = 0; i < e.changedTouches.length; i++) {
@@ -456,57 +304,4 @@ function animate() {
     }
 
     renderer.render(scene, camera);
-}
-
-// ----------------------------------------------------------------------------
-// UNIVERSAL DRAG & DROP (Touch & Mouse Support)
-// ----------------------------------------------------------------------------
-function loadHUDPositions() {
-    document.querySelectorAll('.hud-element').forEach(el => {
-        let savedPos = localStorage.getItem('hud_pos_' + el.id);
-        if (savedPos) {
-            try {
-                let coords = JSON.parse(savedPos);
-                el.style.left = coords.left;
-                el.style.top = coords.top;
-                el.style.right = 'auto';
-                el.style.bottom = 'auto';
-            } catch(e) {}
-        }
-    });
-
-    // Pointer Events работают одновременно для ПАЛЬЦЕВ и МЫШКИ
-    window.addEventListener('pointerdown', (e) => {
-        if (!isCustomizing) return;
-        let target = e.target.closest('.hud-element');
-        if (target) {
-            draggedElement = target;
-            let rect = draggedElement.getBoundingClientRect();
-            dragOffsetX = e.clientX - rect.left;
-            dragOffsetY = e.clientY - rect.top;
-            draggedElement.style.right = 'auto';
-            draggedElement.style.bottom = 'auto';
-            e.preventDefault();
-        }
-    });
-
-    window.addEventListener('pointermove', (e) => {
-        if (!isCustomizing || !draggedElement) return;
-        let newX = e.clientX - dragOffsetX;
-        let newY = e.clientY - dragOffsetY;
-        draggedElement.style.left = newX + 'px';
-        draggedElement.style.top = newY + 'px';
-    });
-
-    window.addEventListener('pointerup', () => {
-        if (draggedElement) {
-            if (draggedElement.id) {
-                localStorage.setItem('hud_pos_' + draggedElement.id, JSON.stringify({
-                    left: draggedElement.style.left,
-                    top: draggedElement.style.top
-                }));
-            }
-            draggedElement = null;
-        }
-    });
 }
