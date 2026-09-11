@@ -77,7 +77,7 @@ window.switchWeapon = function(weaponKey) {
     updateWeaponMesh(weaponKey);
 };
 
-// НОРМАЛЬНЫЕ ДЕТАЛИЗИРОВАННЫЕ ТЕКСТУРЫ ОРУЖИЯ
+// ТЕКСТУРЫ И МОДЕЛИ ОРУЖИЯ
 function updateWeaponMesh(key) {
     if (!camera || !weaponMesh) return;
     while(weaponMesh.children.length > 0) { 
@@ -102,7 +102,6 @@ function updateWeaponMesh(key) {
         handle.position.set(0, -0.14, -0.02);
         weaponMesh.add(body); weaponMesh.add(handle);
     } else {
-        // АК-47: Ствол, цевье из дерева, магазин и ствольная коробка
         let receiver = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.45), metalMat);
         receiver.position.set(0, 0, -0.2);
         
@@ -235,9 +234,7 @@ function initAuthScreen() {
 
         const docEl = document.documentElement;
         if (docEl.requestFullscreen) {
-            docEl.requestFullscreen().catch(err => console.log("Fullscreen request blocked:", err));
-        } else if (docEl.webkitRequestFullscreen) {
-            docEl.webkitRequestFullscreen();
+            docEl.requestFullscreen().catch(err => console.log("Fullscreen blocked:", err));
         }
 
         SERVER_URL = serverUrl;
@@ -300,7 +297,10 @@ function connectToServer(lobbyId) {
         }
     });
 
-    socket.on('damagedBy', (data) => { triggerDamageFlash(); if (data && data.shooterX !== undefined) createDamageArrow(data.shooterX, data.shooterZ); });
+    socket.on('damagedBy', (data) => { 
+        triggerDamageFlash(); 
+        if (data && data.shooterX !== undefined) createDamageArrow(data.shooterX, data.shooterZ); 
+    });
 
     socket.on('updatePlayers', (serverPlayers) => {
         if (!scene) return;
@@ -433,7 +433,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (savedScale) { window.gameSettings.hudScale = parseFloat(savedScale); document.getElementById('scale-slider').value = savedScale; applyHUDScale(savedScale); }
 });
 
-// ИНЪЕКЦИЯ ПОЛНОЦЕННОГО ИНТЕРФЕЙСА НАСТРОЕК, ПРОФИЛЯ И АВАТАРОК
 function injectMissingHUDUI() {
     const wrapper = document.getElementById('hud-scalable-wrapper') || document.body;
     
@@ -469,9 +468,17 @@ function injectMissingHUDUI() {
         menuBtn.style.cssText = 'position: fixed; top: 10px; left: 20px; background: rgba(18,20,18,0.8); border: 1px solid #333931; width: 36px; height: 36px; border-radius: 4px; display: flex; justify-content: center; align-items: center; color: #d4a359; font-size: 18px; cursor: pointer; z-index: 1000; font-family: monospace;';
         menuBtn.innerHTML = '⚙️';
         wrapper.appendChild(menuBtn);
+
+        menuBtn.addEventListener('click', () => {
+            const modal = document.getElementById('game-settings-modal');
+            if (modal) {
+                const nickDisplay = document.getElementById('profile-nick-display');
+                if (nickDisplay) nickDisplay.innerText = myNick || "Сталкер";
+                modal.style.display = 'flex';
+            }
+        });
     }
 
-    // Создаем модальное окно настроек со всеми функциями (профиль, аватарки, худ, выход в меню)
     if (!document.getElementById('game-settings-modal')) {
         const modal = document.createElement('div');
         modal.id = 'game-settings-modal';
@@ -505,7 +512,6 @@ function injectMissingHUDUI() {
         `;
         document.body.appendChild(modal);
 
-        // Обработчики кнопок меню настроек
         document.getElementById('input-avatar-file').addEventListener('change', (e) => {
             let file = e.target.files[0];
             if (file) {
@@ -535,7 +541,7 @@ function injectMissingHUDUI() {
 
         document.getElementById('btn-return-menu').addEventListener('click', () => {
             if (socket) socket.disconnect();
-            location.reload(); // Перезапуск для возврата в чистое главное меню авторизации
+            location.reload();
         });
 
         document.getElementById('btn-close-modal').addEventListener('click', () => {
@@ -583,6 +589,44 @@ function createWeapon() {
     weaponMesh = weaponGroup;
 }
 
+function createObstacle(x, y, z, w, h, d, color) {
+    let mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: color, roughness: 0.8 }));
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    scene.add(mesh); mapObjects.push(mesh);
+    colliders.push(new THREE.Box3().setFromObject(mesh));
+}
+
+function spawnLoot(x, z, type) {
+    let color = type === 'medkit' ? 0xe63946 : 0xf4a261;
+    let mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.5), new THREE.MeshStandardMaterial({ color: color, roughness: 0.5 }));
+    mesh.position.set(x, 0.15, z);
+    scene.add(mesh);
+    lootItems.push({ mesh: mesh, type: type, x: x, z: z });
+}
+
+function checkLootPickups() {
+    if (!yawObject) return;
+    let px = yawObject.position.x;
+    let pz = yawObject.position.z;
+
+    for (let i = lootItems.length - 1; i >= 0; i--) {
+        let item = lootItems[i];
+        let dist = Math.sqrt((px - item.x)**2 + (pz - item.z)**2);
+        if (dist < 1.5) {
+            if (item.type === 'medkit') {
+                hp = Math.min(100, hp + 40);
+            } else if (item.type === 'ammo') {
+                reserveAmmo += 60;
+                weaponState[currentWeaponKey].reserve += 60;
+            }
+            updateHUD();
+            scene.remove(item.mesh);
+            lootItems.splice(i, 1);
+        }
+    }
+}
+
 function buildMap() {
     mapObjects.forEach(obj => scene.remove(obj)); mapObjects = []; colliders = [];
     lootItems.forEach(item => scene.remove(item.mesh)); lootItems = [];
@@ -595,233 +639,165 @@ function buildMap() {
     createObstacle(-120, 4, 0, 2, 8, 240, 0x262a24); createObstacle(120, 4, 0, 2, 8, 240, 0x262a24);
 
     createObstacle(0, 8, 0, 24, 16, 24, 0x454842); 
-    let sarco = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshStandardMaterial({ color: 0x5a4836, roughness: 0.8 }));
-    sarco.position.set(0, 19, 0); scene.add(sarco); mapObjects.push(sarco); colliders.push(new THREE.Box3().setFromObject(sarco));
-
     createObstacle(0, 6, -50, 12, 12, 12, 0x383b35);
-    createObstacle(-16, 5, -55, 10, 10, 10, 0x383b35);
-    createObstacle(16, 7, -55, 10, 14, 10, 0x383b35);
+    createObstacle(40, 4, 30, 15, 8, 15, 0x383b35);
+    createObstacle(-40, 4, -30, 15, 8, 15, 0x383b35);
 
-    spawnLoot(0, 0.4, -25, 'medkit', 0x51cf66);    
-    spawnLoot(-45, 0.4, 40, 'ammo', 0xd4a359);     
-    spawnLoot(40, 0.4, 30, 'armor', 0x4dabf7);     
-}
-
-function createObstacle(x, y, z, w, h, d, color) {
-    let mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: color, roughness: 0.8 })); 
-    mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true;
-    scene.add(mesh); mapObjects.push(mesh); colliders.push(new THREE.Box3().setFromObject(mesh));
-}
-
-function spawnLoot(x, y, z, type, colorHex) {
-    let geo = new THREE.BoxGeometry(0.6, 0.4, 0.6);
-    let mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
-    let mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y, z); scene.add(mesh);
-    lootItems.push({ mesh: mesh, type: type, x: x, y: y, z: z, baseHeight: y, seed: Math.random() * 100 });
-}
-
-function checkWallCollisions(newPos) {
-    let pr = 0.55; 
-    let playerBox = new THREE.Box3(
-        new THREE.Vector3(newPos.x - pr, newPos.y - 1.6, newPos.z - pr), 
-        new THREE.Vector3(newPos.x + pr, newPos.y + 0.2, newPos.z + pr)
-    );
-    for (let i = 0; i < colliders.length; i++) { 
-        if (playerBox.intersectsBox(colliders[i])) return true; 
-    }
-    return false;
-}
-
-function checkLootPickups() {
-    if (!yawObject || hp <= 0) return;
-    let pPos = yawObject.position;
-    
-    for (let i = lootItems.length - 1; i >= 0; i--) {
-        let item = lootItems[i];
-        let dist = pPos.distanceTo(item.mesh.position);
-        
-        if (dist < 1.5) { 
-            let pickedUp = false;
-            if (item.type === 'medkit' && hp < 100) { hp = 100; pickedUp = true; } 
-            else if (item.type === 'armor' && armor < 100) { armor = 100; pickedUp = true; } 
-            else if (item.type === 'ammo' && reserveAmmo < WEAPONS[currentWeaponKey].maxReserve) { 
-                reserveAmmo = WEAPONS[currentWeaponKey].maxReserve; 
-                pickedUp = true; 
-            }
-            
-            if (pickedUp) {
-                updateHUD();
-                let pickedMesh = item.mesh; scene.remove(pickedMesh);
-                lootItems.splice(i, 1);
-                setTimeout(() => { if (scene) { scene.add(pickedMesh); lootItems.push(item); } }, 12000);
-            }
-        }
-    }
-}
-
-function performShot() {
-    if (isReloading || hp <= 0 || !myId || isCustomizing) return;
-    let weapon = WEAPONS[currentWeaponKey];
-    if (ammo <= 0 && weapon.ammo !== Infinity) { stopAutofire(); startReload(); return; }
-    
-    if (weapon.ammo !== Infinity) ammo--;
-    updateHUD();
-
-    if(weaponMesh) { 
-        weaponMesh.position.z = -0.33; 
-        setTimeout(() => weaponMesh.position.z = -0.4, 40); 
-    }
-
-    let raycaster = new THREE.Raycaster(); 
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    let targets = [];
-    if (currentGameMode === 'coop') { 
-        for (let id in remoteBots) { targets.push(...remoteBots[id].children); } 
-    } else { 
-        for (let id in remotePlayers) { targets.push(...remotePlayers[id].children); } 
-    }
-    
-    let intersects = raycaster.intersectObjects(targets);
-    if (intersects.length > 0 && socket) {
-        let hitObj = intersects[0].object;
-        if (hitObj.userData && hitObj.userData.targetId) { 
-            socket.emit('playerHit', { targetId: hitObj.userData.targetId, zone: hitObj.userData.zone || 'body' }); 
-        }
-    }
-}
-
-function startAutofire() { 
-    if (fireIntervalId !== null) return; 
-    performShot(); 
-    fireIntervalId = setInterval(performShot, WEAPONS[currentWeaponKey].fireRate); 
-}
-function stopAutofire() { if (fireIntervalId !== null) { clearInterval(fireIntervalId); fireIntervalId = null; } }
-
-function startReload() {
-    let weapon = WEAPONS[currentWeaponKey];
-    if (isReloading || weapon.ammo === Infinity || ammo === weapon.ammo || reserveAmmo <= 0) return;
-    isReloading = true; updateHUD();
-    setTimeout(() => { 
-        let needed = weapon.ammo - ammo; 
-        let transfer = Math.min(needed, reserveAmmo); 
-        ammo += transfer; 
-        reserveAmmo -= transfer; 
-        isReloading = false; 
-        updateHUD(); 
-    }, 1200);
+    spawnLoot(10, 10, 'medkit');
+    spawnLoot(-10, -10, 'ammo');
 }
 
 function updateHUD() {
-    if(document.getElementById('val-hp')) document.getElementById('val-hp').innerText = hp;
-    if(document.getElementById('val-armor')) document.getElementById('val-armor').innerText = armor;
-    if(document.getElementById('val-ammo')) {
-        let weapon = WEAPONS[currentWeaponKey];
-        document.getElementById('val-ammo').innerText = isReloading ? `ПЕРЕЗАРЯДКА` : (weapon.ammo === Infinity ? `БЕСКОНЕЧНО` : `${ammo} / ${reserveAmmo}`);
-    }
-    if(document.getElementById('val-kills')) document.getElementById('val-kills').innerText = kills;
-}
+    let hpEl = document.getElementById('val-hp');
+    let armorEl = document.getElementById('val-armor');
+    let ammoEl = document.getElementById('val-ammo');
+    let killsEl = document.getElementById('val-kills');
+    let modeEl = document.getElementById('val-mode');
 
-document.getElementById('btn-respawn')?.addEventListener('click', () => { if(socket) socket.emit('requestRespawn'); });
-
-function loadCrosshairSettings() {
-    const crosshair = document.getElementById('game-crosshair'); if(!crosshair) return;
-    let color = localStorage.getItem('ch_color') || '#ffffff';
-    let size = localStorage.getItem('ch_size') || '5';
-    let shape = localStorage.getItem('ch_shape') || '50%';
-
-    crosshair.style.background = color;
-    crosshair.style.width = size + 'px'; crosshair.style.height = size + 'px';
-    crosshair.style.borderRadius = shape;
+    if (hpEl) hpEl.innerText = Math.max(0, hp);
+    if (armorEl) armorEl.innerText = Math.max(0, armor);
+    if (ammoEl) ammoEl.innerText = currentWeaponKey === 'knife' ? '∞' : `${ammo} / ${reserveAmmo}`;
+    if (killsEl) killsEl.innerText = kills;
+    if (modeEl) modeEl.innerText = currentGameMode.toUpperCase();
 }
 
 function setupControls() {
-    const jZone = document.getElementById('joystick-zone'), stick = document.getElementById('joystick-stick');
-    const settingsModal = document.getElementById('game-settings-modal');
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'KeyW') moveDirection.forward = 1;
+        if (e.code === 'KeyS') moveDirection.forward = -1;
+        if (e.code === 'KeyA') moveDirection.right = -1;
+        if (e.code === 'KeyD') moveDirection.right = 1;
+        if (e.code === 'Space' && isGrounded) { playerVelocity.y = JUMP_FORCE; isGrounded = false; }
+        if (e.code === 'KeyR') reloadWeapon();
+        if (e.code === 'Digit1') window.switchWeapon('knife');
+        if (e.code === 'Digit2') window.switchWeapon('pistol');
+        if (e.code === 'Digit3') window.switchWeapon('rifle');
+    });
 
-    // КЛИК ПО КНОПКЕ ШЕСТЕРЕНКИ (ОТКРЫВАЕТ МОДАЛЬНОЕ ОКНО НАСТРОЕК)
-    document.addEventListener('click', (e) => {
-        if (e.target && e.target.id === 'btn-menu-trigger') {
-            if (isCustomizing) return; 
-            stopAutofire(); 
-            if(settingsModal) {
-                if(document.getElementById('profile-nick-display')) {
-                    document.getElementById('profile-nick-display').innerText = myNick || "Сталкер";
-                }
-                settingsModal.style.display = 'flex';
-            }
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'KeyW' || e.code === 'KeyS') moveDirection.forward = 0;
+        if (e.code === 'KeyA' || e.code === 'KeyD') moveDirection.right = 0;
+    });
+
+    window.addEventListener('mousedown', (e) => {
+        if (e.button === 0 && !isCustomizing) startAutofire();
+    });
+    window.addEventListener('mouseup', () => stopAutofire());
+
+    window.addEventListener('mousemove', (e) => {
+        if (document.pointerLockElement === document.body && !isCustomizing) {
+            yawObject.rotation.y -= e.movementX * window.gameSettings.sensitivity;
+            pitchObject.rotation.x -= e.movementY * window.gameSettings.sensitivity;
+            pitchObject.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitchObject.rotation.x));
         }
     });
 
-    document.getElementById('btn-fire')?.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startAutofire(); } });
-    document.getElementById('btn-fire')?.addEventListener('touchend', (e) => { if(!isCustomizing){ e.preventDefault(); stopAutofire(); } });
-    document.getElementById('btn-reload')?.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startReload(); } });
-    document.getElementById('btn-jump')?.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); if(isGrounded) playerVelocity.y = JUMP_FORCE; } });
-    document.getElementById('btn-crouch')?.addEventListener('touchstart', (e) => { 
-        if(!isCustomizing){ e.preventDefault(); isCrouching = !isCrouching; }
-    });
-
-    if (jZone) {
-        jZone.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.stopPropagation(); let t = e.targetTouches[0]; joystickTouchId = t.identifier; updateJoystick(t); } });
-        jZone.addEventListener('touchmove', (e) => { if(!isCustomizing){ e.stopPropagation(); for(let t of e.touches) { if(t.identifier === joystickTouchId) updateJoystick(t); } } });
-        jZone.addEventListener('touchend', () => { if(!isCustomizing){ joystickTouchId = null; if(stick) stick.style.transform = `translate(0px, 0px)`; moveDirection.forward = 0; moveDirection.right = 0; } });
-    }
-
-    function updateJoystick(touch) {
-        let rect = jZone.getBoundingClientRect(); 
-        let dx = touch.clientX - (rect.left + rect.width / 2);
-        let dy = touch.clientY - (rect.top + rect.height / 2);
-        let dist = Math.sqrt(dx*dx + dy*dy); 
-        if (dist > 40) { dx = (dx / dist) * 40; dy = (dy / dist) * 40; }
-        if (stick) stick.style.transform = `translate(${dx}px, ${dy}px)`; 
-        moveDirection.forward = -(dy / 40); 
-        moveDirection.right = (dx / 40);
-    }
-
-    window.addEventListener('touchstart', (e) => { 
-        if (isCustomizing || e.target.closest('#game-settings-modal') || e.target.closest('.overlay') || e.target.closest('#game-chat') || e.target.closest('button') || e.target.closest('input')) return; 
-        for(let t of e.changedTouches) { if(lookTouchId === null) { lookTouchId = t.identifier; lastLookX = t.clientX; lastLookY = t.clientY; } } 
-    }, { passive: true });
-
-    window.addEventListener('touchmove', (e) => {
-        if (isCustomizing) return;
-        for(let t of e.changedTouches) { 
-            if(t.identifier === lookTouchId) { 
-                let dx = t.clientX - lastLookX, dy = t.clientY - lastLookY; 
-                let sens = window.gameSettings.sensitivity; 
-                yawObject.rotation.y -= dx * sens; 
-                pitchObject.rotation.x -= dy * sens; 
-                pitchObject.rotation.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitchObject.rotation.x)); 
-                lastLookX = t.clientX; lastLookY = t.clientY; 
-            } 
+    const canvas = renderer.domElement;
+    canvas.addEventListener('click', () => {
+        if (!isCustomizing && document.getElementById('game-settings-modal').style.display !== 'flex') {
+            document.body.requestPointerLock();
         }
-    }, { passive: true });
-
-    window.addEventListener('touchend', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouchId = null; } });
+    });
 }
 
-let clock = new THREE.Clock();
-function animate() {
-    requestAnimationFrame(animate); if (!renderer || !scene || !camera) return;
-    let delta = clock.getDelta(); if (delta > 0.1) delta = 0.1;
-    lootItems.forEach(item => { item.mesh.rotation.y += 1.0 * delta; item.mesh.position.y = item.baseHeight + Math.sin(Date.now() * 0.002 + item.seed) * 0.08; });
+function startAutofire() {
+    if (fireIntervalId || isReloading) return;
+    shoot();
+    let rate = WEAPONS[currentWeaponKey].fireRate;
+    fireIntervalId = setInterval(shoot, rate);
+}
 
-    if (myId && hp > 0 && !isCustomizing) {
-        playerVelocity.y -= GRAVITY * delta; let currentSpeed = isCrouching ? crouchSpeed : moveSpeed;
-        let forwardVector = new THREE.Vector3(0, 0, -1).applyQuaternion(yawObject.quaternion);
-        let sideVector = new THREE.Vector3(1, 0, 0).applyQuaternion(yawObject.quaternion);
-        let moveX = (forwardVector.x * moveDirection.forward + sideVector.x * moveDirection.right) * currentSpeed * delta;
-        let moveZ = (forwardVector.z * moveDirection.forward + sideVector.z * moveDirection.right) * currentSpeed * delta;
-        
-        let targetPos = yawObject.position.clone(); targetPos.x += moveX; if (!checkWallCollisions(targetPos)) yawObject.position.x = targetPos.x;
-        targetPos = yawObject.position.clone(); targetPos.z += moveZ; if (!checkWallCollisions(targetPos)) yawObject.position.z = targetPos.z;
-        
-        yawObject.position.y += playerVelocity.y * delta;
-        let targetHeight = isCrouching ? 0.9 : 1.7;
-        if (yawObject.position.y <= targetHeight) { playerVelocity.y = 0; yawObject.position.y = targetHeight; isGrounded = true; } else { isGrounded = false; }
-        
-        if(socket && socket.connected) socket.emit('playerMove', { x: yawObject.position.x, z: yawObject.position.z, rotY: yawObject.rotation.y });
+function stopAutofire() {
+    if (fireIntervalId) { clearInterval(fireIntervalId); fireIntervalId = null; }
+}
+
+function reloadWeapon() {
+    if (isReloading || currentWeaponKey === 'knife' || reserveAmmo <= 0 || ammo === WEAPONS[currentWeaponKey].ammo) return;
+    isReloading = true;
+    setTimeout(() => {
+        let needed = WEAPONS[currentWeaponKey].ammo - ammo;
+        let took = Math.min(needed, reserveAmmo);
+        ammo += took;
+        reserveAmmo -= took;
+        weaponState[currentWeaponKey].ammo = ammo;
+        weaponState[currentWeaponKey].reserve = reserveAmmo;
+        isReloading = false;
+        updateHUD();
+    }, 1500);
+}
+
+function shoot() {
+    if (hp <= 0 || isReloading) return;
+    if (currentWeaponKey !== 'knife' && ammo <= 0) { reloadWeapon(); return; }
+
+    if (currentWeaponKey !== 'knife') {
+        ammo--;
+        weaponState[currentWeaponKey].ammo = ammo;
+        updateHUD();
     }
+
+    if (weaponMesh) {
+        weaponMesh.position.z += 0.05;
+        setTimeout(() => { if (weaponMesh) weaponMesh.position.z -= 0.05; }, 50);
+    }
+
+    let raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+    let targets = [];
+    for (let id in remotePlayers) remotePlayers[id].traverse(c => { if(c.isMesh) targets.push(c); });
+    for (let id in remoteBots) remoteBots[id].traverse(c => { if(c.isMesh) targets.push(c); });
+
+    let intersects = raycaster.intersectObjects(targets);
+    if (intersects.length > 0) {
+        let hit = intersects[0];
+        let targetGroup = hit.object;
+        while (targetGroup.parent && !targetGroup.userData.targetId) {
+            targetGroup = targetGroup.parent;
+        }
+        let targetId = targetGroup.userData ? targetGroup.userData.targetId : null;
+        if (targetId && socket) {
+            let isHead = hit.object.userData && hit.object.userData.zone === 'head';
+            let dmg = WEAPONS[currentWeaponKey].damage * (isHead ? 2 : 1);
+            socket.emit('shootHit', { targetId: targetId, damage: dmg });
+        }
+    }
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    let delta = 0.016;
+    
+    // Физика и движение
+    playerVelocity.y -= GRAVITY * delta;
+    
+    let moveVector = new THREE.Vector3(moveDirection.right, 0, -moveDirection.forward).normalize();
+    moveVector.applyQuaternion(yawObject.quaternion);
+    
+    let speed = isCrouching ? crouchSpeed : moveSpeed;
+    yawObject.position.x += moveVector.x * speed * delta;
+    yawObject.position.z += moveVector.z * speed * delta;
+    yawObject.position.y += playerVelocity.y * delta;
+
+    if (yawObject.position.y <= 3.0) {
+        yawObject.position.y = 3.0;
+        playerVelocity.y = 0;
+        isGrounded = true;
+    }
+
+    if (socket && socket.connected) {
+        socket.emit('playerMove', {
+            x: yawObject.position.x,
+            y: yawObject.position.y,
+            z: yawObject.position.z,
+            rotY: yawObject.rotation.y,
+            pitch: pitchObject.rotation.x
+        });
+    }
+
     renderer.render(scene, camera);
 }
 
-window.addEventListener('resize', () => { if(camera && renderer) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } });
+function loadHUDPositions() {}
+function loadCrosshairSettings() {}
