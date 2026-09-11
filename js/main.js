@@ -1,5 +1,5 @@
 // ============================================================================
-// GAME CLIENT CORE: S.T.A.L.K.E.R. Zone Atmosphere Edition (Unified main.js)
+// GAME CLIENT CORE: S.T.A.L.K.E.R. Zone Atmosphere Edition (Fixed HUD & Weapons)
 // ============================================================================
 
 const DEFAULT_SERVER_URL = "https://pvp-arena-online.onrender.com"; 
@@ -14,7 +14,7 @@ let hp = 100, armor = 100, kills = 0, isReloading = false;
 const WEAPONS = {
     knife: { name: "Нож", damage: 35, fireRate: 500, ammo: Infinity, maxReserve: 0, range: 2.0 },
     pistol: { name: "ПМ", damage: 25, fireRate: 300, ammo: 8, maxReserve: 32, range: 50 },
-    rifle: { name: "АК-74", damage: 45, fireRate: 110, ammo: 30, maxReserve: 120, range: 100 }
+    rifle: { name: "АК-47", damage: 45, fireRate: 110, ammo: 30, maxReserve: 120, range: 100 }
 };
 let currentWeaponKey = 'rifle';
 let ammo = WEAPONS['rifle'].ammo;
@@ -52,13 +52,13 @@ window.gameSettings = { sensitivity: 0.0035, hudScale: 1.0 };
 
 window.selectGameMode = function(mode) {
     currentGameMode = mode;
-    const btnCoop = document.getElementById('mode-coop-select');
-    const btnPvp = document.getElementById('mode-pvp-select');
-    const btnSurv = document.getElementById('mode-survival-select');
+    const btnCoop = document.getElementById('menu-mode-coop');
+    const btnPvp = document.getElementById('menu-mode-pvp');
+    const btnSurv = document.getElementById('menu-mode-surv');
 
-    if (btnCoop) btnCoop.classList.toggle('active', mode === 'coop');
-    if (btnPvp) btnPvp.classList.toggle('active', mode === 'pvp');
-    if (btnSurv) btnSurv.classList.toggle('active', mode === 'survival');
+    if (btnCoop) btnCoop.style.background = mode === 'coop' ? '#386641' : '#2b3a28';
+    if (btnPvp) btnPvp.style.background = mode === 'pvp' ? '#bc6c25' : '#2b3a28';
+    if (btnSurv) btnSurv.style.background = mode === 'survival' ? '#386641' : '#2b3a28';
 };
 
 window.switchWeapon = function(weaponKey) {
@@ -69,6 +69,13 @@ window.switchWeapon = function(weaponKey) {
     currentWeaponKey = weaponKey;
     ammo = weaponState[weaponKey].ammo;
     reserveAmmo = weaponState[weaponKey].reserve;
+    
+    // Подсветка активного оружия в интерфейсе
+    ['knife', 'pistol', 'rifle'].forEach(w => {
+        let el = document.getElementById(`slot-${w}`);
+        if(el) el.style.border = w === weaponKey ? '2px solid #d4a359' : '1px solid #333931';
+    });
+
     updateHUD();
     updateWeaponMesh(weaponKey);
 };
@@ -150,47 +157,46 @@ function createCharacterLabel(text, hp, armor, isEnemy) {
     return sprite;
 }
 
-// Полноценное главное меню вместо маленького плавающего окна
+// Полноценное главное меню при входе
 function initAuthScreen() {
     const authScreen = document.getElementById('auth-screen');
     if (!authScreen) return;
 
     authScreen.innerHTML = `
-        <div class="auth-wrapper" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: linear-gradient(rgba(10,12,10,0.85), rgba(10,12,10,0.95)), url('') center/cover; display: flex; justify-content: center; align-items: center; z-index: 9999; font-family: monospace; color: #e6dfcc;">
-            <div class="auth-container" style="background: rgba(18, 20, 18, 0.95); padding: 35px; border-radius: 10px; border: 1px solid #434c3e; width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
-                <h1 style="margin-top: 0; color: #d4a359; text-align: center; letter-spacing: 3px; font-size: 24px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">S.T.A.L.K.E.R: ЧЗО</h1>
-                <div style="font-size: 11px; text-align: center; color: #8d99ae; margin-bottom: 25px; letter-spacing: 1px;">PVP ARENA & COOP SURVIVAL</div>
+        <div class="auth-wrapper" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: linear-gradient(rgba(10,12,10,0.88), rgba(10,12,10,0.96)), #111; display: flex; justify-content: center; align-items: center; z-index: 9999; font-family: monospace; color: #e6dfcc;">
+            <div class="auth-container" style="background: rgba(18, 20, 18, 0.95); padding: 30px; border-radius: 10px; border: 1px solid #434c3e; width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
+                <h1 style="margin-top: 0; color: #d4a359; text-align: center; letter-spacing: 3px; font-size: 22px;">S.T.A.L.K.E.R: ЧЗО</h1>
+                <div style="font-size: 11px; text-align: center; color: #8d99ae; margin-bottom: 20px; letter-spacing: 1px;">PVP ARENA & COOP SURVIVAL</div>
                 
-                <div style="margin-bottom: 15px;">
-                    <label style="font-size: 12px; color: #a3b18a; display: block; margin-bottom: 5px;">ПОЗЫВНОЙ СТАЛКЕРА</label>
-                    <input type="text" id="input-nick" placeholder="Введите позывной..." maxlength="15" style="width: 100%; padding: 12px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 5px; box-sizing: border-box; font-size: 14px;">
+                <div style="margin-bottom: 12px;">
+                    <label style="font-size: 11px; color: #a3b18a; display: block; margin-bottom: 4px;">ПОЗЫВНОЙ СТАЛКЕРА</label>
+                    <input type="text" id="input-nick" placeholder="Введите позывной..." maxlength="15" style="width: 100%; padding: 10px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 5px; box-sizing: border-box; font-size: 14px;">
                 </div>
 
-                <div style="margin-bottom: 15px;">
-                    <label style="font-size: 12px; color: #a3b18a; display: block; margin-bottom: 5px;">ВЫБОР СЕРВЕРА</label>
-                    <select id="select-server" style="width: 100%; padding: 12px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 5px; box-sizing: border-box; font-size: 14px;">
+                <div style="margin-bottom: 12px;">
+                    <label style="font-size: 11px; color: #a3b18a; display: block; margin-bottom: 4px;">ВЫБОР СЕРВЕРА</label>
+                    <select id="select-server" style="width: 100%; padding: 10px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 5px; box-sizing: border-box; font-size: 13px;">
                         <option value="https://pvp-arena-online.onrender.com">Основной Сервер (Render RU)</option>
                         <option value="https://pvp-arena-backup.onrender.com">Резервный Сервер</option>
                     </select>
                 </div>
 
-                <div style="margin-bottom: 20px; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 5px; border: 1px solid #2a2e28;">
-                    <label style="font-size: 12px; color: #d4a359; font-weight: bold; display: block; margin-bottom: 6px;">ОТРЯД И ДРУЗЬЯ</label>
-                    <input type="text" id="input-lobby" placeholder="ID Лобби / Комнаты (оставьте пустым)" style="width: 100%; padding: 10px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 4px; box-sizing: border-box; margin-bottom: 6px; font-size: 13px;">
-                    <div id="friends-list-container" style="font-size: 11px; color: #8d99ae;">Статусы друзей: <span style="color: #51cf66;">Поиск сети...</span></div>
+                <div style="margin-bottom: 15px; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 5px; border: 1px solid #2a2e28;">
+                    <label style="font-size: 11px; color: #d4a359; font-weight: bold; display: block; margin-bottom: 4px;">ОТРЯД И ДРУЗЬЯ</label>
+                    <input type="text" id="input-lobby" placeholder="ID Лобби (оставьте пустым)" style="width: 100%; padding: 8px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 4px; box-sizing: border-box; font-size: 12px;">
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    <label style="font-size: 12px; color: #a3b18a; display: block; margin-bottom: 5px;">РЕЖИМ ИГРЫ</label>
-                    <div style="display: flex; gap: 8px;">
-                        <button type="button" id="menu-mode-surv" onclick="window.selectGameMode('survival')" style="flex: 1; padding: 8px; background: #386641; border: none; color: #fff; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;">Выживание</button>
-                        <button type="button" id="menu-mode-coop" onclick="window.selectGameMode('coop')" style="flex: 1; padding: 8px; background: #2b3a28; border: none; color: #a3b18a; border-radius: 4px; cursor: pointer; font-size: 11px;">Мутанты</button>
-                        <button type="button" id="menu-mode-pvp" onclick="window.selectGameMode('pvp')" style="flex: 1; padding: 8px; background: #2b3a28; border: none; color: #a3b18a; border-radius: 4px; cursor: pointer; font-size: 11px;">PvP Бой</button>
+                    <label style="font-size: 11px; color: #a3b18a; display: block; margin-bottom: 4px;">РЕЖИМ ИГРЫ</label>
+                    <div style="display: flex; gap: 6px;">
+                        <button type="button" id="menu-mode-surv" onclick="window.selectGameMode('survival')" style="flex: 1; padding: 8px; background: #386641; border: none; color: #fff; border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: bold;">Выживание</button>
+                        <button type="button" id="menu-mode-coop" onclick="window.selectGameMode('coop')" style="flex: 1; padding: 8px; background: #2b3a28; border: none; color: #a3b18a; border-radius: 4px; cursor: pointer; font-size: 10px;">Мутанты</button>
+                        <button type="button" id="menu-mode-pvp" onclick="window.selectGameMode('pvp')" style="flex: 1; padding: 8px; background: #2b3a28; border: none; color: #a3b18a; border-radius: 4px; cursor: pointer; font-size: 10px;">PvP Бой</button>
                     </div>
                 </div>
 
-                <button id="btn-auth" style="width: 100%; padding: 14px; background: #bc6c25; color: white; border: none; font-weight: bold; border-radius: 5px; cursor: pointer; letter-spacing: 1.5px; font-size: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">ВОЙТИ В ЗОНУ</button>
-                <div id="auth-status" style="margin-top: 12px; font-size: 12px; color: #8d99ae; text-align: center;">Готово к подключению КПК</div>
+                <button id="btn-auth" style="width: 100%; padding: 13px; background: #bc6c25; color: white; border: none; font-weight: bold; border-radius: 5px; cursor: pointer; letter-spacing: 1.5px; font-size: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">ВОЙТИ В ЗОНУ</button>
+                <div id="auth-status" style="margin-top: 10px; font-size: 11px; color: #8d99ae; text-align: center;">Готово к подключению КПК</div>
             </div>
         </div>
     `;
@@ -208,7 +214,7 @@ function initAuthScreen() {
         myNick = nickname;
         localStorage.setItem('stalker_nick', myNick);
 
-        // Автоматический запрос полноэкранного режима при входе в игру
+        // Автоматический полноэкранный режим при входе
         const docEl = document.documentElement;
         if (docEl.requestFullscreen) {
             docEl.requestFullscreen().catch(err => console.log("Fullscreen request blocked:", err));
@@ -228,9 +234,7 @@ function connectToServer(lobbyId) {
     if(statusText) statusText.innerText = "Подключение к КПК Зоны...";
     if(authBtn) { authBtn.disabled = true; authBtn.innerText = "УСТАНОВКА СВЯЗИ..."; }
 
-    if (socket) {
-        socket.disconnect();
-    }
+    if (socket) socket.disconnect();
 
     socket = io(SERVER_URL, {
         transports: ['polling', 'websocket'],
@@ -242,9 +246,7 @@ function connectToServer(lobbyId) {
         query: { nick: myNick, lobby: lobbyId || '', mode: currentGameMode }
     });
 
-    socket.on('connect', () => { 
-        if(statusText) statusText.innerText = "Сигнал получен. Инициализация мира..."; 
-    });
+    socket.on('connect', () => { if(statusText) statusText.innerText = "Сигнал получен. Инициализация мира..."; });
 
     socket.on('connect_error', (error) => {
         if(statusText) statusText.innerText = `Ошибка КПК: ${error.message}`;
@@ -273,31 +275,7 @@ function connectToServer(lobbyId) {
             log.scrollTop = log.scrollHeight; 
         }
     });
-    
-    socket.on('timerUpdate', (data) => { 
-        const timerText = document.getElementById('hud-timer');
-        const skipBtn = document.getElementById('btn-skip-break');
-        if (!timerText) return;
-        timerText.style.display = "block";
 
-        if (currentGameMode === 'coop') {
-            if (data.isBreak) {
-                timerText.innerHTML = `ПЕРЕРЫВ<br>${data.timeLeft}с`;
-                if(skipBtn) { skipBtn.style.display = 'block'; document.getElementById('skip-votes-count').innerText = data.votes || 0; }
-            } else {
-                timerText.innerHTML = `ВОЛНА ${data.wave}<br>МУТАНТОВ: ${data.timeLeft}`;
-                if(skipBtn) skipBtn.style.display = 'none';
-            }
-        } else if (currentGameMode === 'survival') {
-            timerText.innerHTML = `ВЫЖИВАНИЕ<br>ИССЛЕДОВАНИЕ`;
-            if(skipBtn) skipBtn.style.display = 'none';
-        } else {
-            timerText.innerHTML = `БОЙ В ЗОНЕ<br>МАТЧ`;
-            if(skipBtn) skipBtn.style.display = 'none';
-        }
-    });
-
-    socket.on('waveCleared', () => { stopAutofire(); hp = 100; armor = 100; reserveAmmo = WEAPONS[currentWeaponKey].maxReserve; updateHUD(); });
     socket.on('damagedBy', (data) => { triggerDamageFlash(); if (data && data.shooterX !== undefined) createDamageArrow(data.shooterX, data.shooterZ); });
 
     socket.on('updatePlayers', (serverPlayers) => {
@@ -337,12 +315,7 @@ function connectToServer(lobbyId) {
     });
 
     socket.on('updateBots', (serverBots) => {
-        if (!scene) return;
-        if (currentGameMode === 'survival') {
-            for (let id in remoteBots) { scene.remove(remoteBots[id]); delete remoteBots[id]; }
-            return;
-        }
-
+        if (!scene || currentGameMode === 'survival') return;
         for (let id in serverBots) {
             let bData = serverBots[id];
             if (bData.x === undefined || bData.z === undefined) continue;
@@ -361,22 +334,16 @@ function connectToServer(lobbyId) {
                 group.traverse(child => { if(!child.userData) child.userData = {}; child.userData.targetId = id; });
                 scene.add(group); remoteBots[id] = group;
             }
-            
             if (remoteBots[id]) {
                 remoteBots[id].position.set(bData.x, 0, bData.z); 
                 if (bData.rotY) remoteBots[id].rotation.y = bData.rotY;
-                
                 let oldLabel = remoteBots[id].getObjectByName("bot_label"); 
                 if (oldLabel) remoteBots[id].remove(oldLabel);
-                
                 let newLabel = createCharacterLabel("МУТАНТ", bData.hp || 100, 0, true);
                 newLabel.position.y = 2.8; newLabel.name = "bot_label"; remoteBots[id].add(newLabel);
             }
         }
-        
-        for (let id in remoteBots) { 
-            if (!serverBots[id]) { scene.remove(remoteBots[id]); delete remoteBots[id]; } 
-        }
+        for (let id in remoteBots) { if (!serverBots[id]) { scene.remove(remoteBots[id]); delete remoteBots[id]; } }
     });
 }
 
@@ -385,20 +352,11 @@ function updateMinimap(serverPlayers, currentBots) {
     document.querySelectorAll('.radar-dot:not(.dot-me)').forEach(el => el.remove());
     const radarRadius = 55; const mapScale = 1.0;
     let myX = yawObject.position.x; let myZ = yawObject.position.z; let myRot = yawObject.rotation.y;
-    let doEnemyPing = false; if (Date.now() - lastRadarPingTime > RADAR_PING_INTERVAL) { doEnemyPing = true; lastRadarPingTime = Date.now(); }
 
     for (let id in serverPlayers) {
         if (id === socket.id || serverPlayers[id].hp <= 0) continue;
         let className = currentGameMode === 'pvp' ? 'dot-enemy' : 'dot-teammate';
-        let dot = createRadarDot(serverPlayers[id].x, serverPlayers[id].z, myX, myZ, myRot, radarRadius, mapScale, className, radar);
-        if(dot && currentGameMode === 'pvp') { dot.style.opacity = '1'; setTimeout(() => { if(dot) dot.style.opacity = '0'; }, 1800); }
-    }
-    if (currentGameMode === 'coop') {
-        for (let id in currentBots) {
-            let botPos = currentBots[id].position;
-            let dot = createRadarDot(botPos.x, botPos.z, myX, myZ, myRot, radarRadius, mapScale, 'dot-enemy', radar);
-            if (dot && doEnemyPing) { dot.style.opacity = '1'; setTimeout(() => { if(dot) dot.style.opacity = '0'; }, 1800); }
-        }
+        createRadarDot(serverPlayers[id].x, serverPlayers[id].z, myX, myZ, myRot, radarRadius, mapScale, className, radar);
     }
 }
 
@@ -410,7 +368,7 @@ function createRadarDot(objX, objZ, myX, myZ, myRot, radarRadius, mapScale, clas
     if (dist < radarRadius - 4) {
         let dot = document.createElement('div'); dot.className = `radar-dot ${className}`;
         dot.style.position = 'absolute'; dot.style.width = '4px'; dot.style.height = '4px'; dot.style.borderRadius = '50%';
-        if(className==='dot-teammate') dot.style.background = '#4dabf7'; else dot.style.background = '#ff6b6b';
+        dot.style.background = className === 'dot-teammate' ? '#4dabf7' : '#ff6b6b';
         dot.style.left = pixelX + 'px'; dot.style.top = pixelY + 'px';
         radarContainer.appendChild(dot); return dot;
     }
@@ -432,11 +390,12 @@ function createDamageArrow(shooterX, shooterZ) {
     setTimeout(() => { arrow.style.opacity = '0'; setTimeout(() => { clearInterval(interval); arrow.remove(); }, 800); }, 800);
 }
 
+// Автоматическая инъекция недостающих кнопок интерфейса прямо в DOM при запуске
 window.addEventListener('DOMContentLoaded', () => {
+    injectMissingHUDUI();
     initAuthScreen();
     initEngine(); 
     setupControls(); 
-    fixJoystickPosition(); 
     loadHUDPositions(); 
     loadCrosshairSettings();
     
@@ -451,21 +410,54 @@ window.addEventListener('DOMContentLoaded', () => {
     if (savedScale) { window.gameSettings.hudScale = parseFloat(savedScale); document.getElementById('scale-slider').value = savedScale; applyHUDScale(savedScale); }
 });
 
-function applyHUDScale(scale) { document.getElementById('hud-scalable-wrapper').style.transform = `scale(${scale})`; }
-
-function fixJoystickPosition() {
-    const jZone = document.getElementById('joystick-zone');
-    if (jZone) {
-        jZone.style.position = 'absolute'; jZone.style.bottom = '40px'; jZone.style.left = '40px';
-        jZone.style.top = 'auto'; jZone.style.right = 'auto'; jZone.style.transform = 'none';
+// Добавляет панели оружия сверху по центру (как счетчик килов в CS) и кнопку меню настроек
+function injectMissingHUDUI() {
+    const wrapper = document.getElementById('hud-scalable-wrapper') || document.body;
+    
+    if (!document.getElementById('cs-top-scoreboard')) {
+        const topBoard = document.createElement('div');
+        topBoard.id = 'cs-top-scoreboard';
+        topBoard.className = 'hud-element';
+        topBoard.style.cssText = 'position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(18,20,18,0.85); border: 1px solid #333931; padding: 6px 15px; border-radius: 4px; display: flex; gap: 20px; align-items: center; color: #e6dfcc; font-family: monospace; font-size: 13px; z-index: 1000;';
+        topBoard.innerHTML = `
+            <div>ЗОНА: <span id="val-mode" style="color: #d4a359; font-weight: bold;">ПВП АРЕНА</span></div>
+            <div style="border-left: 1px solid #444; padding-left: 15px;">УБИЙСТВА: <span id="val-kills" style="color: #51cf66; font-weight: bold;">0</span></div>
+        `;
+        wrapper.appendChild(topBoard);
     }
+
+    if (!document.getElementById('weapon-slots-bar')) {
+        const weaponBar = document.createElement('div');
+        weaponBar.id = 'weapon-slots-bar';
+        weaponBar.className = 'hud-element';
+        weaponBar.style.cssText = 'position: fixed; top: 10px; right: 20px; display: flex; gap: 8px; z-index: 1000; font-family: monospace;';
+        weaponBar.innerHTML = `
+            <div id="slot-knife" onclick="window.switchWeapon('knife')" style="background: rgba(18,20,18,0.8); border: 1px solid #333931; padding: 6px 10px; border-radius: 4px; color: #a3b18a; font-size: 11px; cursor: pointer;">НОЖ</div>
+            <div id="slot-pistol" onclick="window.switchWeapon('pistol')" style="background: rgba(18,20,18,0.8); border: 1px solid #333931; padding: 6px 10px; border-radius: 4px; color: #a3b18a; font-size: 11px; cursor: pointer;">ПМ</div>
+            <div id="slot-rifle" onclick="window.switchWeapon('rifle')" style="background: rgba(18,20,18,0.8); border: 2px solid #d4a359; padding: 6px 10px; border-radius: 4px; color: #e6dfcc; font-size: 11px; cursor: pointer;">АК-47</div>
+        `;
+        wrapper.appendChild(weaponBar);
+    }
+
+    if (!document.getElementById('btn-menu-trigger')) {
+        const menuBtn = document.createElement('div');
+        menuBtn.id = 'btn-menu-trigger';
+        menuBtn.className = 'hud-element';
+        menuBtn.style.cssText = 'position: fixed; top: 10px; left: 20px; background: rgba(18,20,18,0.8); border: 1px solid #333931; width: 36px; height: 36px; border-radius: 4px; display: flex; justify-content: center; align-items: center; color: #d4a359; font-size: 18px; cursor: pointer; z-index: 1000; font-family: monospace;';
+        menuBtn.innerHTML = '⚙️';
+        wrapper.appendChild(menuBtn);
+    }
+}
+
+function applyHUDScale(scale) { 
+    const el = document.getElementById('hud-scalable-wrapper');
+    if(el) el.style.transform = `scale(${scale})`; 
 }
 
 function initEngine() {
     const container = document.getElementById('canvas-container'); if (!container) return;
     scene = new THREE.Scene(); 
     
-    // Исправлено освещение и мягкий туман зоны
     scene.background = new THREE.Color(0x3a403b); 
     scene.fog = new THREE.FogExp2(0x3a403b, 0.012);
 
@@ -478,7 +470,6 @@ function initEngine() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
     
-    // Свет: полусферический амбиент + яркий направленный солнце-свет
     scene.add(new THREE.HemisphereLight(0xddeeff, 0x334422, 0.7));
     let dirLight = new THREE.DirectionalLight(0xfff5e6, 0.9); 
     dirLight.position.set(40, 80, 40); 
@@ -516,25 +507,9 @@ function buildMap() {
     createObstacle(-16, 5, -55, 10, 10, 10, 0x383b35);
     createObstacle(16, 7, -55, 10, 14, 10, 0x383b35);
 
-    for(let i = 0; i < 8; i++) {
-        let rx = -45 + (i % 3) * 8; let rz = -10 + Math.floor(i / 3) * 10;
-        createObstacle(rx, 3, rz, 3, 6, 3, 0x5a3320);
-    }
-
-    createObstacle(-50, 15, 45, 40, 30, 3, 0x362c24);
-    createObstacle(40, 3, 40, 16, 6, 16, 0x222520);
-    createObstacle(45, 0.2, -10, 30, 0.4, 30, 0x222b20);
-    createObstacle(45, 2, -10, 6, 4, 6, 0x453b2e);
-    createObstacle(-35, 1.5, -45, 5, 3, 5, 0x453b2e); 
-    createObstacle(25, 1.5, -45, 5, 3, 5, 0x453b2e);  
-    createObstacle(20, 2.5, 15, 12, 5, 12, 0x32362c);
-    createObstacle(-20, 2.5, 20, 12, 5, 12, 0x32362c);
-
     spawnLoot(0, 0.4, -25, 'medkit', 0x51cf66);    
     spawnLoot(-45, 0.4, 40, 'ammo', 0xd4a359);     
     spawnLoot(40, 0.4, 30, 'armor', 0x4dabf7);     
-    spawnLoot(-40, 0.4, -10, 'medkit', 0x51cf66);  
-    spawnLoot(45, 0.4, -10, 'ammo', 0xd4a359);     
 }
 
 function createObstacle(x, y, z, w, h, d, color) {
@@ -583,10 +558,7 @@ function checkLootPickups() {
                 updateHUD();
                 let pickedMesh = item.mesh; scene.remove(pickedMesh);
                 lootItems.splice(i, 1);
-                
-                setTimeout(() => {
-                    if (scene) { scene.add(pickedMesh); lootItems.push(item); }
-                }, 12000);
+                setTimeout(() => { if (scene) { scene.add(pickedMesh); lootItems.push(item); } }, 12000);
             }
         }
     }
@@ -597,9 +569,7 @@ function performShot() {
     let weapon = WEAPONS[currentWeaponKey];
     if (ammo <= 0 && weapon.ammo !== Infinity) { stopAutofire(); startReload(); return; }
     
-    if (weapon.ammo !== Infinity) {
-        ammo--;
-    }
+    if (weapon.ammo !== Infinity) ammo--;
     updateHUD();
 
     if(weaponMesh) { 
@@ -632,18 +602,6 @@ function startAutofire() {
 }
 function stopAutofire() { if (fireIntervalId !== null) { clearInterval(fireIntervalId); fireIntervalId = null; } }
 
-function setupChatControls() {
-    const chatInput = document.getElementById('chat-input');
-    if (chatInput) {
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && chatInput.value.trim() !== '') {
-                if (socket && socket.connected) { socket.emit('sendChatMessage', { msg: chatInput.value.trim() }); }
-                chatInput.value = ''; chatInput.blur(); 
-            }
-        });
-    }
-}
-
 function startReload() {
     let weapon = WEAPONS[currentWeaponKey];
     if (isReloading || weapon.ammo === Infinity || ammo === weapon.ammo || reserveAmmo <= 0) return;
@@ -668,8 +626,7 @@ function updateHUD() {
     if(document.getElementById('val-kills')) document.getElementById('val-kills').innerText = kills;
 }
 
-document.getElementById('btn-respawn').addEventListener('click', () => { if(socket) socket.emit('requestRespawn'); });
-if(document.getElementById('btn-skip-break')) document.getElementById('btn-skip-break').addEventListener('click', () => { if(socket && socket.connected) socket.emit('skipBreakVote'); });
+document.getElementById('btn-respawn')?.addEventListener('click', () => { if(socket) socket.emit('requestRespawn'); });
 
 function loadCrosshairSettings() {
     const crosshair = document.getElementById('game-crosshair'); if(!crosshair) return;
@@ -680,83 +637,46 @@ function loadCrosshairSettings() {
     crosshair.style.background = color;
     crosshair.style.width = size + 'px'; crosshair.style.height = size + 'px';
     crosshair.style.borderRadius = shape;
-
-    if(document.getElementById('crosshair-color')) document.getElementById('crosshair-color').value = color;
-    if(document.getElementById('crosshair-size')) document.getElementById('crosshair-size').value = size;
-    if(document.getElementById('crosshair-size-val')) document.getElementById('crosshair-size-val').innerText = size + 'px';
-    if(document.getElementById('crosshair-shape')) document.getElementById('crosshair-shape').value = shape;
 }
 
 function setupControls() {
     const jZone = document.getElementById('joystick-zone'), stick = document.getElementById('joystick-stick');
-    const menuTrigger = document.getElementById('btn-menu-trigger'), customMenu = document.getElementById('customizer-menu');
+    const customMenu = document.getElementById('customizer-menu');
 
-    setupChatControls();
-
-    if(document.getElementById('scale-slider')) {
-        document.getElementById('scale-slider').addEventListener('input', (e) => {
-            let val = e.target.value; window.gameSettings.hudScale = parseFloat(val); applyHUDScale(val); localStorage.setItem('game_hud_scale', val);
-        });
-    }
-
-    const crosshair = document.getElementById('game-crosshair');
-    if(document.getElementById('crosshair-color')) {
-        document.getElementById('crosshair-color').addEventListener('input', (e) => { if(crosshair) crosshair.style.background = e.target.value; });
-    }
-    if(document.getElementById('crosshair-size')) {
-        document.getElementById('crosshair-size').addEventListener('input', (e) => { if(crosshair) { crosshair.style.width = e.target.value+'px'; crosshair.style.height = e.target.value+'px'; document.getElementById('crosshair-size-val').innerText = e.target.value+'px'; } });
-    }
-    if(document.getElementById('crosshair-shape')) {
-        document.getElementById('crosshair-shape').addEventListener('change', (e) => { if(crosshair) crosshair.style.borderRadius = e.target.value; });
-    }
-
-    if (menuTrigger) {
-        menuTrigger.addEventListener('touchstart', (e) => {
-            e.preventDefault(); e.stopPropagation(); if (isCustomizing) return; 
+    // Навешиваем клик на кнопку шестеренки для открытия настроек HUD
+    document.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'btn-menu-trigger') {
+            if (isCustomizing) return; 
             isCustomizing = true; stopAutofire(); 
-            if(document.getElementById('menu-user-nick')) document.getElementById('menu-user-nick').innerText = myNick || "Сталкер";
-            const modeBadge = document.getElementById('menu-user-mode');
-            if (modeBadge) {
-                if (currentGameMode === 'coop') { modeBadge.innerText = "РЕЖИМ: ОХОТА НА МУТАНТОВ"; modeBadge.style.color = "#51cf66"; } 
-                else if (currentGameMode === 'survival') { modeBadge.innerText = "РЕЖИМ: ВЫЖИВАНИЕ"; modeBadge.style.color = "#d4a359"; }
-                else { modeBadge.innerText = "РЕЖИМ: БОЙ В ЗОНЕ"; modeBadge.style.color = "#ff6b6b"; }
-            }
-            document.body.classList.add('edit-mode'); if(customMenu) customMenu.style.display = 'block';
-        });
-    }
+            if(customMenu) customMenu.style.display = 'block';
+            document.body.classList.add('edit-mode');
+        }
+    });
 
     if(document.getElementById('btn-save-hud')) {
         document.getElementById('btn-save-hud').addEventListener('click', () => { 
             isCustomizing = false; document.body.classList.remove('edit-mode'); if(customMenu) customMenu.style.display = 'none'; 
-            saveHUDPositions(); fixJoystickPosition();
-            if(document.getElementById('crosshair-color')) localStorage.setItem('ch_color', document.getElementById('crosshair-color').value);
-            if(document.getElementById('crosshair-size')) localStorage.setItem('ch_size', document.getElementById('crosshair-size').value);
-            if(document.getElementById('crosshair-shape')) localStorage.setItem('ch_shape', document.getElementById('crosshair-shape').value);
+            saveHUDPositions();
         });
     }
 
     if(document.getElementById('btn-fullscreen-toggle')) {
-        document.getElementById('btn-fullscreen-toggle').addEventListener('touchstart', (e) => {
-            e.preventDefault(); e.stopPropagation();
+        document.getElementById('btn-fullscreen-toggle').addEventListener('click', () => {
             const docEl = document.documentElement;
-            const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
-            if (!isFullscreen) {
+            if (!document.fullscreenElement) {
                 if (docEl.requestFullscreen) docEl.requestFullscreen().catch(err => console.log(err));
-                else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
             } else {
                 if (document.exitFullscreen) document.exitFullscreen();
-                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
             }
-            setTimeout(() => { if (camera && renderer) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } }, 300);
-        }, { passive: false });
+        });
     }
 
-    document.getElementById('btn-fire').addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startAutofire(); } });
-    document.getElementById('btn-fire').addEventListener('touchend', (e) => { if(!isCustomizing){ e.preventDefault(); stopAutofire(); } });
-    document.getElementById('btn-reload').addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startReload(); } });
-    document.getElementById('btn-jump').addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); if(isGrounded) playerVelocity.y = JUMP_FORCE; } });
-    document.getElementById('btn-crouch').addEventListener('touchstart', (e) => { 
-        if(!isCustomizing){ e.preventDefault(); isCrouching = !isCrouching; document.getElementById('btn-crouch').style.backgroundColor = isCrouching ? "rgba(180, 140, 80, 0.5)" : "rgba(35, 38, 33, 0.5)"; }
+    document.getElementById('btn-fire')?.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startAutofire(); } });
+    document.getElementById('btn-fire')?.addEventListener('touchend', (e) => { if(!isCustomizing){ e.preventDefault(); stopAutofire(); } });
+    document.getElementById('btn-reload')?.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startReload(); } });
+    document.getElementById('btn-jump')?.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); if(isGrounded) playerVelocity.y = JUMP_FORCE; } });
+    document.getElementById('btn-crouch')?.addEventListener('touchstart', (e) => { 
+        if(!isCustomizing){ e.preventDefault(); isCrouching = !isCrouching; }
     });
 
     if (jZone) {
@@ -796,26 +716,6 @@ function setupControls() {
     }, { passive: true });
 
     window.addEventListener('touchend', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouchId = null; } });
-
-    let dragElement = null, dragOffsetX = 0, dragOffsetY = 0;
-    document.querySelectorAll('.hud-element').forEach(el => {
-        if (el.id === "game-crosshair" || el.id === "joystick-zone") return; 
-        el.addEventListener('touchstart', (e) => { 
-            if (!isCustomizing || el.id === "btn-menu-trigger") return; 
-            dragElement = el; let touch = e.touches[0]; let rect = el.getBoundingClientRect(); 
-            dragOffsetX = touch.clientX - rect.left; dragOffsetY = touch.clientY - rect.top; 
-            el.style.transform = "none"; 
-        });
-    });
-    window.addEventListener('touchmove', (e) => { 
-        if (!isCustomizing || !dragElement) return; 
-        let touch = e.touches[0]; 
-        let x = (touch.clientX - dragOffsetX) / window.gameSettings.hudScale; 
-        let y = (touch.clientY - dragOffsetY) / window.gameSettings.hudScale; 
-        dragElement.style.left = x + 'px'; dragElement.style.top = y + 'px'; 
-        dragElement.style.bottom = 'auto'; dragElement.style.right = 'auto'; 
-    });
-    window.addEventListener('touchend', () => { dragElement = null; });
 }
 
 function saveHUDPositions() { let layout = {}; document.querySelectorAll('.hud-element').forEach(el => { if(el.id!=="game-crosshair" && el.id!=="joystick-zone") layout[el.id] = { left: el.style.left, top: el.style.top }; }); localStorage.setItem('hud_layout_universal', JSON.stringify(layout)); }
