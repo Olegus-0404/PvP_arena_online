@@ -21,12 +21,8 @@ const io = new Server(httpServer, {
 
 // ГЛОБАЛЬНЫЕ ХРАНИЛИЩА
 const players = {};
-const lobbies = {}; // Хранилище кастомных комнат
 
-// Имитация БД пользователей (в реальном проекте тут будет MongoDB/PostgreSQL)
-const usersDB = {}; 
-
-// Фиксированные точки спавна (замени координаты на свои, где нет текстур)
+// Фиксированные точки спавна
 const spawnPoints = [
     { x: 10, z: 10 }, { x: -10, z: -10 }, { x: 20, z: -20 },
     { x: -20, z: 20 }, { x: 0, z: 25 }, { x: 0, z: -25 }
@@ -56,10 +52,9 @@ function applyDamageToPlayer(target, amount, shooter = null) {
         if (shooter && players[shooter.id]) {
             players[shooter.id].kills++;
             sendPlayerState(players[shooter.id]);
-            // Отправка данных для Killfeed (в стиле CS)
             io.to(target.room).emit('killfeed', {
                 killer: shooter.nick,
-                weapon: shooter.currentWeapon || 'AK-47',
+                weapon: shooter.currentWeapon || 'AK-74',
                 victim: target.nick
             });
         }
@@ -67,43 +62,32 @@ function applyDamageToPlayer(target, amount, shooter = null) {
 }
 
 io.on('connection', (socket) => {
+    // Автоматическая авторизация при подключении через query-параметры из клиента
+    const query = socket.handshake.query;
+    let nick = query.nick ? query.nick.trim() : "Боец_" + socket.id.substr(0, 3);
+    const lobbyId = query.lobby ? query.lobby.trim() : '';
     
-    // АВТОРИЗАЦИЯ И РЕГИСТРАЦИЯ (Базовая реализация)
-    socket.on('playerAuth', (data) => {
-        // data = { email, password, serverUrl, lobbyId, ... }
-        let nick = "Боец_" + socket.id.substr(0, 3);
-        
-        if (data.email) {
-            nick = data.email.split('@')[0]; // Ник берем из почты
-            // Здесь должна быть логика проверки пароля bcrypt
-        }
+    const roomName = lobbyId ? `lobby_${lobbyId}` : 'public_match';
+    const spawn = getSafeSpawnPoint();
+    
+    players[socket.id] = {
+        id: socket.id,
+        nick: nick,
+        room: roomName,
+        hp: 100,
+        armor: 100,
+        kills: 0,
+        x: spawn.x,
+        z: spawn.z,
+        rotY: 0,
+        currentWeapon: 'rifle'
+    };
 
-        const roomName = data.lobbyId ? `lobby_${data.lobbyId}` : 'public_match';
-        
-        if (players[socket.id]) {
-            socket.leave(players[socket.id].room);
-        }
-
-        const spawn = getSafeSpawnPoint();
-        
-        players[socket.id] = {
-            id: socket.id,
-            nick: nick,
-            room: roomName,
-            hp: 100,
-            armor: 100,
-            kills: 0,
-            x: spawn.x,
-            z: spawn.z,
-            rotY: 0,
-            currentWeapon: 'Pistol'
-        };
-
-        socket.join(roomName);
-        socket.emit('authSuccess', { nick: nick, room: roomName });
-        socket.emit('init', { x: spawn.x, z: spawn.z });
-        sendPlayerState(players[socket.id]);
-    });
+    socket.join(roomName);
+    
+    socket.emit('authSuccess', { nick: nick, room: roomName, mode: 'pvp' });
+    socket.emit('init', { x: spawn.x, z: spawn.z });
+    sendPlayerState(players[socket.id]);
 
     socket.on('playerMove', (data) => {
         const p = players[socket.id];
@@ -111,13 +95,11 @@ io.on('connection', (socket) => {
         p.x = data.x; p.z = data.z; p.rotY = data.rotY;
     });
 
-    // Обработка стрельбы (теперь без ботов, только PvP)
     socket.on('playerHit', (data) => {
         const shooter = players[socket.id];
         if (!shooter || shooter.hp <= 0) return;
 
-        // В main.js мы добавим разный урон для ножа, пистолета и калаша
-        const baseDamage = data.zone === 'head' ? 100 : (data.weaponDamage || 35);
+        const baseDamage = data.zone === 'head' ? 100 : 35;
         const targetPlayer = players[data.targetId];
 
         if (targetPlayer && targetPlayer.room === shooter.room && targetPlayer.hp > 0) {
@@ -136,6 +118,14 @@ io.on('connection', (socket) => {
 
         socket.emit('init', { x: spawn.x, z: spawn.z });
         sendPlayerState(p);
+    });
+
+    socket.on('sendChatMessage', (data) => {
+        if (!data || !data.msg) return;
+        const p = players[socket.id];
+        if (p) {
+            io.to(p.room).emit('chatMessage', { nick: p.nick, msg: data.msg });
+        }
     });
 
     socket.on('disconnect', () => {
