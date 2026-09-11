@@ -150,36 +150,48 @@ function createCharacterLabel(text, hp, armor, isEnemy) {
     return sprite;
 }
 
-// Рендер и логика нового экрана входа (никнейм, сервера, лобби, друзья)
+// Полноценное главное меню вместо маленького плавающего окна
 function initAuthScreen() {
     const authScreen = document.getElementById('auth-screen');
     if (!authScreen) return;
 
     authScreen.innerHTML = `
-        <div class="auth-container" style="background: rgba(20, 22, 20, 0.95); padding: 25px; border-radius: 8px; border: 1px solid #434c3e; width: 340px; text-align: center; color: #e6dfcc; font-family: monospace;">
-            <h2 style="margin-top: 0; color: #d4a359; letter-spacing: 2px;">ВХОД В ЗОНУ</h2>
-            
-            <div style="margin-bottom: 12px; text-align: left;">
-                <label style="font-size: 12px; color: #8d99ae;">НИКНЕЙМ СТАЛКЕРА</label>
-                <input type="text" id="input-nick" placeholder="Введите позывной..." maxlength="15" style="width: 100%; padding: 10px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 4px; box-sizing: border-box; margin-top: 4px;">
-            </div>
+        <div class="auth-wrapper" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: linear-gradient(rgba(10,12,10,0.85), rgba(10,12,10,0.95)), url('') center/cover; display: flex; justify-content: center; align-items: center; z-index: 9999; font-family: monospace; color: #e6dfcc;">
+            <div class="auth-container" style="background: rgba(18, 20, 18, 0.95); padding: 35px; border-radius: 10px; border: 1px solid #434c3e; width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
+                <h1 style="margin-top: 0; color: #d4a359; text-align: center; letter-spacing: 3px; font-size: 24px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">S.T.A.L.K.E.R: ЧЗО</h1>
+                <div style="font-size: 11px; text-align: center; color: #8d99ae; margin-bottom: 25px; letter-spacing: 1px;">PVP ARENA & COOP SURVIVAL</div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="font-size: 12px; color: #a3b18a; display: block; margin-bottom: 5px;">ПОЗЫВНОЙ СТАЛКЕРА</label>
+                    <input type="text" id="input-nick" placeholder="Введите позывной..." maxlength="15" style="width: 100%; padding: 12px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 5px; box-sizing: border-box; font-size: 14px;">
+                </div>
 
-            <div style="margin-bottom: 12px; text-align: left;">
-                <label style="font-size: 12px; color: #8d99ae;">СЕРВЕР ЧЗО</label>
-                <select id="select-server" style="width: 100%; padding: 10px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 4px; box-sizing: border-box; margin-top: 4px;">
-                    <option value="https://pvp-arena-online.onrender.com">Основной Сервер (Render RU)</option>
-                    <option value="https://pvp-arena-backup.onrender.com">Резервный Сервер</option>
-                </select>
-            </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="font-size: 12px; color: #a3b18a; display: block; margin-bottom: 5px;">ВЫБОР СЕРВЕРА</label>
+                    <select id="select-server" style="width: 100%; padding: 12px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 5px; box-sizing: border-box; font-size: 14px;">
+                        <option value="https://pvp-arena-online.onrender.com">Основной Сервер (Render RU)</option>
+                        <option value="https://pvp-arena-backup.onrender.com">Резервный Сервер</option>
+                    </select>
+                </div>
 
-            <div style="margin-bottom: 16px; text-align: left; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px;">
-                <label style="font-size: 12px; color: #d4a359; font-weight: bold;">УПРАВЛЕНИЕ ЛОББИ</label>
-                <input type="text" id="input-lobby" placeholder="ID Лобби (пусто для нового)" style="width: 100%; padding: 8px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 4px; box-sizing: border-box; margin-top: 6px; margin-bottom: 8px;">
-                <div id="friends-list-container" style="font-size: 11px; color: #a5a5a5;">Друзья в сети: <span style="color: #51cf66;">Поиск...</span></div>
-            </div>
+                <div style="margin-bottom: 20px; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 5px; border: 1px solid #2a2e28;">
+                    <label style="font-size: 12px; color: #d4a359; font-weight: bold; display: block; margin-bottom: 6px;">ОТРЯД И ДРУЗЬЯ</label>
+                    <input type="text" id="input-lobby" placeholder="ID Лобби / Комнаты (оставьте пустым)" style="width: 100%; padding: 10px; background: #111311; border: 1px solid #333931; color: #fff; border-radius: 4px; box-sizing: border-box; margin-bottom: 6px; font-size: 13px;">
+                    <div id="friends-list-container" style="font-size: 11px; color: #8d99ae;">Статусы друзей: <span style="color: #51cf66;">Поиск сети...</span></div>
+                </div>
 
-            <button id="btn-auth" style="width: 100%; padding: 12px; background: #386641; color: white; border: none; font-weight: bold; border-radius: 4px; cursor: pointer; letter-spacing: 1px;">ВОЙТИ В ИГРУ</button>
-            <div id="auth-status" style="margin-top: 10px; font-size: 12px; color: #8d99ae;">Готово к подключению к КПК</div>
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 12px; color: #a3b18a; display: block; margin-bottom: 5px;">РЕЖИМ ИГРЫ</label>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" id="menu-mode-surv" onclick="window.selectGameMode('survival')" style="flex: 1; padding: 8px; background: #386641; border: none; color: #fff; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;">Выживание</button>
+                        <button type="button" id="menu-mode-coop" onclick="window.selectGameMode('coop')" style="flex: 1; padding: 8px; background: #2b3a28; border: none; color: #a3b18a; border-radius: 4px; cursor: pointer; font-size: 11px;">Мутанты</button>
+                        <button type="button" id="menu-mode-pvp" onclick="window.selectGameMode('pvp')" style="flex: 1; padding: 8px; background: #2b3a28; border: none; color: #a3b18a; border-radius: 4px; cursor: pointer; font-size: 11px;">PvP Бой</button>
+                    </div>
+                </div>
+
+                <button id="btn-auth" style="width: 100%; padding: 14px; background: #bc6c25; color: white; border: none; font-weight: bold; border-radius: 5px; cursor: pointer; letter-spacing: 1.5px; font-size: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">ВОЙТИ В ЗОНУ</button>
+                <div id="auth-status" style="margin-top: 12px; font-size: 12px; color: #8d99ae; text-align: center;">Готово к подключению КПК</div>
+            </div>
         </div>
     `;
 
@@ -196,6 +208,14 @@ function initAuthScreen() {
         myNick = nickname;
         localStorage.setItem('stalker_nick', myNick);
 
+        // Автоматический запрос полноэкранного режима при входе в игру
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) {
+            docEl.requestFullscreen().catch(err => console.log("Fullscreen request blocked:", err));
+        } else if (docEl.webkitRequestFullscreen) {
+            docEl.webkitRequestFullscreen();
+        }
+
         SERVER_URL = serverUrl;
         connectToServer(lobbyId);
     });
@@ -206,7 +226,7 @@ function connectToServer(lobbyId) {
     const authBtn = document.getElementById('btn-auth');
 
     if(statusText) statusText.innerText = "Подключение к КПК Зоны...";
-    if(authBtn) { authBtn.disabled = true; authBtn.innerText = "СВЯЗЬ..."; }
+    if(authBtn) { authBtn.disabled = true; authBtn.innerText = "УСТАНОВКА СВЯЗИ..."; }
 
     if (socket) {
         socket.disconnect();
@@ -219,24 +239,16 @@ function connectToServer(lobbyId) {
         reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
         timeout: 20000,
-        query: { nick: myNick, lobby: lobbyId || '' }
+        query: { nick: myNick, lobby: lobbyId || '', mode: currentGameMode }
     });
 
     socket.on('connect', () => { 
-        if(statusText) statusText.innerText = "Сигнал получен. Входите в ЧЗО."; 
-        if(authBtn) { authBtn.disabled = false; authBtn.innerText = "ВОЙТИ В ИГРУ"; }
-        
-        setTimeout(() => {
-            const timerText = document.getElementById('hud-timer');
-            if (timerText && timerText.innerText === "ЗАГРУЗКА...") {
-                timerText.style.display = "none";
-            }
-        }, 1500);
+        if(statusText) statusText.innerText = "Сигнал получен. Инициализация мира..."; 
     });
 
     socket.on('connect_error', (error) => {
         if(statusText) statusText.innerText = `Ошибка КПК: ${error.message}`;
-        if(authBtn) { authBtn.disabled = false; authBtn.innerText = "ВОЙТИ В ИГРУ"; }
+        if(authBtn) { authBtn.disabled = false; authBtn.innerText = "ВОЙТИ В ЗОНУ"; }
     });
     
     socket.on('authSuccess', (data) => { 
@@ -453,8 +465,9 @@ function initEngine() {
     const container = document.getElementById('canvas-container'); if (!container) return;
     scene = new THREE.Scene(); 
     
-    scene.background = new THREE.Color(0x1a1d1a); 
-    scene.fog = new THREE.FogExp2(0x1a1d1a, 0.018);
+    // Исправлено освещение и мягкий туман зоны
+    scene.background = new THREE.Color(0x3a403b); 
+    scene.fog = new THREE.FogExp2(0x3a403b, 0.012);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     pitchObject.add(camera); yawObject.add(pitchObject); scene.add(yawObject);
@@ -465,9 +478,10 @@ function initEngine() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
     
-    scene.add(new THREE.AmbientLight(0x73796e, 0.6));
-    let dirLight = new THREE.DirectionalLight(0xc2ba9b, 0.5); 
-    dirLight.position.set(20, 50, 20); 
+    // Свет: полусферический амбиент + яркий направленный солнце-свет
+    scene.add(new THREE.HemisphereLight(0xddeeff, 0x334422, 0.7));
+    let dirLight = new THREE.DirectionalLight(0xfff5e6, 0.9); 
+    dirLight.position.set(40, 80, 40); 
     dirLight.castShadow = true;
     scene.add(dirLight);
     
@@ -487,34 +501,34 @@ function buildMap() {
     mapObjects.forEach(obj => scene.remove(obj)); mapObjects = []; colliders = [];
     lootItems.forEach(item => scene.remove(item.mesh)); lootItems = [];
 
-    let floor = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.MeshStandardMaterial({ color: 0x222620, roughness: 1.0 })); 
+    let floor = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.MeshStandardMaterial({ color: 0x2b3028, roughness: 0.9 })); 
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
     scene.add(floor); mapObjects.push(floor);
     
-    createObstacle(0, 4, -120, 240, 8, 2, 0x1f1d18); createObstacle(0, 4, 120, 240, 8, 2, 0x1f1d18);
-    createObstacle(-120, 4, 0, 2, 8, 240, 0x1f1d18); createObstacle(120, 4, 0, 2, 8, 240, 0x1f1d18);
+    createObstacle(0, 4, -120, 240, 8, 2, 0x262a24); createObstacle(0, 4, 120, 240, 8, 2, 0x262a24);
+    createObstacle(-120, 4, 0, 2, 8, 240, 0x262a24); createObstacle(120, 4, 0, 2, 8, 240, 0x262a24);
 
-    createObstacle(0, 8, 0, 24, 16, 24, 0x3d3e3b); 
-    let sarco = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshStandardMaterial({ color: 0x4a3b2c, roughness: 0.9 }));
+    createObstacle(0, 8, 0, 24, 16, 24, 0x454842); 
+    let sarco = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshStandardMaterial({ color: 0x5a4836, roughness: 0.8 }));
     sarco.position.set(0, 19, 0); scene.add(sarco); mapObjects.push(sarco); colliders.push(new THREE.Box3().setFromObject(sarco));
 
-    createObstacle(0, 6, -50, 12, 12, 12, 0x2f312d);
-    createObstacle(-16, 5, -55, 10, 10, 10, 0x2f312d);
-    createObstacle(16, 7, -55, 10, 14, 10, 0x2f312d);
+    createObstacle(0, 6, -50, 12, 12, 12, 0x383b35);
+    createObstacle(-16, 5, -55, 10, 10, 10, 0x383b35);
+    createObstacle(16, 7, -55, 10, 14, 10, 0x383b35);
 
     for(let i = 0; i < 8; i++) {
         let rx = -45 + (i % 3) * 8; let rz = -10 + Math.floor(i / 3) * 10;
-        createObstacle(rx, 3, rz, 3, 6, 3, 0x4a2718);
+        createObstacle(rx, 3, rz, 3, 6, 3, 0x5a3320);
     }
 
-    createObstacle(-50, 15, 45, 40, 30, 3, 0x2b231d);
-    createObstacle(40, 3, 40, 16, 6, 16, 0x1a1b18);
-    createObstacle(45, 0.2, -10, 30, 0.4, 30, 0x1a2118);
-    createObstacle(45, 2, -10, 6, 4, 6, 0x383025);
-    createObstacle(-35, 1.5, -45, 5, 3, 5, 0x383025); 
-    createObstacle(25, 1.5, -45, 5, 3, 5, 0x383025);  
-    createObstacle(20, 2.5, 15, 12, 5, 12, 0x282b23);
-    createObstacle(-20, 2.5, 20, 12, 5, 12, 0x282b23);
+    createObstacle(-50, 15, 45, 40, 30, 3, 0x362c24);
+    createObstacle(40, 3, 40, 16, 6, 16, 0x222520);
+    createObstacle(45, 0.2, -10, 30, 0.4, 30, 0x222b20);
+    createObstacle(45, 2, -10, 6, 4, 6, 0x453b2e);
+    createObstacle(-35, 1.5, -45, 5, 3, 5, 0x453b2e); 
+    createObstacle(25, 1.5, -45, 5, 3, 5, 0x453b2e);  
+    createObstacle(20, 2.5, 15, 12, 5, 12, 0x32362c);
+    createObstacle(-20, 2.5, 20, 12, 5, 12, 0x32362c);
 
     spawnLoot(0, 0.4, -25, 'medkit', 0x51cf66);    
     spawnLoot(-45, 0.4, 40, 'ammo', 0xd4a359);     
@@ -524,14 +538,14 @@ function buildMap() {
 }
 
 function createObstacle(x, y, z, w, h, d, color) {
-    let mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: color, roughness: 0.9 })); 
+    let mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: color, roughness: 0.8 })); 
     mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true;
     scene.add(mesh); mapObjects.push(mesh); colliders.push(new THREE.Box3().setFromObject(mesh));
 }
 
 function spawnLoot(x, y, z, type, colorHex) {
     let geo = new THREE.BoxGeometry(0.6, 0.4, 0.6);
-    let mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5 });
+    let mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
     let mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y, z); scene.add(mesh);
     lootItems.push({ mesh: mesh, type: type, x: x, y: y, z: z, baseHeight: y, seed: Math.random() * 100 });
 }
@@ -728,8 +742,10 @@ function setupControls() {
             const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
             if (!isFullscreen) {
                 if (docEl.requestFullscreen) docEl.requestFullscreen().catch(err => console.log(err));
+                else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
             } else {
                 if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
             }
             setTimeout(() => { if (camera && renderer) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } }, 300);
         }, { passive: false });
