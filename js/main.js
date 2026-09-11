@@ -1,5 +1,5 @@
 // ============================================================================
-// GAME CLIENT CORE: S.T.A.L.K.E.R. Zone Atmosphere Edition (Fixed Collisions & Spawn)
+// GAME CLIENT CORE: S.T.A.L.K.E.R. Zone Atmosphere Edition (Full Menu & Textures)
 // ============================================================================
 
 const DEFAULT_SERVER_URL = "https://pvp-arena-online.onrender.com"; 
@@ -9,6 +9,7 @@ let socket = null;
 let myId = null, myNick = "", currentGameMode = "survival";
 let currentLobbyId = null;
 let hp = 100, armor = 100, kills = 0, isReloading = false;
+let playerAvatarData = localStorage.getItem('stalker_avatar') || '';
 
 // Арсенал и оружие
 const WEAPONS = {
@@ -76,26 +77,49 @@ window.switchWeapon = function(weaponKey) {
     updateWeaponMesh(weaponKey);
 };
 
+// НОРМАЛЬНЫЕ ДЕТАЛИЗИРОВАННЫЕ ТЕКСТУРЫ ОРУЖИЯ
 function updateWeaponMesh(key) {
     if (!camera || !weaponMesh) return;
     while(weaponMesh.children.length > 0) { 
         weaponMesh.remove(weaponMesh.children[0]); 
     }
     
-    let mat = new THREE.MeshStandardMaterial({ color: 0x111311, roughness: 0.8, metalness: 0.6 });
+    let metalMat = new THREE.MeshStandardMaterial({ color: 0x2b2d2f, roughness: 0.4, metalness: 0.85 });
+    let woodMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.7, metalness: 0.1 });
+    let darkMat = new THREE.MeshStandardMaterial({ color: 0x111311, roughness: 0.9, metalness: 0.2 });
+
     if (key === 'knife') {
-        let blade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.2, 0.05), mat);
-        blade.position.set(0, 0, -0.2);
-        weaponMesh.add(blade);
+        let handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.12, 0.04), woodMat);
+        handle.position.set(0, -0.05, 0);
+        let blade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.22, 0.01), metalMat);
+        blade.position.set(0, 0.1, 0);
+        weaponMesh.add(handle); weaponMesh.add(blade);
     } else if (key === 'pistol') {
-        let p = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.25), mat);
-        p.position.set(0, -0.05, -0.2);
-        weaponMesh.add(p);
+        let body = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.22), metalMat);
+        body.position.set(0, -0.04, -0.1);
+        let handle = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.14, 0.07), darkMat);
+        handle.rotation.x = 0.2;
+        handle.position.set(0, -0.14, -0.02);
+        weaponMesh.add(body); weaponMesh.add(handle);
     } else {
-        let barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5), mat);
-        barrel.rotation.x = Math.PI / 2;
-        barrel.position.set(0, 0, -0.25);
-        weaponMesh.add(barrel);
+        // АК-47: Ствол, цевье из дерева, магазин и ствольная коробка
+        let receiver = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.45), metalMat);
+        receiver.position.set(0, 0, -0.2);
+        
+        let handguard = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.07, 0.25), woodMat);
+        handguard.position.set(0, -0.01, -0.38);
+
+        let mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.22, 0.08), darkMat);
+        mag.rotation.x = -0.3;
+        mag.position.set(0, -0.15, -0.25);
+
+        let stock = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, 0.3), woodMat);
+        stock.position.set(0, -0.02, 0.15);
+
+        weaponMesh.add(receiver);
+        weaponMesh.add(handguard);
+        weaponMesh.add(mag);
+        weaponMesh.add(stock);
     }
 }
 
@@ -255,7 +279,6 @@ function connectToServer(lobbyId) {
         buildMap();
     });
     
-    // ИСПРАВЛЕННЫЙ БЕЗОПАСНЫЙ СПАВН (защита от проваливания и застревания)
     socket.on('init', (spawnPos) => { 
         if (yawObject) {
             yawObject.position.set(spawnPos.x || 0, 3.0, spawnPos.z || 30);
@@ -410,6 +433,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (savedScale) { window.gameSettings.hudScale = parseFloat(savedScale); document.getElementById('scale-slider').value = savedScale; applyHUDScale(savedScale); }
 });
 
+// ИНЪЕКЦИЯ ПОЛНОЦЕННОГО ИНТЕРФЕЙСА НАСТРОЕК, ПРОФИЛЯ И АВАТАРОК
 function injectMissingHUDUI() {
     const wrapper = document.getElementById('hud-scalable-wrapper') || document.body;
     
@@ -445,6 +469,78 @@ function injectMissingHUDUI() {
         menuBtn.style.cssText = 'position: fixed; top: 10px; left: 20px; background: rgba(18,20,18,0.8); border: 1px solid #333931; width: 36px; height: 36px; border-radius: 4px; display: flex; justify-content: center; align-items: center; color: #d4a359; font-size: 18px; cursor: pointer; z-index: 1000; font-family: monospace;';
         menuBtn.innerHTML = '⚙️';
         wrapper.appendChild(menuBtn);
+    }
+
+    // Создаем модальное окно настроек со всеми функциями (профиль, аватарки, худ, выход в меню)
+    if (!document.getElementById('game-settings-modal')) {
+        const modal = document.createElement('div');
+        modal.id = 'game-settings-modal';
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 99999; font-family: monospace; color: #e6dfcc;';
+        modal.innerHTML = `
+            <div style="background: rgba(18,20,18,0.98); border: 1px solid #434c3e; padding: 25px; border-radius: 8px; width: 420px; max-height: 90vh; overflow-y: auto;">
+                <h2 style="color: #d4a359; margin-top: 0; text-align: center; font-size: 18px; letter-spacing: 2px;">КПК СТАЛКЕРА: НАСТРОЙКИ</h2>
+                
+                <div style="background: rgba(0,0,0,0.4); padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #2a2e28; display: flex; gap: 12px; align-items: center;">
+                    <div id="profile-avatar-preview" style="width: 55px; height: 55px; border-radius: 50%; background: #222; border: 2px solid #d4a359; background-size: cover; background-position: center; ${playerAvatarData ? 'background-image: url(' + playerAvatarData + ');' : ''}"></div>
+                    <div style="flex: 1;">
+                        <div style="font-size: 12px; color: #8d99ae;">ПРОФИЛЬ БОЙЦА</div>
+                        <div id="profile-nick-display" style="font-weight: bold; font-size: 15px; color: #fff; margin-bottom: 4px;">Сталкер</div>
+                        <label style="font-size: 10px; background: #bc6c25; color: #fff; padding: 4px 8px; border-radius: 4px; cursor: pointer; display: inline-block;">
+                            Сменить фото <input type="file" id="input-avatar-file" accept="image/*" style="display: none;">
+                        </label>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="font-size: 11px; color: #a3b18a; display: block; margin-bottom: 5px;">МАСШТАБ HUD И ИНТЕРФЕЙСА</label>
+                    <input type="range" id="scale-slider" min="0.7" max="1.3" step="0.05" value="1.0" style="width: 100%; cursor: pointer;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 20px;">
+                    <button id="btn-edit-hud-pos" style="padding: 10px; background: #386641; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px;">Настроить позиции HUD (Перетаскивание)</button>
+                    <button id="btn-return-menu" style="padding: 10px; background: #7f4f24; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px;">Выйти в главное меню</button>
+                    <button id="btn-close-modal" style="padding: 10px; background: #333931; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px;">Закрыть настройки</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Обработчики кнопок меню настроек
+        document.getElementById('input-avatar-file').addEventListener('change', (e) => {
+            let file = e.target.files[0];
+            if (file) {
+                let reader = new FileReader();
+                reader.onload = function(event) {
+                    playerAvatarData = event.target.result;
+                    localStorage.setItem('stalker_avatar', playerAvatarData);
+                    document.getElementById('profile-avatar-preview').style.backgroundImage = `url(${playerAvatarData})`;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('scale-slider').addEventListener('input', (e) => {
+            let val = e.target.value;
+            window.gameSettings.hudScale = parseFloat(val);
+            localStorage.setItem('game_hud_scale', val);
+            applyHUDScale(val);
+        });
+
+        document.getElementById('btn-edit-hud-pos').addEventListener('click', () => {
+            document.getElementById('game-settings-modal').style.display = 'none';
+            isCustomizing = true;
+            stopAutofire();
+            document.body.classList.add('edit-mode');
+        });
+
+        document.getElementById('btn-return-menu').addEventListener('click', () => {
+            if (socket) socket.disconnect();
+            location.reload(); // Перезапуск для возврата в чистое главное меню авторизации
+        });
+
+        document.getElementById('btn-close-modal').addEventListener('click', () => {
+            document.getElementById('game-settings-modal').style.display = 'none';
+        });
     }
 }
 
@@ -524,7 +620,6 @@ function spawnLoot(x, y, z, type, colorHex) {
     lootItems.push({ mesh: mesh, type: type, x: x, y: y, z: z, baseHeight: y, seed: Math.random() * 100 });
 }
 
-// УВЕЛИЧЕННЫЙ РАДИУС КОЛЛИЗИИ (защита от застревания и прострелов)
 function checkWallCollisions(newPos) {
     let pr = 0.55; 
     let playerBox = new THREE.Box3(
@@ -641,34 +736,21 @@ function loadCrosshairSettings() {
 
 function setupControls() {
     const jZone = document.getElementById('joystick-zone'), stick = document.getElementById('joystick-stick');
-    const customMenu = document.getElementById('customizer-menu');
+    const settingsModal = document.getElementById('game-settings-modal');
 
+    // КЛИК ПО КНОПКЕ ШЕСТЕРЕНКИ (ОТКРЫВАЕТ МОДАЛЬНОЕ ОКНО НАСТРОЕК)
     document.addEventListener('click', (e) => {
         if (e.target && e.target.id === 'btn-menu-trigger') {
             if (isCustomizing) return; 
-            isCustomizing = true; stopAutofire(); 
-            if(customMenu) customMenu.style.display = 'block';
-            document.body.classList.add('edit-mode');
+            stopAutofire(); 
+            if(settingsModal) {
+                if(document.getElementById('profile-nick-display')) {
+                    document.getElementById('profile-nick-display').innerText = myNick || "Сталкер";
+                }
+                settingsModal.style.display = 'flex';
+            }
         }
     });
-
-    if(document.getElementById('btn-save-hud')) {
-        document.getElementById('btn-save-hud').addEventListener('click', () => { 
-            isCustomizing = false; document.body.classList.remove('edit-mode'); if(customMenu) customMenu.style.display = 'none'; 
-            saveHUDPositions();
-        });
-    }
-
-    if(document.getElementById('btn-fullscreen-toggle')) {
-        document.getElementById('btn-fullscreen-toggle').addEventListener('click', () => {
-            const docEl = document.documentElement;
-            if (!document.fullscreenElement) {
-                if (docEl.requestFullscreen) docEl.requestFullscreen().catch(err => console.log(err));
-            } else {
-                if (document.exitFullscreen) document.exitFullscreen();
-            }
-        });
-    }
 
     document.getElementById('btn-fire')?.addEventListener('touchstart', (e) => { if(!isCustomizing){ e.preventDefault(); startAutofire(); } });
     document.getElementById('btn-fire')?.addEventListener('touchend', (e) => { if(!isCustomizing){ e.preventDefault(); stopAutofire(); } });
@@ -696,7 +778,7 @@ function setupControls() {
     }
 
     window.addEventListener('touchstart', (e) => { 
-        if (isCustomizing || e.target.closest('#customizer-menu') || e.target.closest('.overlay') || e.target.closest('#game-chat') || e.target.closest('button') || e.target.closest('input')) return; 
+        if (isCustomizing || e.target.closest('#game-settings-modal') || e.target.closest('.overlay') || e.target.closest('#game-chat') || e.target.closest('button') || e.target.closest('input')) return; 
         for(let t of e.changedTouches) { if(lookTouchId === null) { lookTouchId = t.identifier; lastLookX = t.clientX; lastLookY = t.clientY; } } 
     }, { passive: true });
 
@@ -716,9 +798,6 @@ function setupControls() {
 
     window.addEventListener('touchend', (e) => { for(let t of e.changedTouches) { if(t.identifier === lookTouchId) lookTouchId = null; } });
 }
-
-function saveHUDPositions() { let layout = {}; document.querySelectorAll('.hud-element').forEach(el => { if(el.id!=="game-crosshair" && el.id!=="joystick-zone") layout[el.id] = { left: el.style.left, top: el.style.top }; }); localStorage.setItem('hud_layout_universal', JSON.stringify(layout)); }
-function loadHUDPositions() { let saved = localStorage.getItem('hud_layout_universal'); if (!saved) return; let layout = JSON.parse(saved); for (let id in layout) { let el = document.getElementById(id); if (el && layout[id].left) { el.style.left = layout[id].left; el.style.top = layout[id].top; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.transform = 'none'; } } }
 
 let clock = new THREE.Clock();
 function animate() {
