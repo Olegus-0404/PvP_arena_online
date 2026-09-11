@@ -1,5 +1,5 @@
 // ============================================================================
-// GAME CLIENT CORE: S.T.A.L.K.E.R. Zone Atmosphere Edition (Full Menu & Textures)
+// GAME CLIENT CORE: S.T.A.L.K.E.R. Zone Atmosphere Edition (Full Drag & Drop HUD Fix)
 // ============================================================================
 
 const DEFAULT_SERVER_URL = "https://pvp-arena-online.onrender.com"; 
@@ -41,10 +41,13 @@ let crouchSpeed = 1.8;
 let colliders = [];
 let lootItems = []; 
 
-let joystickTouchId = null, lookTouchId = null;
-let lastLookX = 0, lastLookY = 0;
 let fireIntervalId = null;
 let isCrouching = false, isCustomizing = false;
+
+// Drag & Drop HUD переменные
+let draggedElement = null;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
 
 window.gameSettings = { sensitivity: 0.0035, hudScale: 1.0 };
 
@@ -420,7 +423,6 @@ window.addEventListener('DOMContentLoaded', () => {
     initEngine(); 
     setupControls(); 
     loadHUDPositions(); 
-    loadCrosshairSettings();
     
     let savedNick = localStorage.getItem('stalker_nick');
     if (savedNick && document.getElementById('input-nick')) {
@@ -430,7 +432,7 @@ window.addEventListener('DOMContentLoaded', () => {
     setInterval(() => { checkLootPickups(); }, 100);
 
     let savedScale = localStorage.getItem('game_hud_scale');
-    if (savedScale) { window.gameSettings.hudScale = parseFloat(savedScale); document.getElementById('scale-slider').value = savedScale; applyHUDScale(savedScale); }
+    if (savedScale) { window.gameSettings.hudScale = parseFloat(savedScale); if (document.getElementById('scale-slider')) document.getElementById('scale-slider').value = savedScale; applyHUDScale(savedScale); }
 });
 
 function injectMissingHUDUI() {
@@ -440,7 +442,7 @@ function injectMissingHUDUI() {
         const topBoard = document.createElement('div');
         topBoard.id = 'cs-top-scoreboard';
         topBoard.className = 'hud-element';
-        topBoard.style.cssText = 'position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(18,20,18,0.85); border: 1px solid #333931; padding: 6px 15px; border-radius: 4px; display: flex; gap: 20px; align-items: center; color: #e6dfcc; font-family: monospace; font-size: 13px; z-index: 1000;';
+        topBoard.style.cssText = 'position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(18,20,18,0.85); border: 1px solid #333931; padding: 6px 15px; border-radius: 4px; display: flex; gap: 20px; align-items: center; color: #e6dfcc; font-family: monospace; font-size: 13px; z-index: 1000; cursor: move;';
         topBoard.innerHTML = `
             <div>ЗОНА: <span id="val-mode" style="color: #d4a359; font-weight: bold;">ПВП АРЕНА</span></div>
             <div style="border-left: 1px solid #444; padding-left: 15px;">УБИЙСТВА: <span id="val-kills" style="color: #51cf66; font-weight: bold;">0</span></div>
@@ -452,7 +454,7 @@ function injectMissingHUDUI() {
         const weaponBar = document.createElement('div');
         weaponBar.id = 'weapon-slots-bar';
         weaponBar.className = 'hud-element';
-        weaponBar.style.cssText = 'position: fixed; top: 10px; right: 20px; display: flex; gap: 8px; z-index: 1000; font-family: monospace;';
+        weaponBar.style.cssText = 'position: fixed; top: 10px; right: 20px; display: flex; gap: 8px; z-index: 1000; font-family: monospace; cursor: move;';
         weaponBar.innerHTML = `
             <div id="slot-knife" onclick="window.switchWeapon('knife')" style="background: rgba(18,20,18,0.8); border: 1px solid #333931; padding: 6px 10px; border-radius: 4px; color: #a3b18a; font-size: 11px; cursor: pointer;">НОЖ</div>
             <div id="slot-pistol" onclick="window.switchWeapon('pistol')" style="background: rgba(18,20,18,0.8); border: 1px solid #333931; padding: 6px 10px; border-radius: 4px; color: #a3b18a; font-size: 11px; cursor: pointer;">ПМ</div>
@@ -475,6 +477,7 @@ function injectMissingHUDUI() {
                 const nickDisplay = document.getElementById('profile-nick-display');
                 if (nickDisplay) nickDisplay.innerText = myNick || "Сталкер";
                 modal.style.display = 'flex';
+                if (document.pointerLockElement) document.exitPointerLock();
             }
         });
     }
@@ -537,6 +540,9 @@ function injectMissingHUDUI() {
             isCustomizing = true;
             stopAutofire();
             document.body.classList.add('edit-mode');
+            const exitBtn = document.getElementById('btn-exit-edit');
+            if (exitBtn) exitBtn.style.display = 'block';
+            if (document.pointerLockElement) document.exitPointerLock();
         });
 
         document.getElementById('btn-return-menu').addEventListener('click', () => {
@@ -546,6 +552,7 @@ function injectMissingHUDUI() {
 
         document.getElementById('btn-close-modal').addEventListener('click', () => {
             document.getElementById('game-settings-modal').style.display = 'none';
+            document.body.requestPointerLock();
         });
     }
 }
@@ -692,12 +699,13 @@ function setupControls() {
         }
     });
 
-    const canvas = renderer.domElement;
-    canvas.addEventListener('click', () => {
-        if (!isCustomizing && document.getElementById('game-settings-modal').style.display !== 'flex') {
-            document.body.requestPointerLock();
-        }
-    });
+    if (renderer && renderer.domElement) {
+        renderer.domElement.addEventListener('click', () => {
+            if (!isCustomizing && document.getElementById('game-settings-modal').style.display !== 'flex') {
+                document.body.requestPointerLock();
+            }
+        });
+    }
 }
 
 function startAutofire() {
@@ -799,5 +807,69 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-function loadHUDPositions() {}
-function loadCrosshairSettings() {}
+// ----------------------------------------------------------------------------
+// РЕЖИМ ПЕРЕТАСКИВАНИЯ (DRAG & DROP) И СОХРАНЕНИЕ POSITIONS
+// ----------------------------------------------------------------------------
+
+function loadHUDPositions() {
+    if (!document.getElementById('btn-exit-edit')) {
+        const exitEditBtn = document.createElement('div');
+        exitEditBtn.id = 'btn-exit-edit';
+        exitEditBtn.innerHTML = '💾 СОХРАНИТЬ И ВЫЙТИ';
+        exitEditBtn.style.cssText = 'position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #bc6c25; color: white; padding: 12px 24px; border-radius: 5px; font-family: monospace; font-weight: bold; font-size: 15px; cursor: pointer; display: none; z-index: 100000; border: 2px solid #fff; box-shadow: 0 0 10px rgba(0,0,0,0.8);';
+        document.body.appendChild(exitEditBtn);
+
+        exitEditBtn.addEventListener('click', () => {
+            isCustomizing = false;
+            document.body.classList.remove('edit-mode');
+            exitEditBtn.style.display = 'none';
+            document.body.requestPointerLock();
+        });
+    }
+
+    document.querySelectorAll('.hud-element').forEach(el => {
+        let savedPos = localStorage.getItem('hud_pos_' + el.id);
+        if (savedPos) {
+            try {
+                let coords = JSON.parse(savedPos);
+                el.style.left = coords.left;
+                el.style.top = coords.top;
+                el.style.right = 'auto';
+                el.style.bottom = 'auto';
+            } catch(e) {}
+        }
+    });
+
+    window.addEventListener('mousedown', (e) => {
+        if (!isCustomizing) return;
+        let target = e.target.closest('.hud-element');
+        if (target) {
+            draggedElement = target;
+            let rect = draggedElement.getBoundingClientRect();
+            dragOffsetX = e.clientX - rect.left;
+            dragOffsetY = e.clientY - rect.top;
+            draggedElement.style.right = 'auto';
+            draggedElement.style.bottom = 'auto';
+        }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isCustomizing || !draggedElement) return;
+        let newX = e.clientX - dragOffsetX;
+        let newY = e.clientY - dragOffsetY;
+        draggedElement.style.left = newX + 'px';
+        draggedElement.style.top = newY + 'px';
+    });
+
+    window.addEventListener('mouseup', () => {
+        if (draggedElement) {
+            if (draggedElement.id) {
+                localStorage.setItem('hud_pos_' + draggedElement.id, JSON.stringify({
+                    left: draggedElement.style.left,
+                    top: draggedElement.style.top
+                }));
+            }
+            draggedElement = null;
+        }
+    });
+}
