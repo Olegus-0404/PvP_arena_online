@@ -1,111 +1,95 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PvP Arena Online v2</title>
-    <style>
-        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background-color: #121212; font-family: 'Segoe UI', Roboto, sans-serif; color: #fff; }
-        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
-
-        /* Окно авторизации (Темно-серый стиль) */
-        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1e1e1e; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
-        .auth-container { background: #2d2d2d; border: 1px solid #444; border-radius: 8px; padding: 30px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .auth-container h1 { color: #ffffff; margin-bottom: 20px; font-size: 24px; font-weight: 600; }
-        
-        .auth-input { width: 100%; padding: 14px; background: #1e1e1e; border: 1px solid #444; color: #fff; border-radius: 6px; margin-bottom: 12px; font-size: 15px; outline: none; transition: 0.2s; }
-        .auth-input:focus { border-color: #888; }
-        
-        .btn-main { width: 100%; padding: 14px; background: #3a3a3a; color: white; border: 1px solid #555; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn-main:hover { background: #4a4a4a; }
-        
-        /* Киллфед (Счетчик убийств сверху по центру) */
-        #killfeed-container { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
-        .killfeed-item { background: rgba(30, 30, 30, 0.8); border: 1px solid #444; padding: 5px 15px; border-radius: 4px; font-size: 13px; display: flex; align-items: center; gap: 10px; animation: fadeOut 4s forwards; }
-        @keyframes fadeOut { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; display: none; } }
-        .kf-killer { color: #fff; font-weight: bold; }
-        .kf-weapon { color: #888; font-size: 11px; }
-        .kf-victim { color: #ff4d4d; font-weight: bold; }
-
-        /* HUD элементов (Серый стиль) */
-        #hud-scalable-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-        .hud-element { position: absolute; pointer-events: auto; }
-        
-        .hud-stat-box { background: rgba(45, 45, 45, 0.8); border: 1px solid #555; padding: 8px 15px; border-radius: 6px; display: flex; flex-direction: column; }
-        .hud-stat-box span:first-child { font-size: 11px; color: #aaa; text-transform: uppercase; }
-        .hud-stat-box span:last-child { font-size: 22px; color: #fff; font-weight: bold; }
-
-        #hud-hp { bottom: 20px; left: 20px; }
-        #hud-armor { bottom: 20px; left: 120px; }
-        #hud-ammo { bottom: 20px; right: 20px; text-align: right; }
-        
-        /* Кнопки игры */
-        .btn-game { width: 65px; height: 65px; background: rgba(58, 58, 58, 0.6); border: 1px solid #666; border-radius: 50%; display: flex; justify-content: center; align-items: center; }
-        .btn-game:active { background: rgba(80, 80, 80, 0.8); }
-        .btn-game svg { width: 50%; height: 50%; fill: #fff; }
-        
-        #btn-fire { bottom: 100px; right: 40px; width: 80px; height: 80px; }
-        #btn-reload { bottom: 110px; right: 140px; }
-        #btn-jump { bottom: 30px; right: 130px; }
-        #btn-crouch { bottom: 20px; right: 210px; }
-
-        #joystick-zone { bottom: 30px; left: 30px; width: 120px; height: 120px; background: rgba(45, 45, 45, 0.5); border: 1px solid #666; border-radius: 50%; display: flex; justify-content: center; align-items: center; }
-        #joystick-stick { width: 45px; height: 45px; background: #888; border-radius: 50%; }
-
-        /* Меню профиля и друзей (добавим позже логику) */
-        #btn-profile { top: 20px; left: 20px; width: 50px; height: 50px; background: #2d2d2d; border: 1px solid #555; border-radius: 50%; overflow: hidden; display: flex; justify-content: center; align-items: center; cursor: pointer; }
-        #btn-profile img { width: 100%; height: 100%; object-fit: cover; }
-        
-        #game-crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: #fff; border-radius: 50%; pointer-events: none; z-index: 10; }
-        #respawn-screen { display: none; background: rgba(20, 20, 20, 0.8); }
-    </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PvP Arena Online v2</title>
+<style>
+* { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
+body, html { width: 100%; height: 100%; overflow: hidden; background-color: #121212; font-family: 'Segoe UI', Roboto, sans-serif; color: #fff; }
+#canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+/* Окно авторизации (Темно-серый стиль) */
+.overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1e1e1e; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+.auth-container { background: #2d2d2d; border: 1px solid #444; border-radius: 8px; padding: 30px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.auth-container h1 { color: #ffffff; margin-bottom: 20px; font-size: 24px; font-weight: 600; }
+.auth-input { width: 100%; padding: 14px; background: #1e1e1e; border: 1px solid #444; color: #fff; border-radius: 6px; margin-bottom: 12px; font-size: 15px; outline: none; transition: 0.2s; }
+.auth-input:focus { border-color: #888; }
+.btn-main { width: 100%; padding: 14px; background: #3a3a3a; color: white; border: 1px solid #555; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+.btn-main:hover { background: #4a4a4a; }
+/* Киллфед (Счетчик убийств сверху по центру) */
+#killfeed-container { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
+.killfeed-item { background: rgba(30, 30, 30, 0.8); border: 1px solid #444; padding: 5px 15px; border-radius: 4px; font-size: 13px; display: flex; align-items: center; gap: 10px; animation: fadeOut 4s forwards; }
+@keyframes fadeOut { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; display: none; } }
+.kf-killer { color: #fff; font-weight: bold; }
+.kf-weapon { color: #888; font-size: 11px; }
+.kf-victim { color: #ff4d4d; font-weight: bold; }
+/* HUD элементов (Серый стиль) */
+#hud-scalable-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+.hud-element { position: absolute; pointer-events: auto; }
+.hud-stat-box { background: rgba(45, 45, 45, 0.8); border: 1px solid #555; padding: 8px 15px; border-radius: 6px; display: flex; flex-direction: column; }
+.hud-stat-box span:first-child { font-size: 11px; color: #aaa; text-transform: uppercase; }
+.hud-stat-box span:last-child { font-size: 22px; color: #fff; font-weight: bold; }
+#hud-hp { bottom: 20px; left: 20px; }
+#hud-armor { bottom: 20px; left: 120px; }
+#hud-ammo { bottom: 20px; right: 20px; text-align: right; }
+/* Кнопки игры */
+.btn-game { width: 65px; height: 65px; background: rgba(58, 58, 58, 0.6); border: 1px solid #666; border-radius: 50%; display: flex; justify-content: center; align-items: center; }
+.btn-game:active { background: rgba(80, 80, 80, 0.8); }
+.btn-game svg { width: 50%; height: 50%; fill: #fff; }
+#btn-fire { bottom: 100px; right: 40px; width: 80px; height: 80px; }
+#btn-reload { bottom: 110px; right: 140px; }
+#btn-jump { bottom: 30px; right: 130px; }
+#btn-crouch { bottom: 20px; right: 210px; }
+#joystick-zone { bottom: 30px; left: 30px; width: 120px; height: 120px; background: rgba(45, 45, 45, 0.5); border: 1px solid #666; border-radius: 50%; display: flex; justify-content: center; align-items: center; touch-action: none; }
+#joystick-stick { width: 45px; height: 45px; background: #888; border-radius: 50%; }
+/* Меню профиля и друзей (добавим позже логику) */
+#btn-profile { top: 20px; left: 20px; width: 50px; height: 50px; background: #2d2d2d; border: 1px solid #555; border-radius: 50%; overflow: hidden; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+#btn-profile img { width: 100%; height: 100%; object-fit: cover; }
+#game-crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: #fff; border-radius: 50%; pointer-events: none; z-index: 10; }
+#respawn-screen { display: none; background: rgba(20, 20, 20, 0.8); }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
-
-    <div id="canvas-container"></div>
-
-    <div id="auth-screen" class="overlay">
-        <div class="auth-container">
-            <h1>ARENA LOG IN</h1>
-            <input type="email" id="input-email" class="auth-input" placeholder="E-mail адрес">
-            <input type="password" id="input-pass" class="auth-input" placeholder="Пароль">
-            <input type="text" id="input-server" class="auth-input" placeholder="URL Сервера (оставь пустым для авто)">
-            <input type="text" id="input-lobby" class="auth-input" placeholder="ID Лобби (необязательно)">
-            <button id="btn-auth" class="btn-main">ВОЙТИ В ИГРУ</button>
-            <p id="auth-status" style="margin-top: 15px; color: #888; font-size: 13px;">Укажите почту для сохранения профиля</p>
-        </div>
-    </div>
-
-    <div id="respawn-screen" class="overlay">
-        <h2 style="color:#fff; margin-bottom:20px;">ВЫ УБИТЫ</h2>
-        <button id="btn-respawn" class="btn-main" style="max-width: 250px;">ВОЗРОДИТЬСЯ</button>
-    </div>
-
-    <div id="game-crosshair"></div>
-
-    <div id="hud-scalable-wrapper">
-        <div id="killfeed-container" class="hud-element"></div>
-        
-        <div id="btn-profile" class="hud-element">
-            <img src="https://via.placeholder.com/50/3a3a3a/ffffff?text=U" alt="Avatar" id="user-avatar">
-        </div>
-
-        <div id="hud-hp" class="hud-element hud-stat-box"><span>Здоровье</span><span id="val-hp">100</span></div>
-        <div id="hud-armor" class="hud-element hud-stat-box"><span>Броня</span><span id="val-armor">100</span></div>
-        <div id="hud-ammo" class="hud-element hud-stat-box"><span>АК-47</span><span id="val-ammo">30 / 90</span></div>
-        
-        <div id="joystick-zone" class="hud-element"><div id="joystick-stick"></div></div>
-        
-        <div id="btn-fire" class="hud-element btn-game">FIRE</div>
-        <div id="btn-reload" class="hud-element btn-game">RELOAD</div>
-        <div id="btn-jump" class="hud-element btn-game">JUMP</div>
-        <div id="btn-crouch" class="hud-element btn-game">CROUCH</div>
-    </div>
-
-    <script src="js/settings.js"></script>
-    <script src="js/main.js"></script>
+<div id="canvas-container"></div>
+<div id="auth-screen" class="overlay">
+<div class="auth-container">
+<h1>ARENA LOG IN</h1>
+<input type="email" id="input-email" class="auth-input" placeholder="E-mail адрес">
+<input type="password" id="input-pass" class="auth-input" placeholder="Пароль">
+<input type="text" id="input-server" class="auth-input" placeholder="URL Сервера (оставь пустым для авто)">
+<input type="text" id="input-lobby" class="auth-input" placeholder="ID Лобби (необязательно)">
+<button id="btn-auth" class="btn-main">ВОЙТИ В ИГРУ</button>
+<p id="auth-status" style="margin-top: 15px; color: #888; font-size: 13px;">Укажите почту для сохранения профиля</p>
+</div>
+</div>
+<div id="respawn-screen" class="overlay">
+<h2 style="color:#fff; margin-bottom:20px;">ВЫ УБИТЫ</h2>
+<button id="btn-respawn" class="btn-main" style="max-width: 250px;">ВОЗРОДИТЬСЯ</button>
+</div>
+<div id="game-crosshair"></div>
+<div id="hud-scalable-wrapper">
+<div id="killfeed-container" class="hud-element"></div>
+<div id="btn-profile" class="hud-element">
+<img src="https://via.placeholder.com/50/3a3a3a/ffffff?text=U" alt="Avatar" id="user-avatar">
+</div>
+<div id="hud-hp" class="hud-element hud-stat-box"><span>Здоровье</span><span id="val-hp">100</span></div>
+<div id="hud-armor" class="hud-element hud-stat-box"><span>Броня</span><span id="val-armor">100</span></div>
+<div id="hud-ammo" class="hud-element hud-stat-box"><span>АК-47</span><span id="val-ammo">30 / 90</span></div>
+<div id="joystick-zone" class="hud-element"><div id="joystick-stick"></div></div>
+<div id="btn-fire" class="hud-element btn-game">FIRE</div>
+<div id="btn-reload" class="hud-element btn-game">RELOAD</div>
+<div id="btn-jump" class="hud-element btn-game">JUMP</div>
+<div id="btn-crouch" class="hud-element btn-game">CROUCH</div>
+</div>
+<script src="js/settings.js"></script>
+<script src="js/state.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/network.js"></script>
+<script src="js/weapons.js"></script>
+<script src="js/controls.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>
