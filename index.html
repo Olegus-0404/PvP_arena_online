@@ -16,6 +16,18 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: #121
 .auth-input:focus { border-color: #888; }
 .btn-main { width: 100%; padding: 14px; background: #3a3a3a; color: white; border: 1px solid #555; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
 .btn-main:hover { background: #4a4a4a; }
+.btn-secondary { background: transparent; margin-top: 10px; }
+.btn-secondary:hover { background: rgba(255,255,255,0.08); }
+.menu-avatar { width: 90px; height: 90px; border-radius: 50%; overflow: hidden; margin: 0 auto 15px; cursor: pointer; border: 2px solid #555; }
+.menu-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-edit-hint { display: block; font-size: 11px; color: #888; margin-top: 6px; }
+.settings-section { text-align: left; margin-bottom: 18px; }
+.settings-section h3 { font-size: 12px; color: #aaa; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+.settings-container { max-height: 85vh; overflow-y: auto; }
+input[type=color]#crosshair-color { width: 100%; height: 40px; padding: 2px; margin-bottom: 10px; background: #1e1e1e; border: 1px solid #444; border-radius: 6px; }
+input[type=range]#crosshair-size { width: 100%; margin-bottom: 10px; }
+body.hud-edit-mode .hud-element { outline: 2px dashed #6cf; cursor: grab; touch-action: none; }
+body.in-menu #hud-scalable-wrapper, body.in-menu #game-crosshair, body.in-menu #camera-look-zone, body.in-menu #round-banner { display: none; }
 /* Киллфед (Счетчик убийств сверху по центру) */
 #killfeed-container { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
 .killfeed-item { background: rgba(30, 30, 30, 0.8); border: 1px solid #444; padding: 5px 15px; border-radius: 4px; font-size: 13px; display: flex; align-items: center; gap: 10px; animation: fadeOut 4s forwards; }
@@ -45,27 +57,89 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: #121
 /* Меню профиля и друзей (добавим позже логику) */
 #btn-profile { top: 20px; left: 20px; width: 50px; height: 50px; background: #2d2d2d; border: 1px solid #555; border-radius: 50%; overflow: hidden; display: flex; justify-content: center; align-items: center; cursor: pointer; }
 #btn-profile img { width: 100%; height: 100%; object-fit: cover; }
-#game-crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: #fff; border-radius: 50%; pointer-events: none; z-index: 10; }
+#game-crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
 #camera-look-zone { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
 .weapon-slot { width: 48px; height: 48px; background: rgba(45,45,45,0.7); border: 1px solid #555; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 11px; color: #ccc; }
 #weapon-slots { display: flex; gap: 6px; bottom: 100px; right: 20px; }
+#match-hud { top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; text-align: center; }
+#round-banner { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); font-size: 28px; font-weight: bold; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.8); background: rgba(20,20,20,0.6); padding: 12px 30px; border-radius: 8px; opacity: 0; transition: opacity 0.4s; pointer-events: none; z-index: 30; white-space: nowrap; }
 #respawn-screen { display: none; background: rgba(20, 20, 20, 0.8); }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
-<body>
+<body class="in-menu">
 <div id="canvas-container"></div>
 <div id="camera-look-zone"></div>
 <div id="auth-screen" class="overlay">
 <div class="auth-container">
 <h1>ARENA LOG IN</h1>
-<input type="email" id="input-email" class="auth-input" placeholder="E-mail адрес">
-<input type="password" id="input-pass" class="auth-input" placeholder="Пароль">
-<input type="text" id="input-server" class="auth-input" placeholder="URL Сервера (оставь пустым для авто)">
-<input type="text" id="input-lobby" class="auth-input" placeholder="ID Лобби (необязательно)">
+<input type="text" id="input-email" class="auth-input" placeholder="Никнейм">
 <button id="btn-auth" class="btn-main">ВОЙТИ В ИГРУ</button>
-<p id="auth-status" style="margin-top: 15px; color: #888; font-size: 13px;">Укажите почту для сохранения профиля</p>
+<p id="auth-status" style="margin-top: 15px; color: #888; font-size: 13px;">Укажите никнейм для сохранения профиля</p>
+</div>
+</div>
+<div id="main-menu" class="overlay" style="display:none;">
+<div class="auth-container">
+<div id="menu-avatar-wrap" class="menu-avatar">
+<img src="https://via.placeholder.com/90/3a3a3a/ffffff?text=U" alt="avatar" class="user-avatar-img">
+</div>
+<h1 id="menu-nick-display">Игрок</h1>
+<button id="btn-play" class="btn-main">ИГРАТЬ</button>
+<button id="btn-open-settings" class="btn-main btn-secondary">НАСТРОЙКИ</button>
+<button id="btn-open-profile" class="btn-main btn-secondary">ПРОФИЛЬ</button>
+</div>
+</div>
+<div id="settings-screen" class="overlay" style="display:none;">
+<div class="auth-container settings-container">
+<h1>НАСТРОЙКИ</h1>
+<div class="settings-section">
+<h3>HUD</h3>
+<button id="btn-hud-edit" class="btn-main btn-secondary">РЕДАКТИРОВАТЬ РАСПОЛОЖЕНИЕ</button>
+<button id="btn-hud-reset" class="btn-main btn-secondary">СБРОСИТЬ HUD</button>
+</div>
+<div class="settings-section">
+<h3>Прицел</h3>
+<select id="crosshair-style" class="auth-input">
+<option value="dot">Точка</option>
+<option value="cross">Крест</option>
+<option value="circle">Кольцо</option>
+</select>
+<input type="color" id="crosshair-color" value="#ffffff">
+<input type="range" id="crosshair-size" min="2" max="20" value="6">
+</div>
+<div class="settings-section">
+<h3>Сервер</h3>
+<select id="server-select" class="auth-input"></select>
+<input type="text" id="new-server-url" class="auth-input" placeholder="URL нового сервера">
+<button id="btn-add-server" class="btn-main btn-secondary">ДОБАВИТЬ СЕРВЕР</button>
+</div>
+<div class="settings-section">
+<h3>Лобби</h3>
+<input type="text" id="lobby-code" class="auth-input" placeholder="ID лобби (пусто = публичный матч)">
+<button id="btn-create-lobby" class="btn-main btn-secondary">СОЗДАТЬ СВОЁ ЛОББИ</button>
+</div>
+<button id="btn-settings-profile" class="btn-main btn-secondary">ПРОФИЛЬ</button>
+<button id="btn-exit-to-menu" class="btn-main btn-secondary">ВЫЙТИ В ГЛАВНОЕ МЕНЮ</button>
+<button id="btn-close-settings" class="btn-main">ЗАКРЫТЬ</button>
+</div>
+</div>
+<div id="profile-screen" class="overlay" style="display:none;">
+<div class="auth-container">
+<h1>ПРОФИЛЬ</h1>
+<div id="profile-avatar-wrap" class="menu-avatar">
+<img src="https://via.placeholder.com/90/3a3a3a/ffffff?text=U" alt="avatar" id="profile-avatar-img" class="user-avatar-img">
+</div>
+<span class="avatar-edit-hint">Нажми на фото, чтобы сменить</span>
+<input type="file" id="profile-avatar-input" accept="image/*" style="display:none;">
+<div style="height:12px;"></div>
+<input type="text" id="profile-nick" class="auth-input" placeholder="Никнейм">
+<input type="email" id="profile-email" class="auth-input" placeholder="E-mail">
+<input type="password" id="profile-password" class="auth-input" placeholder="Пароль">
+<p style="font-size:12px;color:#888;margin-bottom:12px;">Пароль хранится только в этом браузере — сервер его пока не проверяет.</p>
+<button id="btn-save-profile" class="btn-main">СОХРАНИТЬ</button>
+<button id="btn-close-profile" class="btn-main btn-secondary">ОТМЕНА</button>
 </div>
 </div>
 <div id="respawn-screen" class="overlay">
@@ -73,11 +147,15 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: #121
 <button id="btn-respawn" class="btn-main" style="max-width: 250px;">ВОЗРОДИТЬСЯ</button>
 </div>
 <div id="game-crosshair"></div>
+<div id="round-banner"></div>
 <div id="hud-scalable-wrapper">
-<div id="killfeed-container" class="hud-element"></div>
-<div id="btn-profile" class="hud-element">
-<img src="https://via.placeholder.com/50/3a3a3a/ffffff?text=U" alt="Avatar" id="user-avatar">
+<div id="match-hud" class="hud-element hud-stat-box">
+<span>РАУНД <span id="val-round">1 / 5</span></span>
+<span id="val-timer">3:00</span>
+<span>СЧЁТ <span id="val-score">0 : 0</span></span>
 </div>
+<div id="killfeed-container" class="hud-element"></div>
+<div id="btn-menu-trigger" class="hud-element btn-game" style="top:20px; right:20px; width:50px; height:50px;">☰</div>
 <div id="hud-hp" class="hud-element hud-stat-box"><span>Здоровье</span><span id="val-hp">100</span></div>
 <div id="hud-armor" class="hud-element hud-stat-box"><span>Броня</span><span id="val-armor">100</span></div>
 <div id="hud-ammo" class="hud-element hud-stat-box"><span id="val-weapon-name">АК-47</span><span id="val-ammo">30 / 90</span></div>
@@ -100,6 +178,9 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: #121
 <script src="js/weapons.js"></script>
 <script src="js/controls.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/hud-editor.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/menu.js"></script>
 <script src="js/camera.js"></script>
 <script src="js/main.js"></script>
 </body>
