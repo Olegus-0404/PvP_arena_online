@@ -49,9 +49,9 @@ window.GameConfig = {
     NORMAL_SPEED: 6.0,
     CROUCH_SPEED: 2.5,
     WEAPONS: {
-        knife:  { name: "Нож",   damage: 35, fireRate: 500, ammo: Infinity, maxReserve: 0 },
-        pistol: { name: "ПМ",    damage: 25, fireRate: 300, ammo: 8,  maxReserve: 32 },
-        rifle:  { name: "АК-47", damage: 45, fireRate: 110, ammo: 30, maxReserve: 120 }
+        knife: { name: "Нож", damage: 45, fireRate: 500, ammo: Infinity, maxReserve: 0, range: 2.8 },
+        glock: { name: "Glock", damage: 22, fireRate: 260, ammo: 17, maxReserve: 51, range: 120 },
+        rifle: { name: "АК-47", damage: 34, fireRate: 110, ammo: 30, maxReserve: 120, range: 150 }
     }
 };
 
