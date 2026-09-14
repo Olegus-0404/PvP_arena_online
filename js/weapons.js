@@ -36,14 +36,15 @@ function tryFire(now) {
     updateHUD();
 
     if (G.socket) {
-        const target = raycastOtherPlayers();
+        const weaponRange = weapon.range || 100;
+        const target = raycastOtherPlayers(weaponRange);
         if (target) {
             G.socket.emit('playerHit', { targetId: target.id, zone: target.zone });
         }
     }
 }
 
-function raycastOtherPlayers() {
+function raycastOtherPlayers(maxDist) {
     const G = window.Game;
     const origin = new THREE.Vector3();
     G.camera.getWorldPosition(origin);
@@ -51,7 +52,6 @@ function raycastOtherPlayers() {
     G.camera.getWorldDirection(dir);
 
     const HIT_RADIUS = 1.3;
-    const MAX_DIST = 150;
     let closest = null;
     let closestDist = Infinity;
 
@@ -63,7 +63,7 @@ function raycastOtherPlayers() {
         const targetPos = new THREE.Vector3(p.x, 3.5, p.z);
         const toTarget = targetPos.clone().sub(origin);
         const along = toTarget.dot(dir);
-        if (along <= 0 || along > MAX_DIST) continue;
+        if (along <= 0 || along > maxDist) continue;
 
         const closestPoint = origin.clone().add(dir.clone().multiplyScalar(along));
         const perpDist = closestPoint.distanceTo(targetPos);
