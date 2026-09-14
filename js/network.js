@@ -40,6 +40,25 @@ function connectToServer() {
         }
     });
 
+    G.socket.on('matchState', (data) => {
+        if (typeof updateMatchHUD === 'function') updateMatchHUD(data);
+    });
+
+    G.socket.on('roundStart', (data) => {
+        if (typeof showRoundBanner === 'function') {
+            showRoundBanner(`Раунд ${data.round} / ${data.totalRounds}`);
+        }
+    });
+
+    G.socket.on('matchEnd', (data) => {
+        if (typeof showRoundBanner === 'function') {
+            const text = data.winner === 'draw'
+                ? 'НИЧЬЯ'
+                : `ПОБЕДА КОМАНДЫ ${data.winner === 'blue' ? 'СИНИХ' : 'КРАСНЫХ'}`;
+            showRoundBanner(`${text}  (${data.roundWins.blue} : ${data.roundWins.red})`);
+        }
+    });
+
     G.socket.on('damagedBy', () => {
         flashDamage();
     });
