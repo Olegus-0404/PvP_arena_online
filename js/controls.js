@@ -7,6 +7,7 @@ function setupControls() {
     const C = window.GameConfig;
 
     window.addEventListener('keydown', (e) => {
+        if (G.inputLocked) return;
         if (e.code === 'KeyW') G.moveDirection.forward = 1;
         if (e.code === 'KeyS') G.moveDirection.forward = -1;
         if (e.code === 'KeyA') G.moveDirection.right = -1;
