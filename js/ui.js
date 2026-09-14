@@ -4,12 +4,15 @@
 
 function updateHUD() {
     const G = window.Game;
+    const weapon = window.GameConfig.WEAPONS[G.currentWeaponKey];
     const hpEl = document.getElementById('val-hp');
     const armorEl = document.getElementById('val-armor');
     const ammoEl = document.getElementById('val-ammo');
+    const nameEl = document.getElementById('val-weapon-name');
     if (hpEl) hpEl.innerText = Math.max(0, G.hp);
     if (armorEl) armorEl.innerText = Math.max(0, G.armor);
     if (ammoEl) ammoEl.innerText = G.currentWeaponKey === 'knife' ? '∞' : `${G.ammo} / ${G.reserveAmmo}`;
+    if (nameEl) nameEl.innerText = weapon ? weapon.name : '';
 }
 
 function setupAuthUI() {
