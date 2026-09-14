@@ -1,89 +1,91 @@
 // ============================================================================
-// PROFILE: ник, почта, пароль (только локально), фото аватара
+// HUD EDITOR: перетаскивание элементов HUD и сохранение раскладки
 // ============================================================================
 
-const PROFILE_KEY = 'arenaProfile';
+const HUD_LAYOUT_KEY = 'arenaHudLayout';
+let hudDragState = null;
 
-function loadProfile() {
+function loadHudLayout() {
     try {
-        return JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}');
+        return JSON.parse(localStorage.getItem(HUD_LAYOUT_KEY) || '{}');
     } catch (e) {
         return {};
     }
 }
 
-function saveProfile(profile) {
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+function saveHudLayout(layout) {
+    localStorage.setItem(HUD_LAYOUT_KEY, JSON.stringify(layout));
 }
 
-// Обновляет все элементы .user-avatar-img и подпись ника в меню
-function applyProfileToUI(profile) {
-    document.querySelectorAll('.user-avatar-img').forEach((img) => {
-        if (profile.avatar) img.src = profile.avatar;
+// Вызывается один раз при старте — накладывает сохранённые позиции
+function applySavedHudLayout() {
+    const layout = loadHudLayout();
+    for (const id in layout) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const pos = layout[id];
+        el.style.transform = 'none';
+        el.style.right = 'auto';
+        el.style.bottom = 'auto';
+        el.style.left = pos.leftPct + '%';
+        el.style.top = pos.topPct + '%';
+    }
+}
+
+function setHudEditMode(enabled) {
+    const elements = document.querySelectorAll('.hud-element');
+    elements.forEach((el) => {
+        if (enabled) {
+            el.addEventListener('pointerdown', onHudDragStart);
+        } else {
+            el.removeEventListener('pointerdown', onHudDragStart);
+        }
     });
-    const nickDisplay = document.getElementById('menu-nick-display');
-    if (nickDisplay) nickDisplay.innerText = profile.nick || window.Game.myNick || 'Игрок';
 }
 
-function openProfileScreen() {
-    const profile = loadProfile();
-    const nickEl = document.getElementById('profile-nick');
-    const emailEl = document.getElementById('profile-email');
-    const passEl = document.getElementById('profile-password');
-    const imgEl = document.getElementById('profile-avatar-img');
+function onHudDragStart(e) {
+    if (!document.body.classList.contains('hud-edit-mode')) return;
+    const el = e.currentTarget;
+    e.preventDefault();
 
-    if (nickEl) nickEl.value = profile.nick || window.Game.myNick || '';
-    if (emailEl) emailEl.value = profile.email || '';
-    if (passEl) passEl.value = profile.password || '';
-    if (imgEl && profile.avatar) imgEl.src = profile.avatar;
+    const rect = el.getBoundingClientRect();
+    el.style.transform = 'none';
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+    el.style.left = rect.left + 'px';
+    el.style.top = rect.top + 'px';
 
-    const screen = document.getElementById('profile-screen');
-    if (screen) screen.style.display = 'flex';
+    hudDragState = { el, pointerId: e.pointerId };
+    el.setPointerCapture(e.pointerId);
+    el.addEventListener('pointermove', onHudDragMove);
+    el.addEventListener('pointerup', onHudDragEnd);
+    el.addEventListener('pointercancel', onHudDragEnd);
 }
 
-function closeProfileScreen() {
-    const screen = document.getElementById('profile-screen');
-    if (screen) screen.style.display = 'none';
+function onHudDragMove(e) {
+    if (!hudDragState || e.pointerId !== hudDragState.pointerId) return;
+    const el = hudDragState.el;
+    const curLeft = parseFloat(el.style.left) || 0;
+    const curTop = parseFloat(el.style.top) || 0;
+    el.style.left = (curLeft + e.movementX) + 'px';
+    el.style.top = (curTop + e.movementY) + 'px';
 }
 
-function setupProfileUI() {
-    const avatarWrap = document.getElementById('profile-avatar-wrap');
-    const fileInput = document.getElementById('profile-avatar-input');
-    const imgEl = document.getElementById('profile-avatar-img');
+function onHudDragEnd(e) {
+    if (!hudDragState || e.pointerId !== hudDragState.pointerId) return;
+    const el = hudDragState.el;
 
-    if (avatarWrap && fileInput) {
-        avatarWrap.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => { if (imgEl) imgEl.src = reader.result; };
-            reader.readAsDataURL(file);
-        });
-    }
+    const leftPx = parseFloat(el.style.left) || 0;
+    const topPx = parseFloat(el.style.top) || 0;
+    const leftPct = (leftPx / window.innerWidth) * 100;
+    const topPct = (topPx / window.innerHeight) * 100;
 
-    const saveBtn = document.getElementById('btn-save-profile');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', () => {
-            const profile = loadProfile();
-            const nickVal = document.getElementById('profile-nick').value.trim();
-            profile.nick = nickVal || profile.nick || window.Game.myNick || '';
-            profile.email = document.getElementById('profile-email').value.trim();
-            profile.password = document.getElementById('profile-password').value;
-            if (imgEl && imgEl.src && imgEl.src.startsWith('data:')) {
-                profile.avatar = imgEl.src;
-            }
-            saveProfile(profile);
+    const layout = loadHudLayout();
+    layout[el.id] = { leftPct, topPct };
+    saveHudLayout(layout);
 
-            if (profile.nick) {
-                window.Game.myNick = profile.nick;
-                localStorage.setItem('stalker_nick', profile.nick);
-            }
-            applyProfileToUI(profile);
-            closeProfileScreen();
-        });
-    }
-
-    const closeBtn = document.getElementById('btn-close-profile');
-    if (closeBtn) closeBtn.addEventListener('click', closeProfileScreen);
+    el.removeEventListener('pointermove', onHudDragMove);
+    el.removeEventListener('pointerup', onHudDragEnd);
+    el.removeEventListener('pointercancel', onHudDragEnd);
+    hudDragState = null;
 }
