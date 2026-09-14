@@ -45,10 +45,8 @@ function connectToServer() {
     });
 
     G.socket.on('updatePlayers', (players) => {
-        // TODO: отрисовка других игроков как мешей в сцене — отдельная
-        // задача, сейчас клиент их не рисует, но координаты уже приходят
-        // и используются для рейкаста при стрельбе.
         G.otherPlayers = players;
+        if (typeof syncOtherPlayers === 'function') syncOtherPlayers(players);
     });
 
     G.socket.on('chatMessage', (data) => {
