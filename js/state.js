@@ -39,7 +39,8 @@ window.Game = {
     isGrounded: true,
     isCrouching: false,
     moveDirection: { forward: 0, right: 0 },
-    moveSpeed: 6.0
+    moveSpeed: 6.0,
+    inputLocked: false
 };
 
 // Константы — трогать не нужно, но пусть тоже будут в одном месте
