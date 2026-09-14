@@ -12,12 +12,13 @@ window.addEventListener('DOMContentLoaded', () => {
     setupAuthUI();
     setupRespawnUI();
     if (typeof setupCameraLook === 'function') setupCameraLook();
+    initMenus();
 
     const savedNick = localStorage.getItem('stalker_nick');
     if (savedNick) {
         window.Game.myNick = savedNick;
         const authScreen = document.getElementById('auth-screen');
         if (authScreen) authScreen.style.display = 'none';
-        connectToServer();
+        showMainMenu();
     }
 });
