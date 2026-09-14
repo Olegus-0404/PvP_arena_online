@@ -13,6 +13,9 @@ function setupControls() {
         if (e.code === 'KeyD') G.moveDirection.right = 1;
         if (e.code === 'Space' && G.isGrounded) { G.playerVelocity.y = C.JUMP_FORCE; G.isGrounded = false; }
         if (e.code === 'KeyR') reloadWeapon();
+        if (e.code === 'Digit1') window.switchWeapon('knife');
+        if (e.code === 'Digit2') window.switchWeapon('glock');
+        if (e.code === 'Digit3') window.switchWeapon('rifle');
         if (e.code === 'ControlLeft' || e.code === 'KeyC') setCrouch(true);
     });
     window.addEventListener('keyup', (e) => {
@@ -34,6 +37,10 @@ function setupTouchControls() {
         if (G.isGrounded) { G.playerVelocity.y = C.JUMP_FORCE; G.isGrounded = false; }
     });
     bindHold('btn-crouch', () => setCrouch(true), () => setCrouch(false));
+
+    bindTap('weapon-slot-1', () => window.switchWeapon('knife'));
+    bindTap('weapon-slot-2', () => window.switchWeapon('glock'));
+    bindTap('weapon-slot-3', () => window.switchWeapon('rifle'));
 }
 
 function bindTap(id, handler) {
