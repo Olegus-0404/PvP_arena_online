@@ -1,10 +1,20 @@
 // ============================================================================
-// ENGINE: Three.js сцена, камера, карта GLB, физика и игровой цикл
+// ENGINE
+// Three.js сцена, камера, карта GLB, физика и игровой цикл
 // ============================================================================
+
+let lastPlayersObject = null;
+let lastAnimationTime = performance.now();
 
 function initEngine() {
     const G = window.Game;
-    const container = document.getElementById('canvas-container') || document.body;
+    const container =
+        document.getElementById('canvas-container') ||
+        document.body;
+
+    // ------------------------------------------------------------------------
+    // Базовые объекты игрока
+    // ------------------------------------------------------------------------
 
     G.yawObject = new THREE.Object3D();
     G.pitchObject = new THREE.Object3D();
@@ -13,11 +23,23 @@ function initEngine() {
     G.scene = new THREE.Scene();
     G.scene.background = new THREE.Color(0x3a403b);
 
+    // ------------------------------------------------------------------------
+    // Данные карты
+    // ------------------------------------------------------------------------
+
     G.mapRoot = null;
     G.mapMeshes = [];
     G.mapLoaded = false;
+    G.mapBounds = null;
+    G.mapCenter = new THREE.Vector3();
+    G.mapSize = new THREE.Vector3();
+
     G.fallbackFloor = null;
     G.groundRaycaster = new THREE.Raycaster();
+
+    // ------------------------------------------------------------------------
+    // Камера
+    // ------------------------------------------------------------------------
 
     const size = getContainerSize(container);
 
@@ -25,15 +47,20 @@ function initEngine() {
         75,
         size.w / size.h,
         0.1,
-        1000
+        5000
     );
 
     G.pitchObject.add(G.camera);
     G.yawObject.add(G.pitchObject);
 
-    G.yawObject.position.set(0, 3.5, 0);
+    // Нормальная стартовая высота.
+    G.yawObject.position.set(0, 3, 0);
 
     G.scene.add(G.yawObject);
+
+    // ------------------------------------------------------------------------
+    // Renderer
+    // ------------------------------------------------------------------------
 
     G.renderer = new THREE.WebGLRenderer({
         antialias: true,
@@ -50,6 +77,10 @@ function initEngine() {
 
     container.appendChild(G.renderer.domElement);
 
+    // ------------------------------------------------------------------------
+    // Освещение
+    // ------------------------------------------------------------------------
+
     const hemiLight = new THREE.HemisphereLight(
         0xddeeff,
         0x334422,
@@ -60,18 +91,37 @@ function initEngine() {
 
     const sunLight = new THREE.DirectionalLight(
         0xffffff,
-        0.7
+        0.8
     );
 
     sunLight.position.set(50, 100, 30);
+
     G.scene.add(sunLight);
 
+    // ------------------------------------------------------------------------
+    // Временный пол
+    // ------------------------------------------------------------------------
+
     createFallbackFloor();
+
+    // ------------------------------------------------------------------------
+    // Загрузка карты
+    // ------------------------------------------------------------------------
+
     loadChernobylMap();
+
+    // ------------------------------------------------------------------------
+    // Resize
+    // ------------------------------------------------------------------------
 
     resizeToContainer(container);
     setupRobustResize(container);
 
+    // ------------------------------------------------------------------------
+    // Игровой цикл
+    // ------------------------------------------------------------------------
+
+    lastAnimationTime = performance.now();
     animate();
 }
 
@@ -83,17 +133,20 @@ function initEngine() {
 function createFallbackFloor() {
     const G = window.Game;
 
-    const geometry = new THREE.PlaneGeometry(400, 400);
+    const geometry =
+        new THREE.PlaneGeometry(500, 500);
 
-    const material = new THREE.MeshStandardMaterial({
-        color: 0x2b3028,
-        roughness: 1
-    });
+    const material =
+        new THREE.MeshStandardMaterial({
+            color: 0x2b3028,
+            roughness: 1
+        });
 
-    const floor = new THREE.Mesh(
-        geometry,
-        material
-    );
+    const floor =
+        new THREE.Mesh(
+            geometry,
+            material
+        );
 
     floor.rotation.x = -Math.PI / 2;
     floor.name = '__fallback_floor';
@@ -115,24 +168,52 @@ function loadChernobylMap() {
         typeof THREE === 'undefined' ||
         typeof THREE.GLTFLoader === 'undefined'
     ) {
-        console.error('[MAP] GLTFLoader не найден');
+        console.error(
+            '[MAP] GLTFLoader не найден'
+        );
+
         return;
     }
 
-    const loader = new THREE.GLTFLoader();
+    const loader =
+        new THREE.GLTFLoader();
 
-    console.log('[MAP] Загрузка chernobyl_pvp_map.glb...');
+    const mapPath =
+        'models/chernobyl_pvp_map.glb';
+
+    console.log(
+        '[MAP] Загрузка:',
+        mapPath
+    );
 
     loader.load(
-        'models/chernobyl_pvp_map.glb',
+        mapPath,
 
         function (gltf) {
-            const map = gltf.scene;
+            const map =
+                gltf.scene;
 
-            map.name = 'ChernobylPvPMap';
+            if (!map) {
+                console.error(
+                    '[MAP] GLB не содержит scene'
+                );
+
+                return;
+            }
+
+            map.name =
+                'ChernobylPvPMap';
+
+            G.mapMeshes = [];
+
+            // ----------------------------------------------------------------
+            // Подготовка объектов карты
+            // ----------------------------------------------------------------
 
             map.traverse(function (object) {
-                if (!object.isMesh) return;
+                if (!object.isMesh) {
+                    return;
+                }
 
                 object.castShadow = true;
                 object.receiveShadow = true;
@@ -140,63 +221,185 @@ function loadChernobylMap() {
                 G.mapMeshes.push(object);
             });
 
+            if (!G.mapMeshes.length) {
+                console.warn(
+                    '[MAP] В GLB не найдено Mesh-объектов'
+                );
+            }
+
+            // ----------------------------------------------------------------
+            // Добавляем карту в сцену
+            // ----------------------------------------------------------------
+
             G.mapRoot = map;
-            G.mapLoaded = true;
 
             G.scene.add(map);
 
-            if (G.fallbackFloor) {
-                G.scene.remove(G.fallbackFloor);
+            // ----------------------------------------------------------------
+            // Считаем реальные размеры карты
+            // ----------------------------------------------------------------
 
-                if (G.fallbackFloor.geometry) {
+            const bounds =
+                new THREE.Box3()
+                    .setFromObject(map);
+
+            G.mapBounds =
+                bounds.clone();
+
+            bounds.getCenter(
+                G.mapCenter
+            );
+
+            bounds.getSize(
+                G.mapSize
+            );
+
+            console.log(
+                '[MAP] Размер:',
+                G.mapSize.x.toFixed(2),
+                G.mapSize.y.toFixed(2),
+                G.mapSize.z.toFixed(2)
+            );
+
+            console.log(
+                '[MAP] Центр:',
+                G.mapCenter.x.toFixed(2),
+                G.mapCenter.y.toFixed(2),
+                G.mapCenter.z.toFixed(2)
+            );
+
+            // ----------------------------------------------------------------
+            // Убираем fallback
+            // ----------------------------------------------------------------
+
+            if (G.fallbackFloor) {
+                G.scene.remove(
+                    G.fallbackFloor
+                );
+
+                if (
+                    G.fallbackFloor.geometry
+                ) {
                     G.fallbackFloor.geometry.dispose();
                 }
 
-                if (G.fallbackFloor.material) {
+                if (
+                    G.fallbackFloor.material
+                ) {
                     G.fallbackFloor.material.dispose();
                 }
 
                 G.fallbackFloor = null;
             }
 
+            G.mapLoaded = true;
+
+            // ----------------------------------------------------------------
+            // Spawn-маркеры
+            // ----------------------------------------------------------------
+
+            const spawnBlue =
+                map.getObjectByName(
+                    'spawn_blue'
+                );
+
+            const spawnRed =
+                map.getObjectByName(
+                    'spawn_red'
+                );
+
+            let spawnObject = null;
+
+            // Пока выбираем синий spawn.
+            // Сервер по-прежнему отвечает за команду.
+            if (spawnBlue) {
+                spawnObject =
+                    spawnBlue;
+
+                console.log(
+                    '[MAP] Найден spawn_blue'
+                );
+            } else if (spawnRed) {
+                spawnObject =
+                    spawnRed;
+
+                console.log(
+                    '[MAP] Найден spawn_red'
+                );
+            }
+
+            if (spawnObject) {
+                const worldPosition =
+                    new THREE.Vector3();
+
+                spawnObject.getWorldPosition(
+                    worldPosition
+                );
+
+                console.log(
+                    '[MAP] Spawn:',
+                    worldPosition.x.toFixed(2),
+                    worldPosition.y.toFixed(2),
+                    worldPosition.z.toFixed(2)
+                );
+
+                // Не телепортируем игрока,
+                // если он уже получил позицию от сервера.
+                if (
+                    !G.socket ||
+                    !G.myId
+                ) {
+                    G.yawObject.position.x =
+                        worldPosition.x;
+
+                    G.yawObject.position.z =
+                        worldPosition.z;
+
+                    const ground =
+                        getGroundHeight(
+                            worldPosition.x,
+                            worldPosition.z
+                        );
+
+                    G.yawObject.position.y =
+                        ground + getPlayerEyeHeight();
+                }
+            }
+
             console.log(
-                '[MAP] Карта загружена. Объектов:',
+                '[MAP] Карта загружена. Mesh:',
                 G.mapMeshes.length
             );
-
-            const spawnBlue = map.getObjectByName('spawn_blue');
-            const spawnRed = map.getObjectByName('spawn_red');
-
-            if (spawnBlue) {
-                console.log(
-                    '[MAP] Найден spawn_blue:',
-                    spawnBlue.position
-                );
-            }
-
-            if (spawnRed) {
-                console.log(
-                    '[MAP] Найден spawn_red:',
-                    spawnRed.position
-                );
-            }
         },
 
         function (progress) {
-            if (progress.total > 0) {
+            if (
+                progress &&
+                progress.total > 0
+            ) {
                 const percent =
                     Math.round(
-                        (progress.loaded / progress.total) * 100
+                        (
+                            progress.loaded /
+                            progress.total
+                        ) * 100
                     );
 
-                console.log('[MAP] Загрузка:', percent + '%');
+                console.log(
+                    '[MAP] Загрузка:',
+                    percent + '%'
+                );
             }
         },
 
         function (error) {
             console.error(
-                '[MAP] Ошибка загрузки chernobyl_pvp_map.glb:',
+                '[MAP] Ошибка загрузки:',
                 error
+            );
+
+            console.warn(
+                '[MAP] Оставляем временный пол'
             );
         }
     );
@@ -204,32 +407,41 @@ function loadChernobylMap() {
 
 
 // ============================================================================
-// ВЫСОТА ЗЕМЛИ / КАРТЫ
+// ВЫСОТА ЗЕМЛИ
 // ============================================================================
 
 function getGroundHeight(x, z) {
     const G = window.Game;
 
-    if (!G.mapLoaded || !G.mapMeshes.length) {
-        return 0;
+    if (
+        !G.mapLoaded ||
+        !G.mapMeshes ||
+        !G.mapMeshes.length
+    ) {
+        return null;
     }
 
-    const origin = new THREE.Vector3(
-        x,
-        100,
-        z
-    );
+    const origin =
+        new THREE.Vector3(
+            x,
+            10000,
+            z
+        );
 
-    const direction = new THREE.Vector3(
-        0,
-        -1,
-        0
-    );
+    const direction =
+        new THREE.Vector3(
+            0,
+            -1,
+            0
+        );
 
     G.groundRaycaster.set(
         origin,
         direction
     );
+
+    G.groundRaycaster.far =
+        20000;
 
     const hits =
         G.groundRaycaster.intersectObjects(
@@ -238,10 +450,25 @@ function getGroundHeight(x, z) {
         );
 
     if (!hits.length) {
-        return 0;
+        return null;
     }
 
     return hits[0].point.y;
+}
+
+
+// ============================================================================
+// ВЫСОТА КАМЕРЫ / ИГРОКА
+// ============================================================================
+
+function getPlayerEyeHeight() {
+    const G = window.Game;
+
+    if (G.isCrouching) {
+        return 1.8;
+    }
+
+    return 2.2;
 }
 
 
@@ -251,8 +478,13 @@ function getGroundHeight(x, z) {
 
 function getContainerSize(container) {
     return {
-        w: container.clientWidth || window.innerWidth,
-        h: container.clientHeight || window.innerHeight
+        w:
+            container.clientWidth ||
+            window.innerWidth,
+
+        h:
+            container.clientHeight ||
+            window.innerHeight
     };
 }
 
@@ -260,13 +492,20 @@ function getContainerSize(container) {
 function resizeToContainer(container) {
     const G = window.Game;
 
-    if (!G.camera || !G.renderer) {
+    if (
+        !G.camera ||
+        !G.renderer
+    ) {
         return;
     }
 
-    const size = getContainerSize(container);
+    const size =
+        getContainerSize(container);
 
-    if (size.w === 0 || size.h === 0) {
+    if (
+        size.w <= 0 ||
+        size.h <= 0
+    ) {
         return;
     }
 
@@ -284,19 +523,30 @@ function resizeToContainer(container) {
 
 
 function setupRobustResize(container) {
-    if (typeof ResizeObserver !== 'undefined') {
+    if (
+        typeof ResizeObserver !==
+        'undefined'
+    ) {
         const observer =
-            new ResizeObserver(function () {
-                resizeToContainer(container);
-            });
+            new ResizeObserver(
+                function () {
+                    resizeToContainer(
+                        container
+                    );
+                }
+            );
 
-        observer.observe(container);
+        observer.observe(
+            container
+        );
     }
 
     window.addEventListener(
         'resize',
         function () {
-            resizeToContainer(container);
+            resizeToContainer(
+                container
+            );
         }
     );
 
@@ -305,9 +555,11 @@ function setupRobustResize(container) {
         function () {
             setTimeout(
                 function () {
-                    resizeToContainer(container);
+                    resizeToContainer(
+                        container
+                    );
                 },
-                200
+                250
             );
         }
     );
@@ -316,7 +568,9 @@ function setupRobustResize(container) {
         window.visualViewport.addEventListener(
             'resize',
             function () {
-                resizeToContainer(container);
+                resizeToContainer(
+                    container
+                );
             }
         );
     }
@@ -331,10 +585,11 @@ function setCrouch(state) {
     const G = window.Game;
     const C = window.GameConfig;
 
-    G.isCrouching = state;
+    G.isCrouching =
+        !!state;
 
     G.moveSpeed =
-        state
+        G.isCrouching
             ? C.CROUCH_SPEED
             : C.NORMAL_SPEED;
 }
@@ -344,143 +599,223 @@ function setCrouch(state) {
 // ИГРОВОЙ ЦИКЛ
 // ============================================================================
 
-let lastPlayersObject = null;
-let lastAnimationTime = performance.now();
-
 function animate() {
-    requestAnimationFrame(animate);
+    requestAnimationFrame(
+        animate
+    );
 
     const G = window.Game;
     const C = window.GameConfig;
 
-    const now = performance.now();
+    const now =
+        performance.now();
 
-    const delta =
+    let delta =
+        (now - lastAnimationTime) /
+        1000;
+
+    lastAnimationTime =
+        now;
+
+    // Защита от огромного скачка
+    // после сворачивания вкладки.
+    delta =
         Math.min(
-            (now - lastAnimationTime) / 1000,
+            Math.max(delta, 0),
             0.05
         );
 
-    lastAnimationTime = now;
-
-    if (!G.scene || !G.camera || !G.renderer) {
+    if (
+        !G.scene ||
+        !G.camera ||
+        !G.renderer
+    ) {
         return;
     }
 
-
     // ------------------------------------------------------------------------
-    // Обновление моделей других игроков
+    // Другие игроки
     // ------------------------------------------------------------------------
 
     if (
         G.otherPlayers &&
-        G.otherPlayers !== lastPlayersObject &&
-        typeof syncOtherPlayers === 'function'
+        G.otherPlayers !==
+            lastPlayersObject &&
+        typeof syncOtherPlayers ===
+            'function'
     ) {
-        syncOtherPlayers(G.otherPlayers);
-        lastPlayersObject = G.otherPlayers;
+        syncOtherPlayers(
+            G.otherPlayers
+        );
+
+        lastPlayersObject =
+            G.otherPlayers;
     }
 
     if (
-        typeof updateOtherPlayerAnimations === 'function'
+        typeof updateOtherPlayerAnimations ===
+            'function'
     ) {
-        updateOtherPlayerAnimations(delta);
+        updateOtherPlayerAnimations(
+            delta
+        );
     }
 
-
     // ------------------------------------------------------------------------
-    // Гравитация
-    // ------------------------------------------------------------------------
-
-    G.playerVelocity.y -=
-        C.GRAVITY * delta;
-
-
-    // ------------------------------------------------------------------------
-    // Движение
+    // Управление
     // ------------------------------------------------------------------------
 
-    const inputX =
-        Number(G.moveDirection.right) || 0;
+    const controlsLocked =
+        !!G.inputLocked;
 
-    const inputZ =
-        Number(G.moveDirection.forward) || 0;
+    if (!controlsLocked) {
 
-    const moveVector =
-        new THREE.Vector3(
-            inputX,
-            0,
-            -inputZ
+        // ------------------------------------------------------------
+        // Гравитация
+        // ------------------------------------------------------------
+
+        G.playerVelocity.y -=
+            C.GRAVITY *
+            delta;
+
+        // ------------------------------------------------------------
+        // Движение
+        // ------------------------------------------------------------
+
+        const inputX =
+            Number(
+                G.moveDirection.right
+            ) || 0;
+
+        const inputZ =
+            Number(
+                G.moveDirection.forward
+            ) || 0;
+
+        const moveVector =
+            new THREE.Vector3(
+                inputX,
+                0,
+                -inputZ
+            );
+
+        if (
+            moveVector.lengthSq() > 1
+        ) {
+            moveVector.normalize();
+        }
+
+        moveVector.applyQuaternion(
+            G.yawObject.quaternion
         );
 
-    if (moveVector.lengthSq() > 1) {
-        moveVector.normalize();
-    }
+        G.yawObject.position.x +=
+            moveVector.x *
+            G.moveSpeed *
+            delta;
 
-    moveVector.applyQuaternion(
-        G.yawObject.quaternion
-    );
+        G.yawObject.position.z +=
+            moveVector.z *
+            G.moveSpeed *
+            delta;
 
-    G.yawObject.position.x +=
-        moveVector.x *
-        G.moveSpeed *
-        delta;
+        // ------------------------------------------------------------
+        // Земля
+        // ------------------------------------------------------------
 
-    G.yawObject.position.z +=
-        moveVector.z *
-        G.moveSpeed *
-        delta;
+        const ground =
+            getGroundHeight(
+                G.yawObject.position.x,
+                G.yawObject.position.z
+            );
 
+        // Если карта загружена и земля найдена —
+        // ставим игрока точно на поверхность.
+        if (
+            ground !== null
+        ) {
+            const playerHeight =
+                getPlayerEyeHeight();
 
-    // ------------------------------------------------------------------------
-    // Земля
-    // ------------------------------------------------------------------------
+            const targetY =
+                ground +
+                playerHeight;
 
-    const ground =
-        getGroundHeight(
-            G.yawObject.position.x,
-            G.yawObject.position.z
-        );
+            G.yawObject.position.y +=
+                G.playerVelocity.y *
+                delta;
 
-    const playerHeight =
-        G.isCrouching
-            ? 2.2
-            : 3.0;
+            if (
+                G.yawObject.position.y <=
+                targetY
+            ) {
+                G.yawObject.position.y =
+                    targetY;
 
-    const targetY =
-        ground + playerHeight;
+                G.playerVelocity.y =
+                    0;
 
+                G.isGrounded =
+                    true;
+            } else {
+                G.isGrounded =
+                    false;
+            }
+        } else {
+            // Карта ещё не готова или
+            // под игроком нет поверхности.
+            G.yawObject.position.y +=
+                G.playerVelocity.y *
+                delta;
 
-    G.yawObject.position.y +=
-        G.playerVelocity.y *
-        delta;
+            if (
+                G.yawObject.position.y <=
+                0
+            ) {
+                G.yawObject.position.y =
+                    0;
 
+                G.playerVelocity.y =
+                    0;
 
-    if (
-        G.yawObject.position.y <=
-        targetY
-    ) {
-        G.yawObject.position.y =
-            targetY;
-
-        G.playerVelocity.y = 0;
-
-        G.isGrounded = true;
+                G.isGrounded =
+                    true;
+            } else {
+                G.isGrounded =
+                    false;
+            }
+        }
     } else {
-        G.isGrounded = false;
+        // --------------------------------------------------------------------
+        // HUD-редактор / меню:
+        // полностью останавливаем физическое движение.
+        // --------------------------------------------------------------------
+
+        G.playerVelocity.set(
+            0,
+            0,
+            0
+        );
+
+        G.moveDirection.forward =
+            0;
+
+        G.moveDirection.right =
+            0;
     }
 
-
     // ------------------------------------------------------------------------
-    // Отправка позиции на сервер
+    // Отправка позиции
     // ------------------------------------------------------------------------
 
     if (
-        typeof sendPositionUpdate === 'function'
+        typeof sendPositionUpdate ===
+            'function'
     ) {
-        sendPositionUpdate(now);
+        sendPositionUpdate(
+            now
+        );
     }
-
 
     // ------------------------------------------------------------------------
     // Рендер
