@@ -1,188 +1,804 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+>
+
 <title>PvP Arena Online v2</title>
+
 <style>
-* { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
-body, html { width: 100%; height: 100%; overflow: hidden; background-color: #121212; font-family: 'Segoe UI', Roboto, sans-serif; color: #fff; }
-#canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
-/* Окно авторизации (Темно-серый стиль) */
-.overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1e1e1e; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
-.auth-container { background: #2d2d2d; border: 1px solid #444; border-radius: 8px; padding: 30px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-.auth-container h1 { color: #ffffff; margin-bottom: 20px; font-size: 24px; font-weight: 600; }
-.auth-input { width: 100%; padding: 14px; background: #1e1e1e; border: 1px solid #444; color: #fff; border-radius: 6px; margin-bottom: 12px; font-size: 15px; outline: none; transition: 0.2s; }
-.auth-input:focus { border-color: #888; }
-.btn-main { width: 100%; padding: 14px; background: #3a3a3a; color: white; border: 1px solid #555; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-.btn-main:hover { background: #4a4a4a; }
-.btn-secondary { background: transparent; margin-top: 10px; }
-.btn-secondary:hover { background: rgba(255,255,255,0.08); }
-.menu-avatar { width: 90px; height: 90px; border-radius: 50%; overflow: hidden; margin: 0 auto 15px; cursor: pointer; border: 2px solid #555; }
-.menu-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.avatar-edit-hint { display: block; font-size: 11px; color: #888; margin-top: 6px; }
-.settings-section { text-align: left; margin-bottom: 18px; }
-.settings-section h3 { font-size: 12px; color: #aaa; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
-.settings-container { max-height: 85vh; overflow-y: auto; }
-input[type=color]#crosshair-color { width: 100%; height: 40px; padding: 2px; margin-bottom: 10px; background: #1e1e1e; border: 1px solid #444; border-radius: 6px; }
-input[type=range]#crosshair-size { width: 100%; margin-bottom: 10px; }
-body.hud-edit-mode .hud-element { outline: 2px dashed #6cf; cursor: grab; touch-action: none; }
-body.in-menu #hud-scalable-wrapper, body.in-menu #game-crosshair, body.in-menu #camera-look-zone, body.in-menu #round-banner { display: none; }
-/* Киллфед (Счетчик убийств сверху по центру) */
-#killfeed-container { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
-.killfeed-item { background: rgba(30, 30, 30, 0.8); border: 1px solid #444; padding: 5px 15px; border-radius: 4px; font-size: 13px; display: flex; align-items: center; gap: 10px; animation: fadeOut 4s forwards; }
-@keyframes fadeOut { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; display: none; } }
-.kf-killer { color: #fff; font-weight: bold; }
-.kf-weapon { color: #888; font-size: 11px; }
-.kf-victim { color: #ff4d4d; font-weight: bold; }
-/* HUD элементов (Серый стиль) */
-#hud-scalable-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-.hud-element { position: absolute; pointer-events: auto; }
-.hud-stat-box { background: rgba(45, 45, 45, 0.8); border: 1px solid #555; padding: 8px 15px; border-radius: 6px; display: flex; flex-direction: column; }
-.hud-stat-box span:first-child { font-size: 11px; color: #aaa; text-transform: uppercase; }
-.hud-stat-box span:last-child { font-size: 22px; color: #fff; font-weight: bold; }
-#hud-hp { bottom: 20px; left: 20px; }
-#hud-armor { bottom: 20px; left: 120px; }
-#hud-ammo { bottom: 20px; right: 20px; text-align: right; }
-/* Кнопки игры */
-.btn-game { width: 65px; height: 65px; background: rgba(58, 58, 58, 0.6); border: 1px solid #666; border-radius: 50%; display: flex; justify-content: center; align-items: center; }
-.btn-game:active { background: rgba(80, 80, 80, 0.8); }
-.btn-game svg { width: 50%; height: 50%; fill: #fff; }
-#btn-fire { bottom: 100px; right: 40px; width: 80px; height: 80px; }
-#btn-reload { bottom: 110px; right: 140px; }
-#btn-jump { bottom: 30px; right: 130px; }
-#btn-crouch { bottom: 20px; right: 210px; }
-#joystick-zone { bottom: 30px; left: 30px; width: 120px; height: 120px; background: rgba(45, 45, 45, 0.5); border: 1px solid #666; border-radius: 50%; display: flex; justify-content: center; align-items: center; touch-action: none; }
-#joystick-stick { width: 45px; height: 45px; background: #888; border-radius: 50%; }
-/* Меню профиля и друзей (добавим позже логику) */
-#btn-profile { top: 20px; left: 20px; width: 50px; height: 50px; background: #2d2d2d; border: 1px solid #555; border-radius: 50%; overflow: hidden; display: flex; justify-content: center; align-items: center; cursor: pointer; }
-#btn-profile img { width: 100%; height: 100%; object-fit: cover; }
-#game-crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
-#camera-look-zone { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
-.weapon-slot { width: 48px; height: 48px; background: rgba(45,45,45,0.7); border: 1px solid #555; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 11px; color: #ccc; }
-#weapon-slots { display: flex; gap: 6px; bottom: 100px; right: 20px; }
-#match-hud { top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; text-align: center; }
-#round-banner { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); font-size: 28px; font-weight: bold; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.8); background: rgba(20,20,20,0.6); padding: 12px 30px; border-radius: 8px; opacity: 0; transition: opacity 0.4s; pointer-events: none; z-index: 30; white-space: nowrap; }
-#respawn-screen { display: none; background: rgba(20, 20, 20, 0.8); }
-</style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-</head>
-<body class="in-menu">
-<div id="canvas-container"></div>
-<div id="camera-look-zone"></div>
-<div id="auth-screen" class="overlay">
-<div class="auth-container">
-<h1>ARENA LOG IN</h1>
-<input type="text" id="input-email" class="auth-input" placeholder="Никнейм">
-<button id="btn-auth" class="btn-main">ВОЙТИ В ИГРУ</button>
-<p id="auth-status" style="margin-top: 15px; color: #888; font-size: 13px;">Укажите никнейм для сохранения профиля</p>
-</div>
-</div>
-<div id="main-menu" class="overlay" style="display:none;">
-<div class="auth-container">
-<div id="menu-avatar-wrap" class="menu-avatar">
-<img src="https://via.placeholder.com/90/3a3a3a/ffffff?text=U" alt="avatar" class="user-avatar-img">
-</div>
-<h1 id="menu-nick-display">Игрок</h1>
-<button id="btn-play" class="btn-main">ИГРАТЬ</button>
-<button id="btn-open-settings" class="btn-main btn-secondary">НАСТРОЙКИ</button>
-<button id="btn-open-profile" class="btn-main btn-secondary">ПРОФИЛЬ</button>
-</div>
-</div>
-<div id="settings-screen" class="overlay" style="display:none;">
-<div class="auth-container settings-container">
-<h1>НАСТРОЙКИ</h1>
-<div class="settings-section">
-<h3>HUD</h3>
-<button id="btn-hud-edit" class="btn-main btn-secondary">РЕДАКТИРОВАТЬ РАСПОЛОЖЕНИЕ</button>
-<button id="btn-hud-reset" class="btn-main btn-secondary">СБРОСИТЬ HUD</button>
-</div>
-<div class="settings-section">
-<h3>Прицел</h3>
-<select id="crosshair-style" class="auth-input">
-<option value="dot">Точка</option>
-<option value="cross">Крест</option>
-<option value="circle">Кольцо</option>
-</select>
-<input type="color" id="crosshair-color" value="#ffffff">
-<input type="range" id="crosshair-size" min="2" max="20" value="6">
-</div>
-<div class="settings-section">
-<h3>Сервер</h3>
-<select id="server-select" class="auth-input"></select>
-<input type="text" id="new-server-url" class="auth-input" placeholder="URL нового сервера">
-<button id="btn-add-server" class="btn-main btn-secondary">ДОБАВИТЬ СЕРВЕР</button>
-</div>
-<div class="settings-section">
-<h3>Лобби</h3>
-<input type="text" id="lobby-code" class="auth-input" placeholder="ID лобби (пусто = публичный матч)">
-<button id="btn-create-lobby" class="btn-main btn-secondary">СОЗДАТЬ СВОЁ ЛОББИ</button>
-</div>
-<button id="btn-settings-profile" class="btn-main btn-secondary">ПРОФИЛЬ</button>
-<button id="btn-exit-to-menu" class="btn-main btn-secondary">ВЫЙТИ В ГЛАВНОЕ МЕНЮ</button>
-<button id="btn-close-settings" class="btn-main">ЗАКРЫТЬ</button>
-</div>
-</div>
-<div id="profile-screen" class="overlay" style="display:none;">
-<div class="auth-container">
-<h1>ПРОФИЛЬ</h1>
-<div id="profile-avatar-wrap" class="menu-avatar">
-<img src="https://via.placeholder.com/90/3a3a3a/ffffff?text=U" alt="avatar" id="profile-avatar-img" class="user-avatar-img">
-</div>
-<span class="avatar-edit-hint">Нажми на фото, чтобы сменить</span>
-<input type="file" id="profile-avatar-input" accept="image/*" style="display:none;">
-<div style="height:12px;"></div>
-<input type="text" id="profile-nick" class="auth-input" placeholder="Никнейм">
-<input type="email" id="profile-email" class="auth-input" placeholder="E-mail">
-<input type="password" id="profile-password" class="auth-input" placeholder="Пароль">
-<p style="font-size:12px;color:#888;margin-bottom:12px;">Пароль хранится только в этом браузере — сервер его пока не проверяет.</p>
-<button id="btn-save-profile" class="btn-main">СОХРАНИТЬ</button>
-<button id="btn-close-profile" class="btn-main btn-secondary">ОТМЕНА</button>
-</div>
-</div>
-<div id="respawn-screen" class="overlay">
-<h2 style="color:#fff; margin-bottom:20px;">ВЫ УБИТЫ</h2>
-<button id="btn-respawn" class="btn-main" style="max-width: 250px;">ВОЗРОДИТЬСЯ</button>
-</div>
-<div id="game-crosshair"></div>
-<div id="round-banner"></div>
-<div id="hud-scalable-wrapper">
-<div id="match-hud" class="hud-element hud-stat-box">
-<span>РАУНД <span id="val-round">1 / 5</span></span>
-<span id="val-timer">3:00</span>
-<span>СЧЁТ <span id="val-score">0 : 0</span></span>
-</div>
-<div id="killfeed-container" class="hud-element"></div>
-<div id="btn-menu-trigger" class="hud-element btn-game" style="top:20px; right:20px; width:50px; height:50px;">☰</div>
-<div id="hud-hp" class="hud-element hud-stat-box"><span>Здоровье</span><span id="val-hp">100</span></div>
-<div id="hud-armor" class="hud-element hud-stat-box"><span>Броня</span><span id="val-armor">100</span></div>
-<div id="hud-ammo" class="hud-element hud-stat-box"><span id="val-weapon-name">АК-47</span><span id="val-ammo">30 / 90</span></div>
-<div id="weapon-slots" class="hud-element">
-<div id="weapon-slot-1" class="weapon-slot">1 НОЖ</div>
-<div id="weapon-slot-2" class="weapon-slot">2 GLOCK</div>
-<div id="weapon-slot-3" class="weapon-slot">3 AK</div>
-</div>
-<div id="joystick-zone" class="hud-element"><div id="joystick-stick"></div></div>
-<div id="btn-fire" class="hud-element btn-game">FIRE</div>
-<div id="btn-reload" class="hud-element btn-game">RELOAD</div>
-<div id="btn-jump" class="hud-element btn-game">JUMP</div>
-<div id="btn-crouch" class="hud-element btn-game">CROUCH</div>
-</div>
-<script src="js/settings.js"></script>
-<script src="js/state.js"></script>
-<script src="js/engine.js"></script>
-<script src="js/network.js"></script>
-<script src="js/players.js"></script>
-<script src="js/weapons.js"></script>
-<script src="js/controls.js"></script>
-<script src="js/joystick-fix.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/hud-editor.js"></script>
-<script src="js/profile.js"></script>
-<script src="js/menu.js"></script>
-<script src="js/camera.js"></script>
-<script src="js/main.js"></script>
-</body>
-</html>
+
+* {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #121212;
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    color: #fff;
+}
+
+/* ========================================================= */
+/* ИГРОВАЯ СЦЕНА                                             */
+/* ========================================================= */
+
+#canvas-container {
+    width: 100%;
+    height: 100%;
+
+    position: absolute;
+    top: 0;
+    left: 0;
+
+    z-index: 1;
+}
+
+#camera-look-zone {
+    position: absolute;
+
+    top: 0;
+    left: 0;
+
+    width: 100%;
+    height: 100%;
+
+    z-index: 5;
+
+    touch-action: none;
+}
+
+body.in-menu #camera-look-zone,
+body.in-menu #hud-scalable-wrapper,
+body.in-menu #game-crosshair,
+body.in-menu #round-banner {
+    display: none;
+}
+
+/* ========================================================= */
+/* SVG                                                       */
+/* ========================================================= */
+
+.svg-icon {
+    width: 24px;
+    height: 24px;
+
+    display: block;
+
+    fill: none;
+    stroke: currentColor;
+
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+
+    pointer-events: none;
+}
+
+.svg-icon-fill {
+    fill: currentColor;
+    stroke: none;
+}
+
+/* ========================================================= */
+/* ОКНА                                                       */
+/* ========================================================= */
+
+.overlay {
+    position: absolute;
+
+    top: 0;
+    left: 0;
+
+    width: 100%;
+    height: 100%;
+
+    background: #1e1e1e;
+
+    z-index: 100;
+
+    display: flex;
+
+    flex-direction: column;
+
+    justify-content: center;
+    align-items: center;
+
+    padding:
+        max(20px, env(safe-area-inset-top))
+        max(20px, env(safe-area-inset-right))
+        max(20px, env(safe-area-inset-bottom))
+        max(20px, env(safe-area-inset-left));
+
+    overflow: auto;
+}
+
+.auth-container {
+    background: #2d2d2d;
+
+    border: 1px solid #444;
+
+    border-radius: 8px;
+
+    padding: 30px;
+
+    width: 100%;
+    max-width: 400px;
+
+    text-align: center;
+
+    box-shadow:
+        0 10px 30px rgba(0,0,0,0.5);
+}
+
+.auth-container h1 {
+    color: #fff;
+
+    margin-bottom: 20px;
+
+    font-size: 24px;
+
+    font-weight: 600;
+}
+
+.auth-input {
+    width: 100%;
+
+    padding: 14px;
+
+    background: #1e1e1e;
+
+    border: 1px solid #444;
+
+    color: #fff;
+
+    border-radius: 6px;
+
+    margin-bottom: 12px;
+
+    font-size: 15px;
+
+    outline: none;
+
+    transition: 0.2s;
+}
+
+.auth-input:focus {
+    border-color: #888;
+}
+
+.btn-main {
+    width: 100%;
+
+    min-height: 48px;
+
+    padding: 12px 14px;
+
+    background: #3a3a3a;
+
+    color: white;
+
+    border: 1px solid #555;
+
+    border-radius: 6px;
+
+    font-size: 16px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+
+    transition: 0.15s;
+
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    gap: 9px;
+}
+
+.btn-main:hover {
+    background: #4a4a4a;
+}
+
+.btn-main:active {
+    transform: scale(0.98);
+}
+
+.btn-secondary {
+    background: transparent;
+
+    margin-top: 10px;
+}
+
+.btn-secondary:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+/* ========================================================= */
+/* АВАТАР                                                     */
+/* ========================================================= */
+
+.menu-avatar {
+    width: 90px;
+    height: 90px;
+
+    border-radius: 50%;
+
+    overflow: hidden;
+
+    margin: 0 auto 15px;
+
+    cursor: pointer;
+
+    border: 2px solid #555;
+
+    background: #222;
+}
+
+.menu-avatar img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+
+    display: block;
+}
+
+.avatar-edit-hint {
+    display: block;
+
+    font-size: 11px;
+
+    color: #888;
+
+    margin-top: 6px;
+}
+
+/* ========================================================= */
+/* НАСТРОЙКИ                                                  */
+/* ========================================================= */
+
+.settings-section {
+    text-align: left;
+
+    margin-bottom: 18px;
+}
+
+.settings-section h3 {
+    font-size: 12px;
+
+    color: #aaa;
+
+    text-transform: uppercase;
+
+    margin-bottom: 8px;
+
+    letter-spacing: 0.5px;
+}
+
+.settings-container {
+    max-height: 85vh;
+
+    overflow-y: auto;
+}
+
+input[type=color]#crosshair-color {
+    width: 100%;
+    height: 40px;
+
+    padding: 2px;
+
+    margin-bottom: 10px;
+
+    background: #1e1e1e;
+
+    border: 1px solid #444;
+
+    border-radius: 6px;
+}
+
+input[type=range]#crosshair-size {
+    width: 100%;
+
+    margin-bottom: 10px;
+}
+
+/* ========================================================= */
+/* HUD EDITOR                                                 */
+/* ========================================================= */
+
+body.hud-edit-mode {
+    background: #777;
+}
+
+body.hud-edit-mode #canvas-container {
+    filter: grayscale(1);
+
+    opacity: 0.12;
+}
+
+body.hud-edit-mode #camera-look-zone {
+    pointer-events: none;
+}
+
+body.hud-edit-mode .hud-element {
+    outline: 2px dashed #6cf;
+
+    cursor: grab;
+
+    touch-action: none;
+}
+
+/*
+ * Джойстик в режиме редактора не должен двигать игрока.
+ * Сам элемент при этом остаётся доступным для перемещения
+ * редактором HUD.
+ */
+
+body.hud-edit-mode #joystick-zone {
+    touch-action: none;
+}
+
+/* ========================================================= */
+/* HUD                                                         */
+/* ========================================================= */
+
+#hud-scalable-wrapper {
+    position: absolute;
+
+    top: 0;
+    left: 0;
+
+    width: 100%;
+    height: 100%;
+
+    pointer-events: none;
+
+    z-index: 10;
+}
+
+.hud-element {
+    position: absolute;
+
+    pointer-events: auto;
+}
+
+.hud-stat-box {
+    background: rgba(45,45,45,0.8);
+
+    border: 1px solid #555;
+
+    padding: 8px 15px;
+
+    border-radius: 6px;
+
+    display: flex;
+
+    flex-direction: column;
+}
+
+.hud-stat-box span:first-child {
+    font-size: 11px;
+
+    color: #aaa;
+
+    text-transform: uppercase;
+}
+
+.hud-stat-box span:last-child {
+    font-size: 22px;
+
+    color: #fff;
+
+    font-weight: bold;
+}
+
+#hud-hp {
+    bottom: 20px;
+    left: 20px;
+}
+
+#hud-armor {
+    bottom: 20px;
+    left: 120px;
+}
+
+#hud-ammo {
+    bottom: 20px;
+    right: 20px;
+
+    text-align: right;
+}
+
+/* ========================================================= */
+/* ИГРОВЫЕ КНОПКИ                                             */
+/* ========================================================= */
+
+.btn-game {
+    width: 65px;
+    height: 65px;
+
+    background: rgba(58,58,58,0.6);
+
+    border: 1px solid #666;
+
+    border-radius: 50%;
+
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    color: #fff;
+
+    -webkit-tap-highlight-color: transparent;
+
+    touch-action: none;
+}
+
+.btn-game:active {
+    background: rgba(80,80,80,0.8);
+}
+
+.btn-game .svg-icon {
+    width: 30px;
+    height: 30px;
+}
+
+/* ========================================================= */
+/* FIRE                                                        */
+/* ========================================================= */
+
+#btn-fire {
+    bottom: 100px;
+    right: 40px;
+
+    width: 80px;
+    height: 80px;
+
+    font-size: 13px;
+}
+
+/* ========================================================= */
+/* RELOAD                                                      */
+/* ========================================================= */
+
+#btn-reload {
+    bottom: 110px;
+    right: 140px;
+
+    font-size: 11px;
+}
+
+/* ========================================================= */
+/* JUMP                                                        */
+/* ========================================================= */
+
+#btn-jump {
+    bottom: 30px;
+    right: 130px;
+}
+
+/* ========================================================= */
+/* CROUCH                                                      */
+/* ========================================================= */
+
+#btn-crouch {
+    bottom: 20px;
+    right: 210px;
+}
+
+/* ========================================================= */
+/* JOYSTICK                                                    */
+/* ========================================================= */
+
+#joystick-zone {
+    bottom: 30px;
+    left: 30px;
+
+    width: 120px;
+    height: 120px;
+
+    background: rgba(45,45,45,0.5);
+
+    border: 1px solid #666;
+
+    border-radius: 50%;
+
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    touch-action: none;
+
+    -webkit-tap-highlight-color: transparent;
+}
+
+#joystick-stick {
+    width: 45px;
+    height: 45px;
+
+    background: #888;
+
+    border-radius: 50%;
+
+    pointer-events: none;
+
+    will-change: transform;
+}
+
+/* ========================================================= */
+/* ПРОФИЛЬ В ИГРЕ                                             */
+/* ========================================================= */
+
+#btn-profile {
+    top: 20px;
+    left: 20px;
+
+    width: 50px;
+    height: 50px;
+
+    background: #2d2d2d;
+
+    border: 1px solid #555;
+
+    border-radius: 50%;
+
+    overflow: hidden;
+
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    cursor: pointer;
+}
+
+#btn-profile img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+}
+
+/* ========================================================= */
+/* ПРИЦЕЛ                                                      */
+/* ========================================================= */
+
+#game-crosshair {
+    position: absolute;
+
+    top: 50%;
+    left: 50%;
+
+    transform: translate(-50%, -50%);
+
+    pointer-events: none;
+
+    z-index: 10;
+}
+
+/* ========================================================= */
+/* СЛОТЫ                                                        */
+/* ========================================================= */
+
+.weapon-slot {
+    width: 48px;
+    height: 48px;
+
+    background: rgba(45,45,45,0.7);
+
+    border: 1px solid #555;
+
+    border-radius: 6px;
+
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    font-size: 11px;
+
+    color: #ccc;
+}
+
+#weapon-slots {
+    display: flex;
+
+    gap: 6px;
+
+    bottom: 100px;
+    right: 20px;
+}
+
+/* ========================================================= */
+/* СЧЁТ                                                         */
+/* ========================================================= */
+
+#match-hud {
+    top: 20px;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    display: flex;
+
+    gap: 10px;
+
+    text-align: center;
+}
+
+/* ========================================================= */
+/* РАУНД                                                        */
+/* ========================================================= */
+
+#round-banner {
+    position: absolute;
+
+    top: 35%;
+    left: 50%;
+
+    transform: translate(-50%, -50%);
+
+    font-size: 28px;
+
+    font-weight: bold;
+
+    color: #fff;
+
+    text-shadow:
+        0 2px 8px rgba(0,0,0,0.8);
+
+    background:
+        rgba(20,20,20,0.6);
+
+    padding: 12px 30px;
+
+    border-radius: 8px;
+
+    opacity: 0;
+
+    transition: opacity 0.4s;
+
+    pointer-events: none;
+
+    z-index: 30;
+
+    white-space: nowrap;
+}
+
+/* ========================================================= */
+/* КИЛЛФИД                                                     */
+/* ========================================================= */
+
+#killfeed-container {
+    position: absolute;
+
+    top: 10px;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    z-index: 20;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 5px;
+
+    pointer-events: none;
+}
+
+.killfeed-item {
+    background:
+        rgba(30,30,30,0.8);
+
+    border: 1px solid #444;
+
+    padding: 5px 15px;
+
+    border-radius: 4px;
+
+    font-size: 13px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    animation: fadeOut 4s forwards;
+}
+
+@keyframes fadeOut {
+
+    0% {
+        opacity: 1;
+    }
+
+    80% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+.kf-killer {
+    color: #fff;
+
+    font-weight: bold;
+}
+
+.kf-weapon {
+    color: #888;
+
+    font-size: 11px;
+}
+
+.kf-victim {
+    color: #ff4d4d;
+
+    font-weight: bold;
+}
+
+/* ========================================================= */
+/* RESPAWN                                                      */
+/* ========================================================= */
+
+#respawn-screen {
+    display: none;
+
+    background:
+        rgba(20,20,20,0.8);
+}
+
+/* ========================================================= */
+/* МОБИЛЬНЫЙ ЭКРАН                                             */
+/* ========================================================= */
+
+@media (max-width: 700px) {
+
+    .auth-container {
+        padding: 22px;
+    }
+
+    #hud-hp {
+        left: 12px;
+        bottom: 15px;
+    }
+
+    #hud-armor {
+        left: 105px;
+        bottom: 15px;
+    }
+
+    #hud-ammo {
+        right: 12px;
+        bottom: 15px;
+    }
+
+    #joystick-zone {
+        left: 20px;
+        bottom: 25px;
+    }
+
+    #btn-fire {
+        right: 20px;
