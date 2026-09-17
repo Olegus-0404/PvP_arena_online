@@ -12,20 +12,22 @@ function initEngine() {
         document.getElementById('canvas-container') ||
         document.body;
 
-    // ------------------------------------------------------------------------
-    // Базовые объекты игрока
-    // ------------------------------------------------------------------------
+    // =========================================================================
+    // PLAYER OBJECTS
+    // =========================================================================
 
     G.yawObject = new THREE.Object3D();
     G.pitchObject = new THREE.Object3D();
     G.playerVelocity = new THREE.Vector3();
 
     G.scene = new THREE.Scene();
-    G.scene.background = new THREE.Color(0x3a403b);
 
-    // ------------------------------------------------------------------------
-    // Данные карты
-    // ------------------------------------------------------------------------
+    G.scene.background =
+        new THREE.Color(0x3a403b);
+
+    // =========================================================================
+    // MAP STATE
+    // =========================================================================
 
     G.mapRoot = null;
     G.mapMeshes = [];
@@ -35,106 +37,151 @@ function initEngine() {
     G.mapSize = new THREE.Vector3();
 
     G.fallbackFloor = null;
-    G.groundRaycaster = new THREE.Raycaster();
 
-    // ------------------------------------------------------------------------
-    // Камера
-    // ------------------------------------------------------------------------
+    G.groundRaycaster =
+        new THREE.Raycaster();
 
-    const size = getContainerSize(container);
+    // =========================================================================
+    // CAMERA
+    // =========================================================================
 
-    G.camera = new THREE.PerspectiveCamera(
-        75,
-        size.w / size.h,
-        0.1,
-        5000
+    const size =
+        getContainerSize(container);
+
+    G.camera =
+        new THREE.PerspectiveCamera(
+            75,
+            size.w / size.h,
+            0.1,
+            5000
+        );
+
+    G.pitchObject.add(
+        G.camera
     );
 
-    G.pitchObject.add(G.camera);
-    G.yawObject.add(G.pitchObject);
+    G.yawObject.add(
+        G.pitchObject
+    );
 
-    // Нормальная стартовая высота.
-    G.yawObject.position.set(0, 3, 0);
+    G.yawObject.position.set(
+        0,
+        2.2,
+        0
+    );
 
-    G.scene.add(G.yawObject);
+    G.scene.add(
+        G.yawObject
+    );
 
-    // ------------------------------------------------------------------------
-    // Renderer
-    // ------------------------------------------------------------------------
+    // =========================================================================
+    // RENDERER
+    // =========================================================================
 
-    G.renderer = new THREE.WebGLRenderer({
-        antialias: true,
-        alpha: false
-    });
+    G.renderer =
+        new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: false
+        });
 
     G.renderer.setPixelRatio(
-        Math.min(window.devicePixelRatio || 1, 2)
+        Math.min(
+            window.devicePixelRatio || 1,
+            2
+        )
     );
 
-    G.renderer.domElement.style.display = 'block';
-    G.renderer.domElement.style.width = '100%';
-    G.renderer.domElement.style.height = '100%';
+    G.renderer.domElement.style.display =
+        'block';
 
-    container.appendChild(G.renderer.domElement);
+    G.renderer.domElement.style.width =
+        '100%';
 
-    // ------------------------------------------------------------------------
-    // Освещение
-    // ------------------------------------------------------------------------
+    G.renderer.domElement.style.height =
+        '100%';
 
-    const hemiLight = new THREE.HemisphereLight(
-        0xddeeff,
-        0x334422,
-        1.0
+    container.appendChild(
+        G.renderer.domElement
     );
 
-    G.scene.add(hemiLight);
+    // =========================================================================
+    // LIGHT
+    // =========================================================================
 
-    const sunLight = new THREE.DirectionalLight(
-        0xffffff,
-        0.8
+    const hemiLight =
+        new THREE.HemisphereLight(
+            0xddeeff,
+            0x334422,
+            1.2
+        );
+
+    G.scene.add(
+        hemiLight
     );
 
-    sunLight.position.set(50, 100, 30);
+    const sunLight =
+        new THREE.DirectionalLight(
+            0xffffff,
+            0.8
+        );
 
-    G.scene.add(sunLight);
+    sunLight.position.set(
+        100,
+        150,
+        80
+    );
 
-    // ------------------------------------------------------------------------
-    // Временный пол
-    // ------------------------------------------------------------------------
+    G.scene.add(
+        sunLight
+    );
+
+    // =========================================================================
+    // TEMP FLOOR
+    // =========================================================================
 
     createFallbackFloor();
 
-    // ------------------------------------------------------------------------
-    // Загрузка карты
-    // ------------------------------------------------------------------------
+    // =========================================================================
+    // MAP
+    // =========================================================================
 
     loadChernobylMap();
 
-    // ------------------------------------------------------------------------
-    // Resize
-    // ------------------------------------------------------------------------
+    // =========================================================================
+    // RESIZE
+    // =========================================================================
 
-    resizeToContainer(container);
-    setupRobustResize(container);
+    resizeToContainer(
+        container
+    );
 
-    // ------------------------------------------------------------------------
-    // Игровой цикл
-    // ------------------------------------------------------------------------
+    setupRobustResize(
+        container
+    );
 
-    lastAnimationTime = performance.now();
+    // =========================================================================
+    // LOOP
+    // =========================================================================
+
+    lastAnimationTime =
+        performance.now();
+
     animate();
 }
 
 
 // ============================================================================
-// ВРЕМЕННЫЙ ПОЛ
+// FALLBACK FLOOR
 // ============================================================================
 
 function createFallbackFloor() {
     const G = window.Game;
 
     const geometry =
-        new THREE.PlaneGeometry(500, 500);
+        new THREE.PlaneGeometry(
+            500,
+            500
+        );
 
     const material =
         new THREE.MeshStandardMaterial({
@@ -148,17 +195,23 @@ function createFallbackFloor() {
             material
         );
 
-    floor.rotation.x = -Math.PI / 2;
-    floor.name = '__fallback_floor';
+    floor.rotation.x =
+        -Math.PI / 2;
 
-    G.fallbackFloor = floor;
+    floor.name =
+        '__fallback_floor';
 
-    G.scene.add(floor);
+    G.fallbackFloor =
+        floor;
+
+    G.scene.add(
+        floor
+    );
 }
 
 
 // ============================================================================
-// ЗАГРУЗКА КАРТЫ
+// MAP LOADER
 // ============================================================================
 
 function loadChernobylMap() {
@@ -178,101 +231,213 @@ function loadChernobylMap() {
     const loader =
         new THREE.GLTFLoader();
 
-    const mapPath =
-        'models/chernobyl_pvp_map.glb';
-
-    console.log(
-        '[MAP] Загрузка:',
-        mapPath
-    );
-
     loader.load(
-        mapPath,
+        'models/chernobyl_pvp_map.glb',
 
         function (gltf) {
+
             const map =
                 gltf.scene;
 
             if (!map) {
-                console.error(
-                    '[MAP] GLB не содержит scene'
-                );
-
                 return;
             }
 
             map.name =
                 'ChernobylPvPMap';
 
+            // ---------------------------------------------------------------
+            // Собираем все Mesh
+            // ---------------------------------------------------------------
+
             G.mapMeshes = [];
 
-            // ----------------------------------------------------------------
-            // Подготовка объектов карты
-            // ----------------------------------------------------------------
+            map.traverse(
+                function (object) {
 
-            map.traverse(function (object) {
-                if (!object.isMesh) {
-                    return;
+                    if (!object.isMesh) {
+                        return;
+                    }
+
+                    object.castShadow =
+                        true;
+
+                    object.receiveShadow =
+                        true;
+
+                    G.mapMeshes.push(
+                        object
+                    );
                 }
+            );
 
-                object.castShadow = true;
-                object.receiveShadow = true;
+            // ---------------------------------------------------------------
+            // Сначала добавляем карту
+            // ---------------------------------------------------------------
 
-                G.mapMeshes.push(object);
-            });
+            G.mapRoot =
+                map;
 
-            if (!G.mapMeshes.length) {
-                console.warn(
-                    '[MAP] В GLB не найдено Mesh-объектов'
+            G.scene.add(
+                map
+            );
+
+            // ---------------------------------------------------------------
+            // Получаем исходные размеры
+            // ---------------------------------------------------------------
+
+            let bounds =
+                new THREE.Box3()
+                    .setFromObject(map);
+
+            let size =
+                new THREE.Vector3();
+
+            let center =
+                new THREE.Vector3();
+
+            bounds.getSize(
+                size
+            );
+
+            bounds.getCenter(
+                center
+            );
+
+            console.log(
+                '[MAP] Исходный размер:',
+                size.x,
+                size.y,
+                size.z
+            );
+
+            // ---------------------------------------------------------------
+            // НОРМАЛИЗАЦИЯ КАРТЫ
+            //
+            // Если экспорт из Blender/другого редактора дал неправильный
+            // масштаб, приводим карту к нормальному игровому размеру.
+            // ---------------------------------------------------------------
+
+            const maxXZ =
+                Math.max(
+                    size.x,
+                    size.z
+                );
+
+            let scale =
+                1;
+
+            /*
+             * Нормальный диапазон карты:
+             *
+             * меньше 60  -> слишком маленькая
+             * больше 500 -> слишком большая
+             *
+             * Целевой размер по большей горизонтальной стороне:
+             * примерно 220 игровых единиц.
+             */
+
+            if (
+                maxXZ > 0 &&
+                (
+                    maxXZ < 60 ||
+                    maxXZ > 500
+                )
+            ) {
+
+                scale =
+                    220 /
+                    maxXZ;
+
+                map.scale.set(
+                    scale,
+                    scale,
+                    scale
+                );
+
+                // После изменения масштаба
+                // пересчитываем размеры.
+                bounds =
+                    new THREE.Box3()
+                        .setFromObject(map);
+
+                bounds.getSize(
+                    size
+                );
+
+                bounds.getCenter(
+                    center
+                );
+
+                console.log(
+                    '[MAP] Применён масштаб:',
+                    scale
                 );
             }
 
-            // ----------------------------------------------------------------
-            // Добавляем карту в сцену
-            // ----------------------------------------------------------------
+            // ---------------------------------------------------------------
+            // ЦЕНТРИРУЕМ КАРТУ ПО X/Z
+            //
+            // Y НЕ трогаем, чтобы не уничтожить высоты зданий/рельефа.
+            // ---------------------------------------------------------------
 
-            G.mapRoot = map;
+            map.position.x -=
+                center.x;
 
-            G.scene.add(map);
+            map.position.z -=
+                center.z;
 
-            // ----------------------------------------------------------------
-            // Считаем реальные размеры карты
-            // ----------------------------------------------------------------
+            // ---------------------------------------------------------------
+            // Пересчитываем bounds после центрирования
+            // ---------------------------------------------------------------
 
-            const bounds =
+            bounds =
                 new THREE.Box3()
                     .setFromObject(map);
+
+            bounds.getSize(
+                size
+            );
+
+            bounds.getCenter(
+                center
+            );
 
             G.mapBounds =
                 bounds.clone();
 
-            bounds.getCenter(
-                G.mapCenter
-            );
+            G.mapSize =
+                size.clone();
 
-            bounds.getSize(
-                G.mapSize
+            G.mapCenter =
+                center.clone();
+
+            // ---------------------------------------------------------------
+            // Карта теперь находится вокруг (0, 0, 0)
+            // ---------------------------------------------------------------
+
+            console.log(
+                '[MAP] Новый размер:',
+                size.x,
+                size.y,
+                size.z
             );
 
             console.log(
-                '[MAP] Размер:',
-                G.mapSize.x.toFixed(2),
-                G.mapSize.y.toFixed(2),
-                G.mapSize.z.toFixed(2)
+                '[MAP] Новый центр:',
+                center.x,
+                center.y,
+                center.z
             );
 
-            console.log(
-                '[MAP] Центр:',
-                G.mapCenter.x.toFixed(2),
-                G.mapCenter.y.toFixed(2),
-                G.mapCenter.z.toFixed(2)
-            );
+            // ---------------------------------------------------------------
+            // Убираем временный пол
+            // ---------------------------------------------------------------
 
-            // ----------------------------------------------------------------
-            // Убираем fallback
-            // ----------------------------------------------------------------
+            if (
+                G.fallbackFloor
+            ) {
 
-            if (G.fallbackFloor) {
                 G.scene.remove(
                     G.fallbackFloor
                 );
@@ -289,14 +454,13 @@ function loadChernobylMap() {
                     G.fallbackFloor.material.dispose();
                 }
 
-                G.fallbackFloor = null;
+                G.fallbackFloor =
+                    null;
             }
 
-            G.mapLoaded = true;
-
-            // ----------------------------------------------------------------
-            // Spawn-маркеры
-            // ----------------------------------------------------------------
+            // ---------------------------------------------------------------
+            // Spawn markers
+            // ---------------------------------------------------------------
 
             const spawnBlue =
                 map.getObjectByName(
@@ -308,75 +472,59 @@ function loadChernobylMap() {
                     'spawn_red'
                 );
 
-            let spawnObject = null;
-
-            // Пока выбираем синий spawn.
-            // Сервер по-прежнему отвечает за команду.
             if (spawnBlue) {
-                spawnObject =
-                    spawnBlue;
 
-                console.log(
-                    '[MAP] Найден spawn_blue'
-                );
-            } else if (spawnRed) {
-                spawnObject =
-                    spawnRed;
-
-                console.log(
-                    '[MAP] Найден spawn_red'
-                );
-            }
-
-            if (spawnObject) {
-                const worldPosition =
+                const p =
                     new THREE.Vector3();
 
-                spawnObject.getWorldPosition(
-                    worldPosition
+                spawnBlue.getWorldPosition(
+                    p
                 );
 
                 console.log(
-                    '[MAP] Spawn:',
-                    worldPosition.x.toFixed(2),
-                    worldPosition.y.toFixed(2),
-                    worldPosition.z.toFixed(2)
+                    '[MAP] spawn_blue:',
+                    p.x,
+                    p.y,
+                    p.z
                 );
-
-                // Не телепортируем игрока,
-                // если он уже получил позицию от сервера.
-                if (
-                    !G.socket ||
-                    !G.myId
-                ) {
-                    G.yawObject.position.x =
-                        worldPosition.x;
-
-                    G.yawObject.position.z =
-                        worldPosition.z;
-
-                    const ground =
-                        getGroundHeight(
-                            worldPosition.x,
-                            worldPosition.z
-                        );
-
-                    G.yawObject.position.y =
-                        ground + getPlayerEyeHeight();
-                }
             }
 
+            if (spawnRed) {
+
+                const p =
+                    new THREE.Vector3();
+
+                spawnRed.getWorldPosition(
+                    p
+                );
+
+                console.log(
+                    '[MAP] spawn_red:',
+                    p.x,
+                    p.y,
+                    p.z
+                );
+            }
+
+            // ---------------------------------------------------------------
+            // Карта готова
+            // ---------------------------------------------------------------
+
+            G.mapLoaded =
+                true;
+
             console.log(
-                '[MAP] Карта загружена. Mesh:',
-                G.mapMeshes.length
+                '[MAP] Карта полностью загружена'
             );
         },
 
         function (progress) {
+
             if (
                 progress &&
                 progress.total > 0
             ) {
+
                 const percent =
                     Math.round(
                         (
@@ -386,20 +534,21 @@ function loadChernobylMap() {
                     );
 
                 console.log(
-                    '[MAP] Загрузка:',
+                    '[MAP]',
                     percent + '%'
                 );
             }
         },
 
         function (error) {
+
             console.error(
-                '[MAP] Ошибка загрузки:',
+                '[MAP] Ошибка:',
                 error
             );
 
             console.warn(
-                '[MAP] Оставляем временный пол'
+                '[MAP] Используется временный пол'
             );
         }
     );
@@ -407,11 +556,16 @@ function loadChernobylMap() {
 
 
 // ============================================================================
-// ВЫСОТА ЗЕМЛИ
+// GROUND HEIGHT
 // ============================================================================
 
-function getGroundHeight(x, z) {
-    const G = window.Game;
+function getGroundHeight(
+    x,
+    z
+) {
+
+    const G =
+        window.Game;
 
     if (
         !G.mapLoaded ||
@@ -449,7 +603,9 @@ function getGroundHeight(x, z) {
             true
         );
 
-    if (!hits.length) {
+    if (
+        !hits.length
+    ) {
         return null;
     }
 
@@ -458,13 +614,17 @@ function getGroundHeight(x, z) {
 
 
 // ============================================================================
-// ВЫСОТА КАМЕРЫ / ИГРОКА
+// PLAYER HEIGHT
 // ============================================================================
 
 function getPlayerEyeHeight() {
-    const G = window.Game;
 
-    if (G.isCrouching) {
+    const G =
+        window.Game;
+
+    if (
+        G.isCrouching
+    ) {
         return 1.8;
     }
 
@@ -476,7 +636,10 @@ function getPlayerEyeHeight() {
 // RESIZE
 // ============================================================================
 
-function getContainerSize(container) {
+function getContainerSize(
+    container
+) {
+
     return {
         w:
             container.clientWidth ||
@@ -489,8 +652,12 @@ function getContainerSize(container) {
 }
 
 
-function resizeToContainer(container) {
-    const G = window.Game;
+function resizeToContainer(
+    container
+) {
+
+    const G =
+        window.Game;
 
     if (
         !G.camera ||
@@ -500,7 +667,9 @@ function resizeToContainer(container) {
     }
 
     const size =
-        getContainerSize(container);
+        getContainerSize(
+            container
+        );
 
     if (
         size.w <= 0 ||
@@ -510,7 +679,8 @@ function resizeToContainer(container) {
     }
 
     G.camera.aspect =
-        size.w / size.h;
+        size.w /
+        size.h;
 
     G.camera.updateProjectionMatrix();
 
@@ -522,14 +692,23 @@ function resizeToContainer(container) {
 }
 
 
-function setupRobustResize(container) {
+// ============================================================================
+// ROBUST RESIZE
+// ============================================================================
+
+function setupRobustResize(
+    container
+) {
+
     if (
         typeof ResizeObserver !==
         'undefined'
     ) {
+
         const observer =
             new ResizeObserver(
                 function () {
+
                     resizeToContainer(
                         container
                     );
@@ -544,6 +723,7 @@ function setupRobustResize(container) {
     window.addEventListener(
         'resize',
         function () {
+
             resizeToContainer(
                 container
             );
@@ -553,21 +733,28 @@ function setupRobustResize(container) {
     window.addEventListener(
         'orientationchange',
         function () {
+
             setTimeout(
                 function () {
+
                     resizeToContainer(
                         container
                     );
+
                 },
                 250
             );
         }
     );
 
-    if (window.visualViewport) {
+    if (
+        window.visualViewport
+    ) {
+
         window.visualViewport.addEventListener(
             'resize',
             function () {
+
                 resizeToContainer(
                     container
                 );
@@ -578,12 +765,18 @@ function setupRobustResize(container) {
 
 
 // ============================================================================
-// ПРИСЕДАНИЕ
+// CROUCH
 // ============================================================================
 
-function setCrouch(state) {
-    const G = window.Game;
-    const C = window.GameConfig;
+function setCrouch(
+    state
+) {
+
+    const G =
+        window.Game;
+
+    const C =
+        window.GameConfig;
 
     G.isCrouching =
         !!state;
@@ -596,32 +789,40 @@ function setCrouch(state) {
 
 
 // ============================================================================
-// ИГРОВОЙ ЦИКЛ
+// GAME LOOP
 // ============================================================================
 
 function animate() {
+
     requestAnimationFrame(
         animate
     );
 
-    const G = window.Game;
-    const C = window.GameConfig;
+    const G =
+        window.Game;
+
+    const C =
+        window.GameConfig;
 
     const now =
         performance.now();
 
     let delta =
-        (now - lastAnimationTime) /
-        1000;
+        (
+            now -
+            lastAnimationTime
+        ) / 1000;
 
     lastAnimationTime =
         now;
 
-    // Защита от огромного скачка
-    // после сворачивания вкладки.
+    // Защита после сворачивания браузера.
     delta =
         Math.min(
-            Math.max(delta, 0),
+            Math.max(
+                delta,
+                0
+            ),
             0.05
         );
 
@@ -633,9 +834,9 @@ function animate() {
         return;
     }
 
-    // ------------------------------------------------------------------------
-    // Другие игроки
-    // ------------------------------------------------------------------------
+    // =========================================================================
+    // OTHER PLAYERS
+    // =========================================================================
 
     if (
         G.otherPlayers &&
@@ -644,6 +845,7 @@ function animate() {
         typeof syncOtherPlayers ===
             'function'
     ) {
+
         syncOtherPlayers(
             G.otherPlayers
         );
@@ -656,31 +858,45 @@ function animate() {
         typeof updateOtherPlayerAnimations ===
             'function'
     ) {
+
         updateOtherPlayerAnimations(
             delta
         );
     }
 
-    // ------------------------------------------------------------------------
-    // Управление
-    // ------------------------------------------------------------------------
+    // =========================================================================
+    // INPUT LOCK
+    // =========================================================================
 
-    const controlsLocked =
-        !!G.inputLocked;
+    if (
+        G.inputLocked
+    ) {
 
-    if (!controlsLocked) {
+        G.playerVelocity.set(
+            0,
+            0,
+            0
+        );
 
-        // ------------------------------------------------------------
-        // Гравитация
-        // ------------------------------------------------------------
+        G.moveDirection.forward =
+            0;
+
+        G.moveDirection.right =
+            0;
+
+    } else {
+
+        // =====================================================================
+        // GRAVITY
+        // =====================================================================
 
         G.playerVelocity.y -=
             C.GRAVITY *
             delta;
 
-        // ------------------------------------------------------------
-        // Движение
-        // ------------------------------------------------------------
+        // =====================================================================
+        // MOVEMENT
+        // =====================================================================
 
         const inputX =
             Number(
@@ -702,6 +918,7 @@ function animate() {
         if (
             moveVector.lengthSq() > 1
         ) {
+
             moveVector.normalize();
         }
 
@@ -719,9 +936,9 @@ function animate() {
             G.moveSpeed *
             delta;
 
-        // ------------------------------------------------------------
-        // Земля
-        // ------------------------------------------------------------
+        // =====================================================================
+        // GROUND
+        // =====================================================================
 
         const ground =
             getGroundHeight(
@@ -729,17 +946,16 @@ function animate() {
                 G.yawObject.position.z
             );
 
-        // Если карта загружена и земля найдена —
-        // ставим игрока точно на поверхность.
         if (
             ground !== null
         ) {
-            const playerHeight =
+
+            const eyeHeight =
                 getPlayerEyeHeight();
 
             const targetY =
                 ground +
-                playerHeight;
+                eyeHeight;
 
             G.yawObject.position.y +=
                 G.playerVelocity.y *
@@ -749,6 +965,7 @@ function animate() {
                 G.yawObject.position.y <=
                 targetY
             ) {
+
                 G.yawObject.position.y =
                     targetY;
 
@@ -757,69 +974,57 @@ function animate() {
 
                 G.isGrounded =
                     true;
+
             } else {
+
                 G.isGrounded =
                     false;
             }
+
         } else {
-            // Карта ещё не готова или
-            // под игроком нет поверхности.
+
+            // Карта есть, но конкретно под
+            // игроком поверхности нет.
             G.yawObject.position.y +=
                 G.playerVelocity.y *
                 delta;
 
             if (
-                G.yawObject.position.y <=
-                0
+                G.yawObject.position.y <
+                -20
             ) {
+
+                // Защита от падения
+                // за пределы карты.
                 G.yawObject.position.y =
-                    0;
+                    2.2;
 
                 G.playerVelocity.y =
                     0;
 
                 G.isGrounded =
                     true;
-            } else {
-                G.isGrounded =
-                    false;
             }
         }
-    } else {
-        // --------------------------------------------------------------------
-        // HUD-редактор / меню:
-        // полностью останавливаем физическое движение.
-        // --------------------------------------------------------------------
-
-        G.playerVelocity.set(
-            0,
-            0,
-            0
-        );
-
-        G.moveDirection.forward =
-            0;
-
-        G.moveDirection.right =
-            0;
     }
 
-    // ------------------------------------------------------------------------
-    // Отправка позиции
-    // ------------------------------------------------------------------------
+    // =========================================================================
+    // NETWORK POSITION
+    // =========================================================================
 
     if (
         typeof sendPositionUpdate ===
             'function'
     ) {
+
         sendPositionUpdate(
             now
         );
     }
 
-    // ------------------------------------------------------------------------
-    // Рендер
-    // ------------------------------------------------------------------------
+    // =========================================================================
+    // RENDER
+    // =========================================================================
 
     G.renderer.render(
         G.scene,
