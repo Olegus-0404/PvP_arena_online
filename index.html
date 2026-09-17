@@ -802,3 +802,970 @@ body.hud-edit-mode #joystick-zone {
 
     #btn-fire {
         right: 20px;
+        bottom: 95px;
+    }
+
+    #btn-reload {
+        right: 125px;
+        bottom: 105px;
+    }
+
+    #btn-jump {
+        right: 115px;
+        bottom: 25px;
+    }
+
+    #btn-crouch {
+        right: 195px;
+        bottom: 15px;
+    }
+}
+
+/* ========================================================= */
+/* ОЧЕНЬ УЗКИЙ ЭКРАН                                           */
+/* ========================================================= */
+
+@media (max-width: 430px) {
+
+    #btn-crouch {
+        right: 175px;
+    }
+
+    #btn-jump {
+        right: 100px;
+    }
+
+    #btn-reload {
+        right: 110px;
+    }
+
+    #weapon-slots {
+        right: 10px;
+    }
+
+    .weapon-slot {
+        width: 43px;
+        height: 43px;
+    }
+}
+
+</style>
+
+
+<!-- ========================================================= -->
+<!-- БИБЛИОТЕКИ                                                -->
+<!-- ========================================================= -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+</head>
+
+
+<body class="in-menu">
+
+
+<!-- ========================================================= -->
+<!-- ИГРОВАЯ СЦЕНА                                             -->
+<!-- ========================================================= -->
+
+<div id="canvas-container"></div>
+
+<div id="camera-look-zone"></div>
+
+
+<!-- ========================================================= -->
+<!-- АВТОРИЗАЦИЯ                                               -->
+<!-- ========================================================= -->
+
+<div id="auth-screen" class="overlay">
+
+    <div class="auth-container">
+
+        <h1>ARENA LOG IN</h1>
+
+        <input
+            type="text"
+            id="input-email"
+            class="auth-input"
+            placeholder="Никнейм"
+            autocomplete="username"
+        >
+
+        <button
+            id="btn-auth"
+            class="btn-main"
+        >
+
+            <svg
+                class="svg-icon"
+                viewBox="0 0 24 24"
+            >
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                <polyline points="10 17 15 12 10 7"/>
+                <line x1="15" y1="12" x2="3" y2="12"/>
+            </svg>
+
+            ВОЙТИ В ИГРУ
+
+        </button>
+
+        <p
+            id="auth-status"
+            style="
+                margin-top: 15px;
+                color: #888;
+                font-size: 13px;
+            "
+        >
+            Укажите никнейм для сохранения профиля
+        </p>
+
+    </div>
+
+</div>
+
+
+<!-- ========================================================= -->
+<!-- ГЛАВНОЕ МЕНЮ                                              -->
+<!-- ========================================================= -->
+
+<div
+    id="main-menu"
+    class="overlay"
+    style="display:none;"
+>
+
+    <div class="auth-container">
+
+        <div
+            id="menu-avatar-wrap"
+            class="menu-avatar"
+        >
+
+            <img
+                src="https://via.placeholder.com/90/3a3a3a/ffffff?text=U"
+                alt="avatar"
+                class="user-avatar-img"
+            >
+
+        </div>
+
+        <h1 id="menu-nick-display">
+            Игрок
+        </h1>
+
+
+        <button
+            id="btn-play"
+            class="btn-main"
+        >
+
+            <svg
+                class="svg-icon svg-icon-fill"
+                viewBox="0 0 24 24"
+            >
+                <path d="M8 5v14l11-7z"/>
+            </svg>
+
+            ИГРАТЬ
+
+        </button>
+
+
+        <button
+            id="btn-open-settings"
+            class="btn-main btn-secondary"
+        >
+
+            <svg
+                class="svg-icon"
+                viewBox="0 0 24 24"
+            >
+                <circle cx="12" cy="12" r="3"/>
+
+                <path d="
+                    M19.4 15
+                    a1.7 1.7 0 0 0 .3 1.9
+                    l.1.1
+                    -1.8 1.8
+                    -.1-.1
+                    a1.7 1.7 0 0 0-1.9-.3
+                    1.7 1.7 0 0 0-1 1.5
+                    V20
+                    h-2.5
+                    v-.1
+                    a1.7 1.7 0 0 0-1-1.5
+                    1.7 1.7 0 0 0-1.9.3
+                    l-.1.1
+                    -1.8-1.8
+                    .1-.1
+                    A1.7 1.7 0 0 0 8 15
+                    a1.7 1.7 0 0 0-1.5-1
+                    H6
+                    v-2.5
+                    h.1
+                    a1.7 1.7 0 0 0 1.5-1
+                    1.7 1.7 0 0 0-.3-1.9
+                    l-.1-.1
+                    1.8-1.8
+                    .1.1
+                    a1.7 1.7 0 0 0 1.9.3
+                    1.7 1.7 0 0 0 1-1.5
+                    V6
+                    h2.5
+                    v.1
+                    a1.7 1.7 0 0 0 1 1.5
+                    1.7 1.7 0 0 0 1.9-.3
+                    l.1-.1
+                    1.8 1.8
+                    -.1.1
+                    a1.7 1.7 0 0 0-.3 1.9
+                    1.7 1.7 0 0 0 1.5 1
+                    H20
+                    V14
+                    h-.1
+                    a1.7 1.7 0 0 0-.5 1z
+                "/>
+            </svg>
+
+            НАСТРОЙКИ
+
+        </button>
+
+
+        <button
+            id="btn-open-profile"
+            class="btn-main btn-secondary"
+        >
+
+            <svg
+                class="svg-icon"
+                viewBox="0 0 24 24"
+            >
+                <circle cx="12" cy="8" r="4"/>
+                <path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/>
+            </svg>
+
+            ПРОФИЛЬ
+
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- ========================================================= -->
+<!-- НАСТРОЙКИ                                                  -->
+<!-- ========================================================= -->
+
+<div
+    id="settings-screen"
+    class="overlay"
+    style="display:none;"
+>
+
+    <div class="auth-container settings-container">
+
+        <h1>НАСТРОЙКИ</h1>
+
+
+        <div class="settings-section">
+
+            <h3>HUD</h3>
+
+
+            <button
+                id="btn-hud-edit"
+                class="btn-main btn-secondary"
+            >
+
+                <svg
+                    class="svg-icon"
+                    viewBox="0 0 24 24"
+                >
+                    <rect
+                        x="3"
+                        y="3"
+                        width="18"
+                        height="18"
+                        rx="2"
+                    />
+
+                    <path d="M8 3v4"/>
+                    <path d="M16 3v4"/>
+                    <path d="M8 17v4"/>
+                    <path d="M16 17v4"/>
+
+                    <path d="M3 8h4"/>
+                    <path d="M17 8h4"/>
+                    <path d="M3 16h4"/>
+                    <path d="M17 16h4"/>
+                </svg>
+
+                РЕДАКТИРОВАТЬ РАСПОЛОЖЕНИЕ
+
+            </button>
+
+
+            <button
+                id="btn-hud-reset"
+                class="btn-main btn-secondary"
+            >
+
+                <svg
+                    class="svg-icon"
+                    viewBox="0 0 24 24"
+                >
+                    <path d="M3 12a9 9 0 1 0 3-6.7"/>
+                    <polyline points="3 4 3 9 8 9"/>
+                </svg>
+
+                СБРОСИТЬ HUD
+
+            </button>
+
+        </div>
+
+
+        <div class="settings-section">
+
+            <h3>Прицел</h3>
+
+
+            <select
+                id="crosshair-style"
+                class="auth-input"
+            >
+
+                <option value="dot">
+                    Точка
+                </option>
+
+                <option value="cross">
+                    Крест
+                </option>
+
+                <option value="circle">
+                    Кольцо
+                </option>
+
+            </select>
+
+
+            <input
+                type="color"
+                id="crosshair-color"
+                value="#ffffff"
+            >
+
+
+            <input
+                type="range"
+                id="crosshair-size"
+                min="2"
+                max="20"
+                value="6"
+            >
+
+        </div>
+
+
+        <div class="settings-section">
+
+            <h3>Сервер</h3>
+
+
+            <select
+                id="server-select"
+                class="auth-input"
+            ></select>
+
+
+            <input
+                type="text"
+                id="new-server-url"
+                class="auth-input"
+                placeholder="URL нового сервера"
+            >
+
+
+            <button
+                id="btn-add-server"
+                class="btn-main btn-secondary"
+            >
+
+                <svg
+                    class="svg-icon"
+                    viewBox="0 0 24 24"
+                >
+                    <circle cx="12" cy="12" r="9"/>
+                    <line x1="12" y1="8" x2="12" y2="16"/>
+                    <line x1="8" y1="12" x2="16" y2="12"/>
+                </svg>
+
+                ДОБАВИТЬ СЕРВЕР
+
+            </button>
+
+        </div>
+
+
+        <div class="settings-section">
+
+            <h3>Лобби</h3>
+
+
+            <input
+                type="text"
+                id="lobby-code"
+                class="auth-input"
+                placeholder="ID лобби (пусто = публичный матч)"
+            >
+
+
+            <button
+                id="btn-create-lobby"
+                class="btn-main btn-secondary"
+            >
+
+                <svg
+                    class="svg-icon"
+                    viewBox="0 0 24 24"
+                >
+                    <circle cx="9" cy="8" r="3"/>
+                    <circle cx="17" cy="9" r="2.5"/>
+                    <path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6"/>
+                    <path d="M15 14c3 0 5 2.1 5 5"/>
+                </svg>
+
+                СОЗДАТЬ СВОЁ ЛОББИ
+
+            </button>
+
+        </div>
+
+
+        <button
+            id="btn-settings-profile"
+            class="btn-main btn-secondary"
+        >
+
+            <svg
+                class="svg-icon"
+                viewBox="0 0 24 24"
+            >
+                <circle cx="12" cy="8" r="4"/>
+                <path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/>
+            </svg>
+
+            ПРОФИЛЬ
+
+        </button>
+
+
+        <button
+            id="btn-exit-to-menu"
+            class="btn-main btn-secondary"
+        >
+
+            <svg
+                class="svg-icon"
+                viewBox="0 0 24 24"
+            >
+                <path d="M10 17l5-5-5-5"/>
+                <line x1="15" y1="12" x2="3" y2="12"/>
+                <path d="M19 3h2v18h-2"/>
+            </svg>
+
+            ВЫЙТИ В ГЛАВНОЕ МЕНЮ
+
+        </button>
+
+
+        <button
+            id="btn-close-settings"
+            class="btn-main"
+        >
+
+            <svg
+                class="svg-icon"
+                viewBox="0 0 24 24"
+            >
+                <line x1="6" y1="6" x2="18" y2="18"/>
+                <line x1="18" y1="6" x2="6" y2="18"/>
+            </svg>
+
+            ЗАКРЫТЬ
+
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- ========================================================= -->
+<!-- ПРОФИЛЬ                                                     -->
+<!-- ========================================================= -->
+
+<div
+    id="profile-screen"
+    class="overlay"
+    style="display:none;"
+>
+
+    <div class="auth-container">
+
+        <h1>ПРОФИЛЬ</h1>
+
+
+        <div
+            id="profile-avatar-wrap"
+            class="menu-avatar"
+        >
+
+            <img
+                src="https://via.placeholder.com/90/3a3a3a/ffffff?text=U"
+                alt="avatar"
+                id="profile-avatar-img"
+                class="user-avatar-img"
+            >
+
+        </div>
+
+
+        <span class="avatar-edit-hint">
+            Нажми на фото, чтобы сменить
+        </span>
+
+
+        <input
+            type="file"
+            id="profile-avatar-input"
+            accept="image/*"
+            style="display:none;"
+        >
+
+
+        <div style="height:12px;"></div>
+
+
+        <input
+            type="text"
+            id="profile-nick"
+            class="auth-input"
+            placeholder="Никнейм"
+        >
+
+
+        <input
+            type="email"
+            id="profile-email"
+            class="auth-input"
+            placeholder="E-mail"
+        >
+
+
+        <input
+            type="password"
+            id="profile-password"
+            class="auth-input"
+            placeholder="Пароль"
+        >
+
+
+        <p
+            style="
+                font-size:12px;
+                color:#888;
+                margin-bottom:12px;
+            "
+        >
+            Профиль
+        </p>
+
+
+        <button
+            id="btn-save-profile"
+            class="btn-main"
+        >
+
+            <svg
+                class="svg-icon"
+                viewBox="0 0 24 24"
+            >
+                <polyline points="5 12 10 17 19 7"/>
+            </svg>
+
+            СОХРАНИТЬ
+
+        </button>
+
+
+        <button
+            id="btn-close-profile"
+            class="btn-main btn-secondary"
+        >
+
+            <svg
+                class="svg-icon"
+                viewBox="0 0 24 24"
+            >
+                <line x1="6" y1="6" x2="18" y2="18"/>
+                <line x1="18" y1="6" x2="6" y2="18"/>
+            </svg>
+
+            ОТМЕНА
+
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- ========================================================= -->
+<!-- RESPAWN                                                     -->
+<!-- ========================================================= -->
+
+<div
+    id="respawn-screen"
+    class="overlay"
+>
+
+    <h2
+        style="
+            color:#fff;
+            margin-bottom:20px;
+        "
+    >
+        ВЫ УБИТЫ
+    </h2>
+
+
+    <button
+        id="btn-respawn"
+        class="btn-main"
+        style="max-width:250px;"
+    >
+
+        <svg
+            class="svg-icon"
+            viewBox="0 0 24 24"
+        >
+            <path d="M3 12a9 9 0 1 0 3-6.7"/>
+            <polyline points="3 4 3 9 8 9"/>
+        </svg>
+
+        ВОЗРОДИТЬСЯ
+
+    </button>
+
+</div>
+
+
+<!-- ========================================================= -->
+<!-- ПРИЦЕЛ                                                     -->
+<!-- ========================================================= -->
+
+<div id="game-crosshair"></div>
+
+<div id="round-banner"></div>
+
+
+<!-- ========================================================= -->
+<!-- HUD                                                         -->
+<!-- ========================================================= -->
+
+<div id="hud-scalable-wrapper">
+
+
+    <!-- Счёт -->
+
+    <div
+        id="match-hud"
+        class="hud-element hud-stat-box"
+    >
+
+        <span>
+            РАУНД
+            <span id="val-round">
+                1 / 5
+            </span>
+        </span>
+
+        <span id="val-timer">
+            3:00
+        </span>
+
+        <span>
+            СЧЁТ
+            <span id="val-score">
+                0 : 0
+            </span>
+        </span>
+
+    </div>
+
+
+    <!-- Killfeed -->
+
+    <div
+        id="killfeed-container"
+        class="hud-element"
+    ></div>
+
+
+    <!-- Меню -->
+
+    <div
+        id="btn-menu-trigger"
+        class="hud-element btn-game"
+        style="
+            top:20px;
+            right:20px;
+            width:50px;
+            height:50px;
+        "
+        aria-label="Меню"
+    >
+
+        <svg
+            class="svg-icon"
+            viewBox="0 0 24 24"
+        >
+            <line x1="4" y1="6" x2="20" y2="6"/>
+            <line x1="4" y1="12" x2="20" y2="12"/>
+            <line x1="4" y1="18" x2="20" y2="18"/>
+        </svg>
+
+    </div>
+
+
+    <!-- HP -->
+
+    <div
+        id="hud-hp"
+        class="hud-element hud-stat-box"
+    >
+
+        <span>
+            Здоровье
+        </span>
+
+        <span id="val-hp">
+            100
+        </span>
+
+    </div>
+
+
+    <!-- Броня -->
+
+    <div
+        id="hud-armor"
+        class="hud-element hud-stat-box"
+    >
+
+        <span>
+            Броня
+        </span>
+
+        <span id="val-armor">
+            100
+        </span>
+
+    </div>
+
+
+    <!-- Боезапас -->
+
+    <div
+        id="hud-ammo"
+        class="hud-element hud-stat-box"
+    >
+
+        <span id="val-weapon-name">
+            АК-47
+        </span>
+
+        <span id="val-ammo">
+            30 / 90
+        </span>
+
+    </div>
+
+
+    <!-- Слоты -->
+
+    <div
+        id="weapon-slots"
+        class="hud-element"
+    >
+
+        <div
+            id="weapon-slot-1"
+            class="weapon-slot"
+        >
+            1 НОЖ
+        </div>
+
+
+        <div
+            id="weapon-slot-2"
+            class="weapon-slot"
+        >
+            2 GLOCK
+        </div>
+
+
+        <div
+            id="weapon-slot-3"
+            class="weapon-slot"
+        >
+            3 AK
+        </div>
+
+    </div>
+
+
+    <!-- Джойстик -->
+
+    <div
+        id="joystick-zone"
+        class="hud-element"
+    >
+
+        <div id="joystick-stick"></div>
+
+    </div>
+
+
+    <!-- FIRE -->
+
+    <div
+        id="btn-fire"
+        class="hud-element btn-game"
+        aria-label="Действие"
+    >
+
+        <svg
+            class="svg-icon svg-icon-fill"
+            viewBox="0 0 24 24"
+        >
+            <circle cx="12" cy="12" r="8"/>
+        </svg>
+
+    </div>
+
+
+    <!-- RELOAD -->
+
+    <div
+        id="btn-reload"
+        class="hud-element btn-game"
+        aria-label="Перезагрузка"
+    >
+
+        <svg
+            class="svg-icon"
+            viewBox="0 0 24 24"
+        >
+            <path d="M3 12a9 9 0 0 1 15.5-6.3"/>
+            <polyline points="18 3 18 8 13 8"/>
+
+            <path d="M21 12a9 9 0 0 1-15.5 6.3"/>
+            <polyline points="6 21 6 16 11 16"/>
+        </svg>
+
+    </div>
+
+
+    <!-- JUMP -->
+
+    <div
+        id="btn-jump"
+        class="hud-element btn-game"
+        aria-label="Прыжок"
+    >
+
+        <svg
+            class="svg-icon"
+            viewBox="0 0 24 24"
+        >
+            <path d="M12 19V5"/>
+            <polyline points="6 11 12 5 18 11"/>
+        </svg>
+
+    </div>
+
+
+    <!-- CROUCH -->
+
+    <div
+        id="btn-crouch"
+        class="hud-element btn-game"
+        aria-label="Присесть"
+    >
+
+        <svg
+            class="svg-icon"
+            viewBox="0 0 24 24"
+        >
+            <circle
+                cx="12"
+                cy="6"
+                r="2.5"
+            />
+
+            <path d="M7 20l3-7 2 3 5 1"/>
+
+            <path d="M5 20h14"/>
+
+        </svg>
+
+    </div>
+
+
+</div>
+
+
+<!-- ========================================================= -->
+<!-- JS                                                          -->
+<!-- ========================================================= -->
+
+<script src="js/settings.js"></script>
+
+<script src="js/state.js"></script>
+
+<script src="js/engine.js"></script>
+
+<script src="js/network.js"></script>
+
+<script src="js/players.js"></script>
+
+<script src="js/weapons.js"></script>
+
+<script src="js/controls.js"></script>
+
+<script src="js/joystick-fix.js"></script>
+
+<script src="js/ui.js"></script>
+
+<script src="js/hud-editor.js"></script>
+
+<script src="js/profile.js"></script>
+
+<script src="js/menu.js"></script>
+
+<script src="js/camera.js"></script>
+
+<script src="js/main.js"></script>
+
+</body>
+</html>
