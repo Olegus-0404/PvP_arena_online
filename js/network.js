@@ -8,7 +8,7 @@ function connectToServer() {
 
     G.socket = io(G.SERVER_URL, {
         transports: ['polling', 'websocket'],
-        query: { nick: G.myNick, mode: G.currentGameMode, lobby: G.currentLobby }
+        query: { nick: G.myNick, mode: G.currentGameMode }
     });
 
     G.socket.on('connect', () => { G.myId = G.socket.id; });
