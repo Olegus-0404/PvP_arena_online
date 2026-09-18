@@ -12,7 +12,6 @@ window.Game = {
     myId: null,
     myNick: "",
     currentGameMode: "survival",
-    currentLobby: "",
     otherPlayers: {},
     lastMoveSentAt: 0,
 
