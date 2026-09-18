@@ -19,7 +19,7 @@ function connectToServer() {
 
     G.socket.on('init', (spawnPos) => {
         if (G.yawObject) {
-            G.yawObject.position.set(spawnPos.x || 0, 3.5, spawnPos.z || 30);
+            G.yawObject.position.set(spawnPos.x || 0, window.GameConfig.EYE_HEIGHT, spawnPos.z || 30);
             G.playerVelocity.set(0, 0, 0);
         }
         G.hp = 100; G.armor = 100;
