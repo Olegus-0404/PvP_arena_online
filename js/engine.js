@@ -1,4 +1,4 @@
- // ============================================================================
+// ============================================================================
 // ENGINE: three.js сцена, камера, рендерер, физика, игровой цикл.
 // ============================================================================
 
@@ -17,11 +17,26 @@ function initEngine() {
     G.camera = new THREE.PerspectiveCamera(75, size.w / size.h, 0.1, 1000);
     G.pitchObject.add(G.camera);
     G.yawObject.add(G.pitchObject);
-    G.yawObject.position.set(0, 3.5, 0);
+    G.yawObject.position.set(0, window.GameConfig.EYE_HEIGHT, 0);
     G.scene.add(G.yawObject);
 
     G.renderer = new THREE.WebGLRenderer({ antialias: true });
-    G.renderer.setPixelRatio(window.devicePixelRatio || 1);
+    // Ограничиваем плотность пикселей — полное devicePixelRatio на телефоне
+    // (часто 3+) рендерит в разы больше пикселей, чем реально видно, и жрёт
+    // FPS почти без пользы на маленьком экране. 1.5 — разумный компромисс
+    // между чёткостью и производительностью (условно "480p"-бюджет).
+    G.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+
+    // Правильная цветопередача под PBR-материалы (metalness/roughness из
+    // glTF без этого выглядят блёкло) + киношный tone mapping вместо
+    // плоского линейного — сразу заметнее контраст и блики
+    G.renderer.outputEncoding = THREE.sRGBEncoding;
+    G.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    G.renderer.toneMappingExposure = 1.0;
+
+    // Лёгкие тени — только от солнца, невысокое разрешение карты теней
+    G.renderer.shadowMap.enabled = true;
+    G.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     // КЛЮЧЕВОЙ ФИКС ЧЁРНОЙ ОБЛАСТИ:
     // Раньше канвасу выставлялся фиксированный пиксельный размер через
@@ -44,6 +59,15 @@ function initEngine() {
     G.scene.add(new THREE.HemisphereLight(0xddeeff, 0x334422, 1.1));
     const sun = new THREE.DirectionalLight(0xffffff, 0.9);
     sun.position.set(50, 80, 30);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.left = -110;
+    sun.shadow.camera.right = 110;
+    sun.shadow.camera.top = 110;
+    sun.shadow.camera.bottom = -110;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 250;
+    sun.shadow.bias = -0.0015;
     G.scene.add(sun);
     const fill = new THREE.DirectionalLight(0xffffff, 0.35);
     fill.position.set(-40, 50, -30);
@@ -83,11 +107,18 @@ function loadMap() {
 
             G.scene.add(gltf.scene);
 
-            // Собираем все меши карты для рейкаста земли под ногами
+            // Собираем все меши карты для рейкаста земли под ногами +
+            // включаем тени (отбрасывание и приём) на всей геометрии карты
             G.mapMeshes = [];
             gltf.scene.traverse((obj) => {
-                if (obj.isMesh) G.mapMeshes.push(obj);
+                if (obj.isMesh) {
+                    G.mapMeshes.push(obj);
+                    obj.castShadow = true;
+                    obj.receiveShadow = true;
+                }
             });
+
+            applyEnvironmentReflections();
         },
         undefined,
         (err) => console.error('Не удалось загрузить карту:', err)
@@ -96,6 +127,50 @@ function loadMap() {
 
 const groundRaycaster = new THREE.Raycaster();
 let groundRaycastErrorLogged = false;
+
+// Генерирует НЕЙТРАЛЬНУЮ карту окружения для бликов на металле — отдельная
+// процедурная "студийная" сфера (светлое небо сверху, тёмный низ), а НЕ
+// сама тёмная игровая сцена. Раньше карта окружения строилась из самой
+// сцены — тёмный фон отражался сам в себя и материалы темнели ещё больше
+// (петля затемнения). Теперь источник бликов — независимый и стабильно
+// светлый, поэтому металл бликует, а не гаснет в чёрное.
+function buildNeutralEnvironmentScene() {
+    const geometry = new THREE.SphereGeometry(60, 24, 16);
+    const position = geometry.attributes.position;
+    const colors = [];
+    const topColor = new THREE.Color(0xcfe0ff);
+    const bottomColor = new THREE.Color(0x4a4f45);
+    const tmp = new THREE.Vector3();
+
+    for (let i = 0; i < position.count; i++) {
+        tmp.set(position.getX(i), position.getY(i), position.getZ(i)).normalize();
+        const t = THREE.MathUtils.clamp(tmp.y * 0.5 + 0.5, 0, 1);
+        const c = bottomColor.clone().lerp(topColor, t);
+        colors.push(c.r, c.g, c.b);
+    }
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    const material = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide });
+    const sphere = new THREE.Mesh(geometry, material);
+
+    const envScene = new THREE.Scene();
+    envScene.add(sphere);
+    return envScene;
+}
+
+function applyEnvironmentReflections() {
+    const G = window.Game;
+    try {
+        const pmremGenerator = new THREE.PMREMGenerator(G.renderer);
+        pmremGenerator.compileEquirectangularShader();
+        const envScene = buildNeutralEnvironmentScene();
+        const envRT = pmremGenerator.fromScene(envScene, 0.04);
+        G.scene.environment = envRT.texture;
+        pmremGenerator.dispose();
+    } catch (err) {
+        console.warn('Не удалось построить карту окружения для отражений:', err);
+    }
+}
 
 // Рейкаст вниз по реальной геометрии карты — рельеф неровный (терраин
 // от -0.6 до 6.9 по высоте), поэтому фиксированный groundLevel не подходит.
@@ -185,7 +260,7 @@ function animate() {
     G.yawObject.position.z += moveVector.z * G.moveSpeed * delta;
     G.yawObject.position.y += G.playerVelocity.y * delta;
 
-    const eyeOffset = G.isCrouching ? 2.2 : 3.0;
+    const eyeOffset = G.isCrouching ? C.EYE_HEIGHT_CROUCH : C.EYE_HEIGHT;
     const groundY = getGroundHeight(G.yawObject.position.x, G.yawObject.position.z);
     const groundLevel = groundY + eyeOffset;
     if (G.yawObject.position.y <= groundLevel) {
