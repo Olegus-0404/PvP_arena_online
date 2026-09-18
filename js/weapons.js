@@ -51,7 +51,7 @@ function raycastOtherPlayers(maxDist) {
     const dir = new THREE.Vector3();
     G.camera.getWorldDirection(dir);
 
-    const HIT_RADIUS = 1.3;
+    const HIT_RADIUS = window.GameConfig.HIT_RADIUS;
     let closest = null;
     let closestDist = Infinity;
 
@@ -60,7 +60,7 @@ function raycastOtherPlayers(maxDist) {
         const p = G.otherPlayers[id];
         if (!p || p.hp <= 0) continue;
 
-        const targetPos = new THREE.Vector3(p.x, 3.5, p.z);
+        const targetPos = new THREE.Vector3(p.x, window.GameConfig.HIT_CENTER_Y, p.z);
         const toTarget = targetPos.clone().sub(origin);
         const along = toTarget.dot(dir);
         if (along <= 0 || along > maxDist) continue;
