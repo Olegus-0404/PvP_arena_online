@@ -35,6 +35,9 @@ const spawnPointsByTeam = {
     ]
 };
 
+// Лобби убрали — все игроки всегда в одной общей комнате
+const ROOM_NAME = 'public_match';
+
 const ROUND_DURATION_MS = 3 * 60 * 1000; // 3 минуты
 const TOTAL_ROUNDS = 5;
 
@@ -163,8 +166,7 @@ function applyDamageToPlayer(target, amount, shooter = null) {
 io.on('connection', (socket) => {
     const query = socket.handshake.query;
     let nick = query.nick ? query.nick.trim() : "Боец_" + socket.id.substr(0, 3);
-    const lobbyId = query.lobby ? query.lobby.trim() : '';
-    const roomName = lobbyId ? `lobby_${lobbyId}` : 'public_match';
+    const roomName = ROOM_NAME;
 
     ensureRoom(roomName);
     const team = assignTeam(roomName);
