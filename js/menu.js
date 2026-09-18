@@ -1,11 +1,9 @@
 // ============================================================================
-// MENU: главное меню + экран настроек (прицел, сервера, лобби, выход)
+// MENU: главное меню + экран настроек (прицел, выход в меню, HUD)
+// Выбор сервера и лобби убраны — один общий постоянный сервер для всех.
 // ============================================================================
 
 const CROSSHAIR_KEY = 'arenaCrosshair';
-const SERVERS_KEY = 'arenaServers';
-const SELECTED_SERVER_KEY = 'arenaSelectedServerUrl';
-const LOBBY_CODE_KEY = 'arenaLobbyCode';
 
 // --- ПРИЦЕЛ ---
 function loadCrosshairSettings() {
@@ -51,35 +49,6 @@ function applyCrosshairSettings(settings) {
         el.style.border = 'none';
         el.style.borderRadius = '50%';
     }
-}
-
-// --- СЕРВЕРА ---
-function loadServerList() {
-    try {
-        const saved = JSON.parse(localStorage.getItem(SERVERS_KEY) || 'null');
-        if (saved && saved.length) return saved;
-    } catch (e) { /* ignore */ }
-    return [{ name: 'Основной сервер', url: window.Game.SERVER_URL }];
-}
-
-function saveServerList(list) {
-    localStorage.setItem(SERVERS_KEY, JSON.stringify(list));
-}
-
-function populateServerSelect() {
-    const select = document.getElementById('server-select');
-    if (!select) return;
-    const list = loadServerList();
-    const selectedUrl = localStorage.getItem(SELECTED_SERVER_KEY);
-
-    select.innerHTML = '';
-    list.forEach((s) => {
-        const opt = document.createElement('option');
-        opt.value = s.url;
-        opt.textContent = s.name;
-        select.appendChild(opt);
-    });
-    if (selectedUrl) select.value = selectedUrl;
 }
 
 // --- ГЛАВНОЕ МЕНЮ / НАСТРОЙКИ ---
@@ -132,12 +101,6 @@ function exitToMainMenu() {
 }
 
 function initMenus() {
-    populateServerSelect();
-
-    const savedLobby = localStorage.getItem(LOBBY_CODE_KEY);
-    const lobbyInput = document.getElementById('lobby-code');
-    if (savedLobby && lobbyInput) lobbyInput.value = savedLobby;
-
     const cross = loadCrosshairSettings();
     const styleEl = document.getElementById('crosshair-style');
     const colorEl = document.getElementById('crosshair-color');
@@ -150,15 +113,6 @@ function initMenus() {
     document.getElementById('btn-play')?.addEventListener('click', () => {
         hideMainMenu();
         document.body.classList.remove('in-menu');
-
-        const G = window.Game;
-        const select = document.getElementById('server-select');
-        if (select && select.value) G.SERVER_URL = select.value;
-
-        const lobby = (document.getElementById('lobby-code')?.value || '').trim();
-        G.currentLobby = lobby;
-        localStorage.setItem(LOBBY_CODE_KEY, lobby);
-
         connectToServer();
     });
 
@@ -197,29 +151,6 @@ function initMenus() {
             saveCrosshairSettings(settings);
             applyCrosshairSettings(settings);
         });
-    });
-
-    document.getElementById('btn-add-server')?.addEventListener('click', () => {
-        const input = document.getElementById('new-server-url');
-        const url = input.value.trim();
-        if (!url) return;
-        const list = loadServerList();
-        list.push({ name: url, url });
-        saveServerList(list);
-        input.value = '';
-        populateServerSelect();
-    });
-
-    document.getElementById('server-select')?.addEventListener('change', (e) => {
-        localStorage.setItem(SELECTED_SERVER_KEY, e.target.value);
-    });
-
-    document.getElementById('btn-create-lobby')?.addEventListener('click', () => {
-        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-        const input = document.getElementById('lobby-code');
-        if (input) input.value = code;
-        localStorage.setItem(LOBBY_CODE_KEY, code);
-        alert(`Лобби создано! Код: ${code}\nПередай его другу — он должен ввести этот же код в настройках перед входом в игру.`);
     });
 
     setupProfileUI();
