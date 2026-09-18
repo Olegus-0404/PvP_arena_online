@@ -52,7 +52,16 @@ window.GameConfig = {
         knife: { name: "Нож", damage: 45, fireRate: 500, ammo: Infinity, maxReserve: 0, range: 2.8 },
         glock: { name: "Glock", damage: 22, fireRate: 260, ammo: 17, maxReserve: 51, range: 120 },
         rifle: { name: "АК-47", damage: 34, fireRate: 110, ammo: 30, maxReserve: 120, range: 150 }
-    }
+    },
+    // Рост модели бойца (soldier_stalker.glb / soldier_military.glb) — 1.87
+    // юнита от земли до макушки (посчитано по реальной иерархии костей).
+    // Раньше глаза стояли на 3.0 — почти вдвое выше персонажа, отсюда и
+    // "маленькие игроки", и ощущение расплющенной карты (камера смотрела
+    // на местность будто с ходуль).
+    EYE_HEIGHT: 1.7,
+    EYE_HEIGHT_CROUCH: 1.1,
+    HIT_CENTER_Y: 1.0,
+    HIT_RADIUS: 0.45
 };
 
 window.gameSettings = window.gameSettings || { sensitivity: 0.0035 };
