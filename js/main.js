@@ -1,366 +1,134 @@
 // ============================================================================
 // MAIN
-// Надёжный запуск PvP Arena Online
+// Только запуск игры.
 // ============================================================================
 
-window.addEventListener('DOMContentLoaded', function () {
+window.addEventListener('DOMContentLoaded', () => {
 
-    console.log('[MAIN] DOM загружен');
-
-    const G = window.Game;
-
-    // ------------------------------------------------------------------------
-    // АВТОРИЗАЦИЯ
-    // Подключаем СРАЗУ, до запуска движка
-    // ------------------------------------------------------------------------
-
-    const authScreen =
-        document.getElementById('auth-screen');
-
-    const mainMenu =
-        document.getElementById('main-menu');
-
-    const authButton =
-        document.getElementById('btn-auth');
-
-    const nickInput =
-        document.getElementById('input-email');
-
-    const authStatus =
-        document.getElementById('auth-status');
-
-
-    if (authButton) {
-
-        authButton.addEventListener(
-            'click',
-            function () {
-
-                const nick =
-                    nickInput
-                        ? nickInput.value.trim()
-                        : '';
-
-                if (!nick) {
-
-                    if (authStatus) {
-                        authStatus.innerText =
-                            'Введите никнейм';
-                    }
-
-                    return;
-                }
-
-                console.log(
-                    '[AUTH] Вход:',
-                    nick
-                );
-
-                // Сохраняем ник
-                G.myNick =
-                    nick;
-
-                localStorage.setItem(
-                    'stalker_nick',
-                    nick
-                );
-
-                // Сохраняем профиль,
-                // если profile.js уже загрузился
-                try {
-
-                    if (
-                        typeof loadProfile ===
-                        'function' &&
-                        typeof saveProfile ===
-                        'function'
-                    ) {
-
-                        const profile =
-                            loadProfile();
-
-                        if (!profile.nick) {
-
-                            profile.nick =
-                                nick;
-
-                            saveProfile(
-                                profile
-                            );
-                        }
-                    }
-
-                } catch (error) {
-
-                    console.error(
-                        '[AUTH] Ошибка профиля:',
-                        error
-                    );
-                }
-
-                // Скрываем авторизацию
-                if (authScreen) {
-                    authScreen.style.display =
-                        'none';
-                }
-
-                // Показываем главное меню
-                if (mainMenu) {
-                    mainMenu.style.display =
-                        'flex';
-                }
-
-                document.body.classList.add(
-                    'in-menu'
-                );
-
-                // Обновляем ник в меню
-                const nickDisplay =
-                    document.getElementById(
-                        'menu-nick-display'
-                    );
-
-                if (nickDisplay) {
-                    nickDisplay.innerText =
-                        nick;
-                }
-
-                console.log(
-                    '[AUTH] Главное меню открыто'
-                );
-            }
-        );
-
-    } else {
-
-        console.error(
-            '[AUTH] Кнопка btn-auth не найдена'
-        );
-    }
-
-
-    // ------------------------------------------------------------------------
-    // НАСТРОЙКИ
-    // ------------------------------------------------------------------------
+    console.log('[MAIN] Запуск PvP Arena Online');
 
     try {
-
         if (
-            typeof initGameSettings ===
-            'function'
+            typeof initGameSettings === 'function'
         ) {
             initGameSettings();
         }
-
-    } catch (error) {
-
-        console.error(
-            '[MAIN] Settings:',
-            error
-        );
+    } catch (e) {
+        console.error('[MAIN] Settings:', e);
     }
 
-
-    // ------------------------------------------------------------------------
-    // ENGINE
-    // Ошибка движка НЕ должна ломать меню
-    // ------------------------------------------------------------------------
-
     try {
-
         if (
-            typeof initEngine ===
-            'function'
+            typeof initEngine === 'function'
         ) {
-
             initEngine();
-
-            console.log(
-                '[MAIN] Engine запущен'
-            );
         }
-
-    } catch (error) {
-
-        console.error(
-            '[MAIN] Ошибка engine:',
-            error
-        );
+    } catch (e) {
+        console.error('[MAIN] Engine:', e);
     }
 
-
-    // ------------------------------------------------------------------------
-    // CONTROLS
-    // ------------------------------------------------------------------------
-
     try {
-
         if (
-            typeof setupControls ===
-            'function'
+            typeof setupControls === 'function'
         ) {
-
             setupControls();
         }
-
-    } catch (error) {
-
-        console.error(
-            '[MAIN] Ошибка controls:',
-            error
-        );
+    } catch (e) {
+        console.error('[MAIN] Controls:', e);
     }
 
-
     try {
-
         if (
-            typeof setupTouchControls ===
-            'function'
+            typeof setupTouchControls === 'function'
         ) {
-
             setupTouchControls();
         }
-
-    } catch (error) {
-
-        console.error(
-            '[MAIN] Ошибка touch controls:',
-            error
-        );
+    } catch (e) {
+        console.error('[MAIN] Touch:', e);
     }
 
-
-    // ------------------------------------------------------------------------
-    // UI
-    // ------------------------------------------------------------------------
+    try {
+        if (
+            typeof setupAuthUI === 'function'
+        ) {
+            setupAuthUI();
+        }
+    } catch (e) {
+        console.error('[MAIN] Auth:', e);
+    }
 
     try {
-
         if (
-            typeof setupRespawnUI ===
-            'function'
+            typeof setupRespawnUI === 'function'
         ) {
-
             setupRespawnUI();
         }
-
-    } catch (error) {
-
-        console.error(
-            '[MAIN] Ошибка respawn:',
-            error
-        );
+    } catch (e) {
+        console.error('[MAIN] Respawn:', e);
     }
 
-
-    // ------------------------------------------------------------------------
-    // КАМЕРА
-    // ------------------------------------------------------------------------
-
     try {
-
         if (
-            typeof setupCameraLook ===
-            'function'
+            typeof setupCameraLook === 'function'
         ) {
-
             setupCameraLook();
         }
-
-    } catch (error) {
-
-        console.error(
-            '[MAIN] Ошибка камеры:',
-            error
-        );
+    } catch (e) {
+        console.error('[MAIN] Camera:', e);
     }
-
-
-    // ------------------------------------------------------------------------
-    // МЕНЮ
-    // ------------------------------------------------------------------------
 
     try {
-
         if (
-            typeof initMenus ===
-            'function'
+            typeof initMenus === 'function'
         ) {
-
             initMenus();
-
-            console.log(
-                '[MAIN] Меню подключено'
-            );
         }
-
-    } catch (error) {
-
-        console.error(
-            '[MAIN] Ошибка меню:',
-            error
-        );
+    } catch (e) {
+        console.error('[MAIN] Menu:', e);
     }
 
-
     // ------------------------------------------------------------------------
-    // ЕСЛИ НИК УЖЕ СОХРАНЁН
+    // Автоматический вход для уже сохранённого ника
     // ------------------------------------------------------------------------
 
     try {
 
         const savedNick =
-            localStorage.getItem(
-                'stalker_nick'
-            );
+            localStorage.getItem('stalker_nick');
 
         if (
             savedNick &&
             savedNick.trim()
         ) {
 
-            G.myNick =
+            window.Game.myNick =
                 savedNick.trim();
+
+            const authScreen =
+                document.getElementById(
+                    'auth-screen'
+                );
 
             if (authScreen) {
                 authScreen.style.display =
                     'none';
             }
 
-            if (mainMenu) {
-                mainMenu.style.display =
-                    'flex';
+            if (
+                typeof showMainMenu ===
+                'function'
+            ) {
+                showMainMenu();
             }
-
-            document.body.classList.add(
-                'in-menu'
-            );
-
-            const nickDisplay =
-                document.getElementById(
-                    'menu-nick-display'
-                );
-
-            if (nickDisplay) {
-                nickDisplay.innerText =
-                    savedNick;
-            }
-
-            console.log(
-                '[MAIN] Сохранённый ник:',
-                savedNick
-            );
         }
 
-    } catch (error) {
+    } catch (e) {
 
         console.error(
-            '[MAIN] Ошибка восстановления ника:',
-            error
+            '[MAIN] Saved login:',
+            e
         );
     }
-
 
     console.log(
         '[MAIN] Инициализация завершена'
