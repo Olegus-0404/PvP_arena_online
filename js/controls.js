@@ -1,9 +1,10 @@
 // ============================================================================
 // CONTROLS
-// Клавиатура + мобильный джойстик + игровые кнопки
+// Ходьба + прыжок + приседание + мобильный ввод
 // ============================================================================
 
 function setupControls() {
+
     const G = window.Game;
 
     G.keys = {
@@ -15,91 +16,123 @@ function setupControls() {
         crouch: false
     };
 
-    window.addEventListener('keydown', function(e) {
+    // ------------------------------------------------------------------------
+    // КЛАВИАТУРА
+    // ------------------------------------------------------------------------
 
-        if (document.body.classList.contains('hud-edit-mode')) {
-            return;
+    window.addEventListener(
+        'keydown',
+        function(e) {
+
+            if (
+                document.body.classList.contains(
+                    'hud-edit-mode'
+                )
+            ) {
+                return;
+            }
+
+            switch (e.code) {
+
+                case 'KeyW':
+                case 'ArrowUp':
+                    G.keys.forward = true;
+                    break;
+
+                case 'KeyS':
+                case 'ArrowDown':
+                    G.keys.backward = true;
+                    break;
+
+                case 'KeyA':
+                case 'ArrowLeft':
+                    G.keys.left = true;
+                    break;
+
+                case 'KeyD':
+                case 'ArrowRight':
+                    G.keys.right = true;
+                    break;
+
+                case 'Space':
+                    G.keys.jump = true;
+                    break;
+
+                case 'KeyC':
+                    G.keys.crouch = true;
+                    break;
+            }
+
+            updateKeyboardMovement();
         }
+    );
 
-        switch (e.code) {
 
-            case 'KeyW':
-            case 'ArrowUp':
-                G.keys.forward = true;
-                break;
+    window.addEventListener(
+        'keyup',
+        function(e) {
 
-            case 'KeyS':
-            case 'ArrowDown':
-                G.keys.backward = true;
-                break;
+            switch (e.code) {
 
-            case 'KeyA':
-            case 'ArrowLeft':
-                G.keys.left = true;
-                break;
+                case 'KeyW':
+                case 'ArrowUp':
+                    G.keys.forward = false;
+                    break;
 
-            case 'KeyD':
-            case 'ArrowRight':
-                G.keys.right = true;
-                break;
+                case 'KeyS':
+                case 'ArrowDown':
+                    G.keys.backward = false;
+                    break;
 
-            case 'Space':
-                G.keys.jump = true;
-                break;
+                case 'KeyA':
+                case 'ArrowLeft':
+                    G.keys.left = false;
+                    break;
 
-            case 'KeyC':
-                G.keys.crouch = true;
-                break;
+                case 'KeyD':
+                case 'ArrowRight':
+                    G.keys.right = false;
+                    break;
+
+                case 'Space':
+                    G.keys.jump = false;
+                    break;
+
+                case 'KeyC':
+                    G.keys.crouch = false;
+                    break;
+            }
+
+            updateKeyboardMovement();
         }
+    );
 
-        updateKeyboardMovement();
-    });
 
-    window.addEventListener('keyup', function(e) {
+    // ------------------------------------------------------------------------
+    // Если окно потеряло фокус
+    // ------------------------------------------------------------------------
 
-        switch (e.code) {
+    window.addEventListener(
+        'blur',
+        function() {
 
-            case 'KeyW':
-            case 'ArrowUp':
-                G.keys.forward = false;
-                break;
+            G.keys.forward = false;
+            G.keys.backward = false;
+            G.keys.left = false;
+            G.keys.right = false;
+            G.keys.jump = false;
+            G.keys.crouch = false;
 
-            case 'KeyS':
-            case 'ArrowDown':
-                G.keys.backward = false;
-                break;
+            G.moveDirection.forward = 0;
+            G.moveDirection.right = 0;
 
-            case 'KeyA':
-            case 'ArrowLeft':
-                G.keys.left = false;
-                break;
-
-            case 'KeyD':
-            case 'ArrowRight':
-                G.keys.right = false;
-                break;
-
-            case 'Space':
-                G.keys.jump = false;
-                break;
-
-            case 'KeyC':
-                G.keys.crouch = false;
-                break;
+            if (
+                typeof setCrouch === 'function'
+            ) {
+                setCrouch(false);
+            }
         }
-
-        updateKeyboardMovement();
-    });
-
-    window.addEventListener('blur', function() {
-
-        Object.keys(G.keys).forEach(function(key) {
-            G.keys[key] = false;
-        });
-
-        G.moveDirection.forward = 0;
-        G.moveDirection.right = 0;
-    });
+    );
 }
 
 
@@ -112,37 +145,73 @@ function updateKeyboardMovement() {
     const G = window.Game;
 
     if (
-        document.body.classList.contains('hud-edit-mode') ||
-        G.inputLocked
+        document.body.classList.contains(
+            'hud-edit-mode'
+        )
     ) {
+
         G.moveDirection.forward = 0;
         G.moveDirection.right = 0;
+
+        return;
+    }
+
+    if (
+        G.inputLocked
+    ) {
+
+        G.moveDirection.forward = 0;
+        G.moveDirection.right = 0;
+
         return;
     }
 
     let forward = 0;
     let right = 0;
 
-    if (G.keys.forward) forward += 1;
-    if (G.keys.backward) forward -= 1;
+    if (G.keys.forward) {
+        forward += 1;
+    }
 
-    if (G.keys.right) right += 1;
-    if (G.keys.left) right -= 1;
+    if (G.keys.backward) {
+        forward -= 1;
+    }
 
-    G.moveDirection.forward = forward;
-    G.moveDirection.right = right;
+    if (G.keys.right) {
+        right += 1;
+    }
+
+    if (G.keys.left) {
+        right -= 1;
+    }
+
+    G.moveDirection.forward =
+        forward;
+
+    G.moveDirection.right =
+        right;
+
+
+    // Прыжок
 
     if (
         G.keys.jump &&
         G.isGrounded
     ) {
+
         jumpPlayer();
+
         G.keys.jump = false;
     }
 
+
+    // Приседание
+
     if (
-        typeof setCrouch === 'function'
+        typeof setCrouch ===
+        'function'
     ) {
+
         setCrouch(
             G.keys.crouch
         );
@@ -158,73 +227,20 @@ function setupTouchControls() {
 
     setupJoystick();
 
-    setupGameButton(
-        'btn-jump',
-        function() {
-            if (
-                document.body.classList.contains(
-                    'hud-edit-mode'
-                )
-            ) {
-                return;
-            }
+    setupJumpButton();
 
-            jumpPlayer();
-        }
-    );
-
-    setupGameButton(
-        'btn-crouch',
-        function() {
-
-            if (
-                document.body.classList.contains(
-                    'hud-edit-mode'
-                )
-            ) {
-                return;
-            }
-
-            const G = window.Game;
-
-            G.isCrouching =
-                !G.isCrouching;
-
-            if (
-                typeof setCrouch === 'function'
-            ) {
-                setCrouch(
-                    G.isCrouching
-                );
-            }
-        }
-    );
-
-    /*
-     * Кнопки перезарядки/прочих действий
-     * передаём существующей игровой логике,
-     * если она есть.
-     */
-
-    setupActionButton(
-        'btn-reload',
-        'reload'
-    );
-
-    setupActionButton(
-        'btn-fire',
-        'fire'
-    );
+    setupCrouchButton();
 }
 
 
 // ============================================================================
-// JOYSTICK
+// МОБИЛЬНЫЙ ДЖОЙСТИК
 // ============================================================================
 
 function setupJoystick() {
 
-    const G = window.Game;
+    const G =
+        window.Game;
 
     const zone =
         document.getElementById(
@@ -240,20 +256,29 @@ function setupJoystick() {
         !zone ||
         !stick
     ) {
+
         console.warn(
-            '[JOYSTICK] Элементы не найдены'
+            '[JOYSTICK] Не найдены joystick-zone или joystick-stick'
         );
+
         return;
     }
 
-    let activePointerId = null;
+
+    let activePointerId =
+        null;
 
     let centerX = 0;
     let centerY = 0;
 
-    let maxDistance = 0;
+    let maxDistance = 1;
 
-    function calculateCenter() {
+
+    // ------------------------------------------------------------------------
+    // Центр джойстика
+    // ------------------------------------------------------------------------
+
+    function updateJoystickGeometry() {
 
         const rect =
             zone.getBoundingClientRect();
@@ -269,12 +294,19 @@ function setupJoystick() {
         maxDistance =
             Math.max(
                 1,
-                rect.width / 2 -
+                Math.min(
+                    rect.width,
+                    rect.height
+                ) / 2 -
                 stick.offsetWidth / 2 -
                 5
             );
     }
 
+
+    // ------------------------------------------------------------------------
+    // Сброс
+    // ------------------------------------------------------------------------
 
     function resetJoystick() {
 
@@ -292,6 +324,10 @@ function setupJoystick() {
     }
 
 
+    // ------------------------------------------------------------------------
+    // Движение стика
+    // ------------------------------------------------------------------------
+
     function moveJoystick(
         clientX,
         clientY
@@ -302,16 +338,22 @@ function setupJoystick() {
                 'hud-edit-mode'
             )
         ) {
+
             resetJoystick();
+
             return;
         }
+
 
         if (
             G.inputLocked
         ) {
+
             resetJoystick();
+
             return;
         }
+
 
         let dx =
             clientX -
@@ -321,11 +363,13 @@ function setupJoystick() {
             clientY -
             centerY;
 
+
         const distance =
-            Math.sqrt(
-                dx * dx +
-                dy * dy
+            Math.hypot(
+                dx,
+                dy
             );
+
 
         if (
             distance >
@@ -340,12 +384,14 @@ function setupJoystick() {
             dy *= scale;
         }
 
+
         stick.style.transform =
             'translate(' +
             dx +
             'px, ' +
             dy +
             'px)';
+
 
         const normalizedX =
             dx /
@@ -355,10 +401,6 @@ function setupJoystick() {
             dy /
             maxDistance;
 
-        /*
-         * Y вниз на экране,
-         * поэтому вперёд = отрицательный Y.
-         */
 
         G.moveDirection.right =
             Math.max(
@@ -368,6 +410,7 @@ function setupJoystick() {
                     normalizedX
                 )
             );
+
 
         G.moveDirection.forward =
             Math.max(
@@ -379,6 +422,10 @@ function setupJoystick() {
             );
     }
 
+
+    // ------------------------------------------------------------------------
+    // НАЖАТИЕ
+    // ------------------------------------------------------------------------
 
     zone.addEventListener(
         'pointerdown',
@@ -398,24 +445,32 @@ function setupJoystick() {
                 return;
             }
 
-            /*
-             * Не даём камере получать
-             * этот Pointer Event.
-             */
+            if (
+                activePointerId !== null
+            ) {
+                return;
+            }
+
 
             e.preventDefault();
             e.stopPropagation();
 
-            calculateCenter();
+
+            updateJoystickGeometry();
+
 
             activePointerId =
                 e.pointerId;
 
+
             try {
+
                 zone.setPointerCapture(
                     e.pointerId
                 );
+
             } catch (_) {}
+
 
             moveJoystick(
                 e.clientX,
@@ -427,6 +482,10 @@ function setupJoystick() {
         }
     );
 
+
+    // ------------------------------------------------------------------------
+    // ДВИЖЕНИЕ
+    // ------------------------------------------------------------------------
 
     zone.addEventListener(
         'pointermove',
@@ -439,8 +498,10 @@ function setupJoystick() {
                 return;
             }
 
+
             e.preventDefault();
             e.stopPropagation();
+
 
             moveJoystick(
                 e.clientX,
@@ -453,7 +514,13 @@ function setupJoystick() {
     );
 
 
-    function endPointer(e) {
+    // ------------------------------------------------------------------------
+    // ОТПУСКАНИЕ
+    // ------------------------------------------------------------------------
+
+    function finishJoystick(
+        e
+    ) {
 
         if (
             e.pointerId !==
@@ -462,14 +529,19 @@ function setupJoystick() {
             return;
         }
 
+
         e.preventDefault();
         e.stopPropagation();
 
+
         try {
+
             zone.releasePointerCapture(
                 e.pointerId
             );
+
         } catch (_) {}
+
 
         resetJoystick();
     }
@@ -477,43 +549,62 @@ function setupJoystick() {
 
     zone.addEventListener(
         'pointerup',
-        endPointer,
+        finishJoystick,
         {
             passive: false
         }
     );
 
+
     zone.addEventListener(
         'pointercancel',
-        endPointer,
+        finishJoystick,
         {
             passive: false
         }
     );
+
 
     zone.addEventListener(
         'lostpointercapture',
         function() {
 
-            if (
-                activePointerId !== null
-            ) {
-                resetJoystick();
-            }
+            resetJoystick();
         }
     );
 
 
-    /*
-     * На старых Android-браузерах
-     * pointercancel иногда приходит
-     * при уходе пальца с экрана.
-     */
+    // ------------------------------------------------------------------------
+    // Изменение размера экрана
+    // ------------------------------------------------------------------------
+
+    window.addEventListener(
+        'resize',
+        updateJoystickGeometry
+    );
+
+
+    window.addEventListener(
+        'orientationchange',
+        function() {
+
+            setTimeout(
+                updateJoystickGeometry,
+                200
+            );
+        }
+    );
+
+
+    // ------------------------------------------------------------------------
+    // Смена вкладки / блокировка экрана
+    // ------------------------------------------------------------------------
 
     window.addEventListener(
         'blur',
         resetJoystick
     );
+
 
     document.addEventListener(
         'visibilitychange',
@@ -522,32 +613,37 @@ function setupJoystick() {
             if (
                 document.hidden
             ) {
+
                 resetJoystick();
             }
         }
     );
 
+
+    updateJoystickGeometry();
+
+
     console.log(
-        '[JOYSTICK] Pointer Events активированы'
+        '[JOYSTICK] Мобильный джойстик запущен'
     );
 }
 
 
 // ============================================================================
-// ОБЫЧНАЯ ИГРОВАЯ КНОПКА
+// КНОПКА ПРЫЖКА
 // ============================================================================
 
-function setupGameButton(
-    id,
-    callback
-) {
+function setupJumpButton() {
 
     const button =
-        document.getElementById(id);
+        document.getElementById(
+            'btn-jump'
+        );
 
     if (!button) {
         return;
     }
+
 
     button.addEventListener(
         'pointerdown',
@@ -564,138 +660,70 @@ function setupGameButton(
             e.preventDefault();
             e.stopPropagation();
 
+
+            jumpPlayer();
+
+        },
+        {
+            passive: false
+        }
+    );
+}
+
+
+// ============================================================================
+// КНОПКА ПРИСЕДАНИЯ
+// ============================================================================
+
+function setupCrouchButton() {
+
+    const button =
+        document.getElementById(
+            'btn-crouch'
+        );
+
+    if (!button) {
+        return;
+    }
+
+
+    button.addEventListener(
+        'pointerdown',
+        function(e) {
+
             if (
-                typeof callback ===
+                document.body.classList.contains(
+                    'hud-edit-mode'
+                )
+            ) {
+                return;
+            }
+
+            e.preventDefault();
+            e.stopPropagation();
+
+
+            const G =
+                window.Game;
+
+
+            G.isCrouching =
+                !G.isCrouching;
+
+
+            if (
+                typeof setCrouch ===
                 'function'
             ) {
-                callback();
-            }
-        },
-        {
-            passive: false
-        }
-    );
-}
 
-
-// ============================================================================
-// ACTION BUTTON
-// ============================================================================
-
-function setupActionButton(
-    id,
-    action
-) {
-
-    const button =
-        document.getElementById(id);
-
-    if (!button) {
-        return;
-    }
-
-    let held = false;
-
-
-    button.addEventListener(
-        'pointerdown',
-        function(e) {
-
-            if (
-                document.body.classList.contains(
-                    'hud-edit-mode'
-                )
-            ) {
-                return;
-            }
-
-            e.preventDefault();
-            e.stopPropagation();
-
-            held = true;
-
-            try {
-                button.setPointerCapture(
-                    e.pointerId
+                setCrouch(
+                    G.isCrouching
                 );
-            } catch (_) {}
-
-            if (
-                action === 'reload'
-            ) {
-
-                if (
-                    typeof reloadWeapon ===
-                    'function'
-                ) {
-                    reloadWeapon();
-                }
-
-                return;
             }
 
-            if (
-                action === 'fire'
-            ) {
-
-                if (
-                    typeof startFiring ===
-                    'function'
-                ) {
-                    startFiring();
-                }
-            }
         },
         {
             passive: false
-        }
-    );
-
-
-    button.addEventListener(
-        'pointerup',
-        function(e) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-            held = false;
-
-            if (
-                action === 'fire'
-            ) {
-
-                if (
-                    typeof stopFiring ===
-                    'function'
-                ) {
-                    stopFiring();
-                }
-            }
-        },
-        {
-            passive: false
-        }
-    );
-
-
-    button.addEventListener(
-        'pointercancel',
-        function() {
-
-            held = false;
-
-            if (
-                action === 'fire'
-            ) {
-
-                if (
-                    typeof stopFiring ===
-                    'function'
-                ) {
-                    stopFiring();
-                }
-            }
         }
     );
 }
@@ -707,7 +735,12 @@ function setupActionButton(
 
 function jumpPlayer() {
 
-    const G = window.Game;
+    const G =
+        window.Game;
+
+    const C =
+        window.GameConfig || {};
+
 
     if (
         document.body.classList.contains(
@@ -717,11 +750,13 @@ function jumpPlayer() {
         return;
     }
 
+
     if (
         G.inputLocked
     ) {
         return;
     }
+
 
     if (
         !G.isGrounded
@@ -729,19 +764,26 @@ function jumpPlayer() {
         return;
     }
 
-    const C =
-        window.GameConfig || {};
+
+    if (
+        !G.playerVelocity
+    ) {
+
+        G.playerVelocity =
+            new THREE.Vector3();
+    }
+
 
     const jumpPower =
         Number(
             C.JUMP_POWER
         ) || 8.5;
 
-    if (
-        !G.playerVelocity
-    ) {
-        G.playerVelocity =
-            new THREE.Vector3();
-    }
 
-    G
+    G.playerVelocity.y =
+        jumpPower;
+
+
+    G.isGrounded =
+        false;
+}
